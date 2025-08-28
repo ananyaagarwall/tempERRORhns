@@ -1,0 +1,38 @@
+:root {
+  --primary-black: #181818;
+  --primary-yellow: #FFD600;
+  --secondary-yellow: #FFEB3B;
+  --card-bg: #fff;
+  --text-light: #181818;
+  --text-dark: #181818;
+  --yellow-glow: 0 0 16px #FFD60088;
+  --primary-bg: #fff;
+  --secondary-bg: #fff;
+  --primary-text: #181818;
+  --accent-yellow: #FFD600;
+  --accent-gold: #FFC107;
+  --border-light: #FFD600;
+  --shadow: 0 4px 24px #FFD60022;
+}
+
+body {
+  font-family: 'Inter', Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  background-color: #fff;
+}
+
+.property-card {
+  background-color: #fff;
+  border-radius: 25px;
+  box-shadow: 0 4px 24px #FFD60022;
+  padding: 24px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.15s ease;
+}
+
+.property-card:hover {
+  transform: translateY(-8px) scale(1.02);
+  box-shadow: 0 25px 50px -8px rgba(0, 0, 0, 0.25);
+}
