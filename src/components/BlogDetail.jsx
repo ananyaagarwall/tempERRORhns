@@ -27,6 +27,7 @@ const BlogDetail = () => {
   const [blog, setBlog] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [aiSummary, setAiSummary] = useState('');
   const [activeSection, setActiveSection] = useState('section-1');
 
   // Function to handle scroll and update active section
@@ -55,6 +56,12 @@ const BlogDetail = () => {
       if (found) {
         setBlog(found);
         setNotFound(false);
+        // Fetch AI summary
+        axios.get(`http://localhost:5000/api/blogs/${slug}/summary`).then(summaryRes => {
+          setAiSummary(summaryRes.data.summary || '');
+        }).catch(() => {
+          setAiSummary('');
+        });
       } else {
         setNotFound(true);
       }
@@ -223,10 +230,10 @@ const BlogDetail = () => {
   className="text-white rounded-xl shadow p-5 hidden md:block"
   style={{ backgroundColor: '#0E1E68' }}
 >
-  <div className="font-bold text-lg mb-1">Short Title of article</div>
-  <div className="text-sm font-medium mb-1">One line summary sample - the Best AI and Data-Driven Customer Engagement Tool</div>
-  <div className="text-xs text-blue-100 mb-2">
-    The 2025 real estate market is rapidly evolving, shaped by emerging trends, technological advancements, and diverse opportunities for buyers, sellers, and investors. Navigating this landscape requires an understanding of local housing dynamics, from neighborhood amenities and school ratings to safety and commute options. First-time buyers benefit from clear guidance on budgeting, mortgage options, and legal steps, while sellers can maximize value through strategic home preparation and targeted marketing.
+  {/* AI summary will be rendered here */}
+  <div className="bg-blue-50 rounded-xl p-4 mb-4">
+    <div className="font-bold text-lg mb-2 text-blue-900">Blog Summary </div>
+    <div className="text-sm text-blue-900">{aiSummary ? aiSummary : 'Summary not available.'}</div>
   </div>
 </div>
 

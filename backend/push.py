@@ -16,17 +16,26 @@ Run:
 import os
 import sqlite3
 import random
-from datetime import datetime
+import json
+from datetime import datetime, date
+from slugify import slugify
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hns.db')
 
 
 AREAS = ["Thane", "Ghansoli", "Airoli", "Koparkharaine"]
 
-BUILDER_NAMES = [
-    "Shree Developers", "Omkar Constructions", "Rajdeep Realty", "Sai Infra",
-    "Mahadev Builders", "Anand Group", "Suryodaya Estates", "Navkar Realty",
-    "Krishna Constructions", "Pranav Developers",
+BUILDERS = [
+    {"name": "Shree Developers", "rera_id": "MH/RE/2024/000001"},
+    {"name": "Omkar Constructions", "rera_id": "MH/RE/2024/000002"},
+    {"name": "Rajdeep Realty", "rera_id": "MH/RE/2024/000003"},
+    {"name": "Sai Infra", "rera_id": "MH/RE/2024/000004"},
+    {"name": "Mahadev Builders", "rera_id": "MH/RE/2024/000005"},
+    {"name": "Anand Group", "rera_id": "MH/RE/2024/000006"},
+    {"name": "Suryodaya Estates", "rera_id": "MH/RE/2024/000007"},
+    {"name": "Navkar Realty", "rera_id": "MH/RE/2024/000008"},
+    {"name": "Krishna Constructions", "rera_id": "MH/RE/2024/000009"},
+    {"name": "Pranav Developers", "rera_id": "MH/RE/2024/000010"},
 ]
 
 TITLE_PREFIXES = [
@@ -61,9 +70,41 @@ def random_status() -> str:
 
 
 def random_property_type() -> tuple[str, str]:
-    pt = random.choice(["Residential", "Commercial", "Mixed"])
-    sub = random.choice(["Apartment", "Villa", "Office", "Shop"])
+    types = {
+        "Residential": ["Apartment", "Villa", "Penthouse", "Studio"],
+        "Commercial": ["Office", "Shop", "Retail", "Showroom"],
+        "Mixed": ["Live-Work", "Retail-Residential", "Office-Retail"]
+    }
+    pt = random.choice(list(types.keys()))
+    sub = random.choice(types[pt])
     return pt, sub
+
+def random_date(start_year=2024, end_year=2027):
+    month = random.randint(1, 12)
+    day = random.randint(1, 28)  # Avoiding edge cases with month endings
+    year = random.randint(start_year, end_year)
+    return f"{year}-{month:02d}-{day:02d}"
+
+def generate_amenities():
+    all_amenities = [
+        "Swimming Pool", "Gym", "Club House", "Children's Play Area", 
+        "24x7 Security", "Power Backup", "Parking", "Garden",
+        "Indoor Games", "Community Hall", "Temple", "Jogging Track",
+        "Basketball Court", "Tennis Court", "Library", "Theatre"
+    ]
+    num_amenities = random.randint(5, 10)
+    return random.sample(all_amenities, num_amenities)
+
+def random_configuration():
+    configs = []
+    for bhk in [1, 2, 3, 4]:
+        if random.random() > 0.5:
+            configs.append({
+                "type": f"{bhk}BHK",
+                "size_range": f"{600 + bhk*200}-{800 + bhk*200} sq.ft",
+                "price_range": f"₹{30 + bhk*20}L - ₹{40 + bhk*20}L"
+            })
+    return configs
 
 
 def build_rows(n: int = 20):
@@ -74,7 +115,9 @@ def build_rows(n: int = 20):
     for area in AREAS:
         for _ in range(per_area):
             idx += 1
-            builder_name = random.choice(BUILDER_NAMES)
+            builder = random.choice(BUILDERS)
+            builder_name = builder["name"]
+            builder_id = builder["rera_id"]
             title = make_title(area)
             full_address = make_full_address(area, idx)
             state = "Maharashtra"
@@ -86,25 +129,70 @@ def build_rows(n: int = 20):
                 "₹ 75L - 1.2Cr", "₹ 50L - 90L", "₹ 1.1Cr - 1.8Cr", "₹ 80L - 1.4Cr"
             ])
             description = f"Premium {sub_type.lower()} project by {builder_name} in {area}, offering modern amenities and connectivity."
+            # Generate additional data
+            total_units = random.randint(50, 500)
+            towers = random.randint(1, 5)
+            floors_per_tower = random.randint(10, 30)
+            completion_date = datetime.strptime(random_date(2024, 2027), "%Y-%m-%d").date()
+            possession_date = datetime.strptime(random_date(2024, 2027), "%Y-%m-%d").date()
+            carpet_area_min = random.randint(400, 800)
+            carpet_area_max = random.randint(carpet_area_min + 100, carpet_area_min + 500)
+            price_per_sqft = random.randint(8000, 15000)
+            booking_amount = random.randint(100000, 500000)
+            
             rows.append({
                 # Required / key fields
-                "builder_id": "MH/RE/2024/000001",  # dummy RERA ref
+                "builder_id": builder_id,
                 "builder_name": builder_name,
                 "title": title,
                 "description": description,
                 "location": area,
                 "price_range": price_range,
                 "status": status,
+                
+                # Basic details
+                "total_units": total_units,
+                "completion_date": completion_date,
+                "image_urls": None,  # Keeping null as requested
+                "created_at": datetime.utcnow(),
+                "primary_slug": f"{slugify(title)}-{builder_id[-6:]}",
+                "alias_slugs": json.dumps([f"{slugify(title)}-{area.lower()}", f"{area.lower()}-{property_type.lower()}"]),
+                "form_status": "complete",
+                
+                # Property details
+                "property_type": property_type,
+                "sub_type": sub_type,
+                "property_status": status,
+                "possession_date": possession_date,
+                "configuration": json.dumps(random_configuration()),
+                
+                # Unit details
+                "flat_number": f"Sample-{random.randint(1001, 9999)}",
+                "price_per_sqft": price_per_sqft,
+                "carpet_area_min": carpet_area_min,
+                "carpet_area_max": carpet_area_max,
+                "booking_amount": booking_amount,
+                
                 # Location details
                 "full_address": full_address,
                 "state": state,
                 "city": city,
                 "locality": locality,
-                # Types
-                "property_type": property_type,
-                "sub_type": sub_type,
-                # Optional helpful fields
-                "form_status": "in_progress",
+                "landmark": f"Near {random.choice(['Metro Station', 'Mall', 'Hospital', 'Park', 'School'])}",
+                
+                # Building details
+                "towers": towers,
+                "floors_per_tower": floors_per_tower,
+                "construction_status": json.dumps({
+                    "foundation": random.choice(["Completed", "In Progress"]),
+                    "structure": random.choice(["Completed", "In Progress", "Not Started"]),
+                    "finishing": random.choice(["Completed", "In Progress", "Not Started"])
+                }),
+                
+                # Additional details
+                "floor_plans": None,  # Keeping null as requested
+                "amenities": json.dumps(generate_amenities()),
+                "project_image": None  # Keeping null as requested
             })
     # If we need more due to integer division rounding, pad randomly
     while len(rows) < n:
@@ -115,8 +203,13 @@ def build_rows(n: int = 20):
 def insert_rows(conn: sqlite3.Connection, rows: list[dict]):
     cols = [
         "builder_id", "builder_name", "title", "description", "location",
-        "price_range", "status", "full_address", "state", "city", "locality",
-        "property_type", "sub_type", "form_status"
+        "total_units", "price_range", "completion_date", "status", "image_urls",
+        "created_at", "primary_slug", "alias_slugs", "form_status",
+        "property_type", "sub_type", "property_status", "possession_date",
+        "configuration", "flat_number", "price_per_sqft", "carpet_area_min",
+        "carpet_area_max", "booking_amount", "full_address", "state", "city",
+        "locality", "landmark", "towers", "floors_per_tower",
+        "construction_status", "floor_plans", "amenities", "project_image"
     ]
     placeholders = ",".join([":" + c for c in cols])
     sql = f"""

@@ -18,6 +18,7 @@ import BlogDetail from './components/BlogDetail';
 import FooterNavBar from './components/LandingPage/FooterNavBar';
 import ProjectList from './components/ProjectList';
 import Property from './components/property';
+import GeoLocation from './components/Builder.jsx/geoLocation';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -90,6 +91,11 @@ function App() {
             <AdminRoute>
               <ProjectList />
             </AdminRoute>
+          } />
+          <Route path="geo-location" element={
+            <ProtectedRoute>
+              <GeoLocation />
+            </ProtectedRoute>
           } />
         </Route>
 

@@ -1,3 +1,6 @@
+import os
+import requests
+
 from flask import Flask, request, jsonify, send_from_directory, redirect, make_response
 #flash
 from flask_cors import CORS
@@ -1393,6 +1396,105 @@ def upload_project_image(rera_id):
     print(f"Database updated successfully")
     
     return jsonify(project.to_dict()), 200
+
+# ---------------------------------------------------------------------GEO LOCATION -----------------------------------------------------------------------
+
+
+@app.route('/api/geolocation', methods=['POST'])
+def receive_geolocation():
+    data = request.get_json()
+    lat = data.get('latitude')
+    lon = data.get('longitude')
+    district = None
+    full_address = None
+    # Reverse geocode using OpenStreetMap Nominatim
+    try:
+        url = 'https://nominatim.openstreetmap.org/reverse'
+        params = {
+            'lat': lat,
+            'lon': lon,
+            'format': 'json',
+            'zoom': 10,
+            'addressdetails': 1
+        }
+        headers = {'User-Agent': 'HnSApp/1.0'}
+        resp = requests.get(url, params=params, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            data_json = resp.json()
+            address = data_json.get('address', {})
+            district = address.get('district') or address.get('county') or address.get('state_district')
+            full_address = data_json.get('display_name')
+    except Exception as e:
+        print(f"Reverse geocoding failed: {e}")
+    print(f"Received geolocation: latitude={lat}, longitude={lon}, district={district}, address={full_address}")
+    # Store latest
+    global latest_geolocation
+    latest_geolocation = {'latitude': lat, 'longitude': lon, 'district': district, 'full_address': full_address}
+    return jsonify({
+        'status': 'success',
+        'message': 'Coordinates and location received',
+        'received': {'latitude': lat, 'longitude': lon, 'district': district, 'full_address': full_address}
+    }), 200
+
+# ---------------------------------------------------------------------GEO LOCATION admin dashboard-----------------------------------------------------------------------
+
+@app.route('/api/admin/latest-geolocation', methods=['GET'])
+def get_latest_geolocation():
+    global latest_geolocation
+    # If latest_geolocation is not set, return a default empty response
+    try:
+        return jsonify(latest_geolocation)
+    except Exception:
+        return jsonify({'latitude': None, 'longitude': None, 'district': None, 'full_address': None})
+    
+
+# ------------------------------------------------------- AI Blog Summarization -------------------------------------------------- ---
+
+@app.route('/api/blogs/<slug>/summary', methods=['GET'])
+def summarize_blog(slug):
+    api_key = os.getenv('PERPLEXITY_API_KEY')
+    blog = Blog.query.filter_by(slug=slug).first()
+    if not blog:
+        return jsonify({'error': 'Blog not found'}), 404
+
+    content_parts = []
+    if blog.title:
+        content_parts.append(blog.title)
+    if blog.intro_paragraph:
+        content_parts.append(blog.intro_paragraph)
+    if blog.subheading1:
+        content_parts.append(blog.subheading1)
+    if blog.content1:
+        content_parts.append(blog.content1)
+    if blog.subheading2:
+        content_parts.append(blog.subheading2)
+    if blog.content2:
+        content_parts.append(blog.content2)
+    if blog.subheading3:
+        content_parts.append(blog.subheading3)
+    if blog.content3:
+        content_parts.append(blog.content3)
+
+    content = '\n'.join([str(part) for part in content_parts if part])
+    prompt = f"Summarize the following real estate blog for a user in 3-5 sentences.\n\n{content}"
+    url = "https://api.perplexity.ai/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "sonar",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 200,
+        "temperature": 0.2
+    }
+    try:
+        response = requests.post(url, headers=headers, json=data, timeout=20)
+        response.raise_for_status()
+        summary = response.json()['choices'][0]['message']['content'].strip()
+        return jsonify({'summary': summary})
+    except Exception as e:
+        return jsonify({'error': f'AI summarization failed: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True) 

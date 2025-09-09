@@ -145,15 +145,131 @@ const BlogLanding = () => {
         <FaUserCircle className="text-2xl text-gray-700" />
       </div>
 
-      {/* Banner with 3D gradient pill shapes */}
-      <div className="relative bg-[#2956a3] h-[260px] flex flex-col items-center justify-center">
-        <h1 className="section-heading" style={{color: '#fff', marginTop: '24px', marginBottom: '24px', textShadow: '0 2px 8px #223A5F99'}}>HousenSeek</h1>
-        <div className="flex items-center justify-center w-full absolute left-0 top-1/2 -translate-y-1/2">
-          <div className="w-[320px] h-[90px] bg-gradient-to-r from-[#181e5a] to-[#1a3263] rounded-[40px] shadow-2xl mr-[-60px] z-0" style={{boxShadow:'0 8px 32px #181e5a55'}}></div>
-          <div className="w-[320px] h-[110px] bg-gradient-to-r from-yellow-300 via-yellow-400 to-orange-400 rounded-[40px] shadow-2xl z-10 flex items-center justify-center" style={{boxShadow:'0 8px 32px #eab30855'}}></div>
-          <div className="w-[320px] h-[90px] bg-gradient-to-r from-[#1a3263] to-[#181e5a] rounded-[40px] shadow-2xl ml-[-60px] z-0" style={{boxShadow:'0 8px 32px #181e5a55'}}></div>
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div ref={mobileMenuRef} className="absolute top-full left-0 w-full bg-[#1a3263] shadow-lg rounded-b-2xl flex flex-col items-center py-4 animate-fade-in z-30">
+          <Link to="/search" className="text-white text-lg py-2 w-full text-center hover:bg-blue-900" onClick={() => setMobileMenuOpen(false)}>Search</Link>
+          <Link to="/" className="text-white text-lg py-2 w-full text-center hover:bg-blue-900" onClick={() => setMobileMenuOpen(false)}>Home</Link>
+          <Link to="/builders" className="text-white text-lg py-2 w-full text-center hover:bg-blue-900" onClick={() => setMobileMenuOpen(false)}>Builders</Link>
+          <Link to="/blogs" className="text-white text-lg py-2 w-full text-center hover:bg-blue-900 font-semibold" onClick={() => setMobileMenuOpen(false)}>Blogs</Link>
+        </div>
+      )}
+    
+<div className="max-w-[1320px] mx-auto p-4 grid grid-cols-12 gap-4">
+  {/* Left 4 cards */}
+  <div className="col-span-4 grid grid-cols-2 gap-4">
+    {[
+      {
+        title: "How to compare interiors?",
+        subtitle: "Look into Interiors with us!",
+        image: "/interior.jpeg",
+      },
+      {
+        title: "Pre-Launch or Ready-to-Move?",
+        subtitle: "Weigh your wait vs value.",
+        image: "/prelaunch.jpeg",
+      },
+      {
+        title: "How Much House Can You Afford?",
+        subtitle: "Budgeting tools that do the math.",
+        image: "/afford.jpeg",
+      },
+      {
+        title: "How to correctly search homes?",
+        subtitle: "The correct way to find!",
+        image: "/search-homes.jpeg",
+      },
+    ].map((card, index) => (
+      <div
+        key={index}
+        className="group relative h-[240px] rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105"
+      >
+        <img
+          src={card.image}
+          alt={card.title}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/0 to-black/70 group-hover:from-black/40 group-hover:to-black/80 transition-all duration-300" />
+        <div className="absolute bottom-4 left-4 right-4 text-[#f3ecdc]">
+          <h3 className="font-['Abril_Fatface'] text-base leading-snug">
+            {card.title}
+          </h3>
+          <p className="font-['Red_Hat_Display'] text-xs font-semibold opacity-80">
+            {card.subtitle}
+          </p>
         </div>
       </div>
+    ))}
+  </div>
+
+  {/* Middle big card */}
+  <div className="col-span-4">
+    <div className="group relative h-full min-h-[500px] rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:scale-105">
+      <img
+        src="/checklist.webp"
+        alt="Checklist Before You Commit!"
+        className="w-full h-full object-cover"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/0 to-black/70 group-hover:from-black/40 group-hover:to-black/80 transition-all duration-300" />
+      <div className="absolute bottom-4 left-4 right-4 text-[#f3ecdc]">
+        <h3 className="font-['Abril_Fatface'] text-xl leading-snug">
+          Checklist Before You Commit!
+        </h3>
+        <p className="font-['Red_Hat_Display'] text-sm font-semibold opacity-80">
+          Don’t sign anything without this list.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  {/* Right 4 cards */}
+  <div className="col-span-4 grid grid-cols-2 gap-4">
+    {[
+      {
+        title: "Fake Listings. Real Consequences.",
+        subtitle: "Spot scams before they spot you.",
+        image: "/fake listing.jpg",
+      },
+      {
+        title: "India’s Most Expensive Homes",
+        subtitle: "Jaw-dropping prices. Stunning views.",
+        image: "/expensive.jpg",
+      },
+      {
+        title: "Upcoming Projects Worth Watching!",
+        subtitle: "The future is already under construction.",
+        image: "/upcoming.jpeg",
+      },
+      {
+        title: "Paperwork During Buying Property",
+        subtitle: "10 Documents You Need for Property Purchase",
+        image: "/paperwork.jpeg",
+      },
+    ].map((card, index) => (
+      <div
+        key={index}
+        className="group relative h-[240px] rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:scale-105"
+      >
+        <img
+          src={card.image}
+          alt={card.title}
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/0 to-black/70 group-hover:from-black/40 group-hover:to-black/80 transition-all duration-300" />
+        <div className="absolute bottom-4 left-4 right-4 text-[#f3ecdc]">
+          <h3 className="font-['Abril_Fatface'] text-base leading-snug">
+            {card.title}
+          </h3>
+          <p className="font-['Red_Hat_Display'] text-xs font-semibold opacity-80">
+            {card.subtitle}
+          </p>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+
+
 
       {/* Main Content Container */}
       <div className="max-w-6xl mx-auto px-4">
@@ -183,73 +299,9 @@ const BlogLanding = () => {
             <FaChevronRight size={20} />
           </button>
         </div>
-        {/* Debug output for carousel */}
-        <div className="text-xs text-gray-500 text-center mb-2">
-          <span>carouselIdx: {carouselIdx} | Visible: {visibleCategories.map(c => c.title).join(', ')}</span>
-        </div>
+        
 
-        {/* Cards Section (Featured + Side Cards) */}
-        <div className="py-10 flex flex-col md:flex-row gap-6 md:gap-1 items-start md:ml-16">
-          {/* Featured Blog (left) */}
-          {filteredBlogs[0] && (
-            <div className="max-w-[450px] w-full">
-              <Link to={`/blog/${filteredBlogs[0].slug}`} className="block group" tabIndex={0}>
-                <div className="bg-white rounded-2xl shadow-xl overflow-hidden transition-transform group-hover:-translate-y-1 group-hover:shadow-2xl duration-300">
-                  <div className="relative">
-                    <img
-                      src={
-                        filteredBlogs[0].featured_image
-                          ? `http://localhost:5000/uploads/${filteredBlogs[0].featured_image}`
-                          : 'https://via.placeholder.com/600x400?text=No+Image'
-                      }
-                      alt={filteredBlogs[0].featured_image_alt || filteredBlogs[0].title}
-                      className="w-full h-64 object-cover"
-                    />
-                    <span className="absolute top-4 left-4 bg-yellow-300 text-gray-900 font-bold px-4 py-1 rounded-full text-sm shadow">
-                      Latest
-                    </span>
-                  </div>
-                  <div className="p-6 flex flex-col max-w-[500px] overflow-hidden">
-                    <h2 className="text-2xl md:text-3xl font-extrabold mb-2 leading-tight group-hover:text-blue-700 transition truncate">{filteredBlogs[0].title}</h2>
-                    <p className="text-base font-bold text-gray-700 mb-2 truncate max-w-full">{filteredBlogs[0].intro_paragraph}</p>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-gray-700 font-semibold text-sm">By {filteredBlogs[0].author || "Unknown"}</span>
-                      <span className="text-gray-400 text-xs">• {new Date(filteredBlogs[0].created_at).toLocaleDateString()}</span>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          )}
-          {/* Side Blogs (right) */}
-          <div className="flex flex-col gap-4 md:gap-2 md:ml-12 w-full md:w-auto">
-            {filteredBlogs.slice(1, 4).map((blog) => (
-              <Link key={blog.id} to={`/blog/${blog.slug}`} className="block group w-full" tabIndex={0} style={{ textDecoration: 'none' }}>
-                <div className="relative flex flex-row bg-gray-50 rounded-2xl shadow p-3 gap-4 items-center w-full md:w-[420px] h-[120px] border-l-4 border-blue-500 transition-transform duration-300 hover:scale-105 hover:shadow-xl">
-                  <span className="absolute top-2 left-4 bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded shadow">Featured</span>
-                  <img
-                    src={
-                      blog.featured_image
-                        ? `http://localhost:5000/uploads/${blog.featured_image}`
-                        : 'https://via.placeholder.com/150x100?text=No+Image'
-                    }
-                    alt={blog.featured_image_alt || blog.title}
-                    className="w-32 sm:w-44 h-20 sm:h-28 object-cover rounded-lg flex-shrink-0"
-                  />
-                  <div className="flex flex-col justify-center flex-1 max-w-[220px] overflow-hidden">
-                    <h3 className="font-bold text-lg mb-1 leading-tight truncate">{blog.title}</h3>
-                    <p className="text-sm text-gray-700 mb-1 truncate max-w-full">{blog.intro_paragraph}</p>
-                    <div className="text-xs text-gray-400">
-                      By {blog.author || "Unknown"} • {new Date(blog.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-
-        {/* News Section */}
+        {/* News Section + Blogs from backend */}
         <div className="mb-10 bg-gradient-to-br from-gray-100 via-white to-gray-50 rounded-3xl py-6 md:py-10 px-2 md:px-4 border border-gray-200 shadow-xl">
           <div className="flex items-center justify-center mb-8 w-full text-center gap-3">
             <svg className="w-8 h-8 text-red-500 animate-bounce" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7v4H5V7a2 2 0 012-2h10a2 2 0 012 2z" /><path strokeLinecap="round" strokeLinejoin="round" d="M5 11v6a2 2 0 002 2h10a2 2 0 002-2v-6" /></svg>
@@ -257,78 +309,29 @@ const BlogLanding = () => {
             <span className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow ml-2">Hot</span>
           </div>
           <div className="flex flex-row gap-6 overflow-x-auto scrollbar-hide">
-            {[
-              {
-                id: 'trend1',
-                featured_image: '/1484471303-realty-getty.jpg',
-                featured_image_alt: 'Navi Mumbai',
-                title: 'Navi Mumbai Set for Major Infrastructure Boost',
-                category: 'Exclusive',
-                badge: 'Hot',
-                author: 'Admin',
-                created_at: new Date().toISOString(),
-                slug: 'navi-mumbai-infra',
-              },
-              {
-                id: 'trend2',
-                featured_image: '/Defining-Demand.jpg',
-                featured_image_alt: 'Trade Rumors',
-                title: "Boeser Trade Rumors: What's the Reality?",
-                category: 'Breaking',
-                badge: 'Breaking',
-                author: 'Editor',
-                created_at: new Date().toISOString(),
-                slug: 'boeser-trade-rumors',
-              },
-              {
-                id: 'trend3',
-                featured_image: '/news.jpg',
-                featured_image_alt: 'Real Estate Market',
-                title: 'Maharashtra Real Estate Market Hits New High',
-                category: 'Market',
-                badge: 'Exclusive',
-                author: 'Reporter',
-                created_at: new Date().toISOString(),
-                slug: 'maharashtra-market-high',
-              },
-            ].map((news) => (
-              <Link key={news.id} to={`/blog/${news.slug}`} className="block group min-w-[320px] md:min-w-[350px]" tabIndex={0} style={{ textDecoration: 'none' }}>
+            {filteredBlogs.slice(0, 6).map((blog) => (
+              <Link key={blog.id} to={`/blog/${blog.slug}`} className="block group min-w-[320px] md:min-w-[350px]" tabIndex={0} style={{ textDecoration: 'none' }}>
                 <div className="relative bg-white rounded-2xl border border-gray-200 shadow-xl flex flex-col w-[320px] md:w-[350px] min-w-[320px] md:min-w-[350px] h-[260px] md:h-[340px] transition-transform hover:-translate-y-1 hover:shadow-2xl duration-300 group overflow-hidden">
                   <div className="relative">
                     <div className="relative w-full h-52 overflow-hidden rounded-t-2xl">
                       <img
-                        src={news.featured_image}
-                        alt={news.featured_image_alt || news.title}
+                        src={blog.featured_image ? `http://localhost:5000/uploads/${blog.featured_image}` : 'https://via.placeholder.com/600x400?text=No+Image'}
+                        alt={blog.featured_image_alt || blog.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-125 shadow-lg"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent rounded-t-2xl pointer-events-none"></div>
                     </div>
                     {/* Only one badge per card, with meaningful color */}
-                    {news.badge === 'Hot' && (
-                      <span className="absolute top-3 right-3 flex items-center gap-1 bg-gradient-to-r from-red-600 to-red-400 text-white text-sm font-extrabold px-4 py-1 rounded-full shadow-xl border-2 border-white tracking-widest uppercase z-30" style={{letterSpacing:'0.08em'}}>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2m0 4v2m0 4v2m0 4v2" /></svg>
-                        Hot
-                      </span>
-                    )}
-                    {news.badge === 'Breaking' && (
-                      <span className="absolute top-3 right-3 flex items-center gap-1 bg-gradient-to-r from-yellow-400 to-yellow-300 text-gray-900 text-sm font-extrabold px-4 py-1 rounded-full shadow-xl border-2 border-white tracking-widest uppercase z-30" style={{letterSpacing:'0.08em'}}>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01" /></svg>
-                        Breaking
-                      </span>
-                    )}
-                    {news.badge === 'Exclusive' && (
-                      <span className="absolute top-3 right-3 flex items-center gap-1 bg-gradient-to-r from-blue-600 to-blue-400 text-white text-sm font-extrabold px-4 py-1 rounded-full shadow-xl border-2 border-white tracking-widest uppercase z-30" style={{letterSpacing:'0.08em'}}>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12l2 2 4-4" /></svg>
-                        Exclusive
-                      </span>
-                    )}
+                    <span className="absolute top-3 right-3 flex items-center gap-1 bg-gradient-to-r from-blue-600 to-blue-400 text-white text-sm font-extrabold px-4 py-1 rounded-full shadow-xl border-2 border-white tracking-widest uppercase z-30" style={{letterSpacing:'0.08em'}}>
+                      Trending
+                    </span>
                   </div>
                   <div className="p-5 flex flex-col flex-1">
-                    <h3 className="font-bold text-lg mb-2 leading-tight truncate">{news.title}</h3>
+                    <h3 className="font-bold text-lg mb-2 leading-tight truncate">{blog.title}</h3>
                     <div className="flex items-center text-xs text-gray-400 mb-2">
-                      <span>By {news.author}</span>
+                      <span>By {blog.author || 'Unknown'}</span>
                       <span className="mx-1">•</span>
-                      <span>{new Date(news.created_at).toLocaleDateString()}</span>
+                      <span>{new Date(blog.created_at).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center mt-auto">
                       <span className="text-blue-600 font-semibold text-xs mr-2">Read More</span>
@@ -339,6 +342,8 @@ const BlogLanding = () => {
               </Link>
             ))}
           </div>
+
+          
         </div>
 
         {/* Famous Section (modern card style) */}
@@ -408,10 +413,7 @@ const BlogLanding = () => {
                     </svg>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <span className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 px-4 py-2 rounded-full text-sm font-semibold border border-purple-200">🔥 Trending</span>
-                  <span className="bg-gradient-to-r from-blue-100 to-cyan-100 text-blue-700 px-4 py-2 rounded-full text-sm font-semibold border border-blue-200">⭐ Featured</span>
-                </div>
+                
               </div>
             </div>
             {/* Blog Cards */}
@@ -495,11 +497,31 @@ const BlogLanding = () => {
             <div>
               <h4 className="font-semibold mb-2">Follow Us</h4>
               <div className="flex gap-6 text-gray-700 text-xl mb-2">
-                <a href="#" aria-label="Facebook"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.522-4.477-10-10-10S2 6.478 2 12c0 4.991 3.657 9.128 8.438 9.877v-6.987h-2.54v-2.89h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.242 0-1.632.771-1.632 1.562v1.875h2.773l-.443 2.89h-2.33v6.987C18.343 21.128 22 16.991 22 12z"/></svg></a>
-                <a href="#" aria-label="Twitter"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M22.46 6c-.77.35-1.6.59-2.47.69a4.3 4.3 0 0 0 1.88-2.37 8.59 8.59 0 0 1-2.72 1.04A4.28 4.28 0 0 0 16.11 4c-2.37 0-4.29 1.92-4.29 4.29 0 .34.04.67.11.99C7.69 9.13 4.07 7.38 1.64 4.7c-.37.63-.58 1.36-.58 2.14 0 1.48.75 2.78 1.89 3.54-.7-.02-1.36-.21-1.94-.53v.05c0 2.07 1.47 3.8 3.42 4.19-.36.1-.74.16-1.13.16-.28 0-.54-.03-.8-.08.54 1.68 2.11 2.9 3.97 2.93A8.6 8.6 0 0 1 2 19.54c-.29 0-.57-.02-.85-.05A12.13 12.13 0 0 0 8.29 21.5c7.55 0 11.68-6.26 11.68-11.68 0-.18-.01-.36-.02-.54A8.18 8.18 0 0 0 22.46 6z"/></svg></a>
-                <a href="#" aria-label="Instagram"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5A4.25 4.25 0 0 0 7.75 20.5h8.5A4.25 4.25 0 0 0 20.5 16.25v-8.5A4.25 4.25 0 0 0 16.25 3.5h-8.5zm4.25 2.25a5.25 5.25 0 1 1 0 10.5 5.25 5.25 0 0 1 0-10.5zm0 1.5a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5zm6.25 1.25a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/></svg></a>
-                <a href="#" aria-label="Pinterest"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12c0 4.41 3.13 8.09 7.25 8.09 1.01 0 1.39-.43 1.39-.96v-2.13c-2.95.64-3.57-1.42-3.57-1.42-.92-2.33-2.25-2.95-2.25-2.95-1.84-1.26.14-1.24.14-1.24 2.03.14 3.1 2.09 3.1 2.09 1.81 3.1 4.75 2.2 5.91 1.68.18-1.31.71-2.2 1.29-2.7-2.36-.27-4.85-1.18-4.85-5.25 0-1.16.41-2.11 1.09-2.85-.11-.27-.47-1.36.1-2.84 0 0 .89-.29 2.89 1.09A10.1 10.1 0 0 1 12 6.8c.9.004 1.8.12 2.65.35 2-.98 2.89-1.09 2.89-1.09.57 1.48.21 2.57.1 2.84.68.74 1.09 1.69 1.09 2.85 0 4.08-2.5 4.98-4.87 5.25.73.63 1.38 1.87 1.38 3.77v2.8c0 .53.38.96 1.39.96C18.87 20.09 22 16.41 22 12c0-5.52-4.48-10-10-10z"/></svg></a>
-                <a href="#" aria-label="YouTube"><svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M21.8 8.001a2.75 2.75 0 0 0-1.94-1.94C18.2 6 12 6 12 6s-6.2 0-7.86.06a2.75 2.75 0 0 0-1.94 1.94C2 9.7 2 12 2 12s0 2.3.06 3.999a2.75 2.75 0 0 0 1.94 1.94C5.8 18 12 18 12 18s6.2 0 7.86-.06a2.75 2.75 0 0 0 1.94-1.94C22 14.3 22 12 22 12s0-2.3-.06-3.999zM10 15.5v-7l6 3.5-6 3.5z"/></svg></a>
+                <a href="#" aria-label="Facebook">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M22 12c0-5.522-4.477-10-10-10S2 6.478 2 12c0 4.991 3.657 9.128 8.438 9.877v-6.987h-2.54v-2.89h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.242 0-1.632.771-1.632 1.562v1.875h2.773l-.443 2.89h-2.33v6.987C18.343 21.128 22 16.991 22 12z"/>
+                  </svg>
+                </a>
+                <a href="#" aria-label="Twitter">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M22.46 6c-.77.35-1.6.59-2.47.69a4.3 4.3 0 0 0 1.88-2.37 8.59 8.59 0 0 1-2.72 1.04A4.28 4.28 0 0 0 16.11 4c-2.37 0-4.29 1.92-4.29 4.29 0 .34.04.67.11.99C7.69 9.13 4.07 7.38 1.64 4.7c-.37.63-.58 1.36-.58 2.14 0 1.48.75 2.78 1.89 3.54-.7-.02-1.36-.21-1.94-.53v.05c0 2.07 1.47 3.8 3.42 4.19-.36.1-.74.16-1.13.16-.28 0-.54-.03-.8-.08.54 1.68 2.11 2.9 3.97 2.93A8.6 8.6 0 0 1 2 19.54c-.29 0-.57-.02-.85-.05A12.13 12.13 0 0 0 8.29 21.5c7.55 0 11.68-6.26 11.68-11.68 0-.18-.01-.36-.02-.54A8.18 8.18 0 0 0 22.46 6z"/>
+                  </svg>
+                </a>
+                <a href="#" aria-label="Instagram">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M7.75 2h8.5A5.75 5.75 0 0 1 22 7.75v8.5A5.75 5.75 0 0 1 16.25 22h-8.5A5.75 5.75 0 0 1 2 16.25v-8.5A5.75 5.75 0 0 1 7.75 2zm0 1.5A4.25 4.25 0 0 0 3.5 7.75v8.5A4.25 4.25 0 0 0 7.75 20.5h8.5A4.25 4.25 0 0 0 20.5 16.25v-8.5A4.25 4.25 0 0 0 16.25 3.5h-8.5zm4.25 2.25a5.25 5.25 0 1 1 0 10.5 5.25 5.25 0 0 1 0-10.5zm0 1.5a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5zm6.25 1.25a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                  </svg>
+                </a>
+                <a href="#" aria-label="Pinterest">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12c0 4.41 3.13 8.09 7.25 8.09 1.01 0 1.39-.43 1.39-.96v-2.13c-2.95.64-3.57-1.42-3.57-1.42-.92-2.33-2.25-2.95-2.25-2.95-1.84-1.26.14-1.24.14-1.24 2.03.14 3.1 2.09 3.1 2.09 1.81 3.1 4.75 2.2 5.91 1.68.18-1.31.71-2.2 1.29-2.7-2.36-.27-4.85-1.18-4.85-5.25 0-1.16.41-2.11 1.09-2.85-.11-.27-.47-1.36.1-2.84 0 0 .89-.29 2.89 1.09A10.1 10.1 0 0 1 12 6.8c.9.004 1.8.12 2.65.35 2-.98 2.89-1.09 2.89-1.09.57 1.48.21 2.57.1 2.84.68.74 1.09 1.69 1.09 2.85 0 4.08-2.5 4.98-4.87 5.25.73.63 1.38 1.87 1.38 3.77v2.8c0 .53.38.96 1.39.96C18.87 20.09 22 16.41 22 12c0-5.52-4.48-10-10-10z"/>
+                  </svg>
+                </a>
+                <a href="#" aria-label="YouTube">
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M21.8 8.001a2.75 2.75 0 0 0-1.94-1.94C18.2 6 12 6 12 6s-6.2 0-7.86.06a2.75 2.75 0 0 0-1.94 1.94C2 9.7 2 12 2 12s0 2.3.06 3.999a2.75 2.75 0 0 0 1.94 1.94C5.8 18 12 18 12 18s6.2 0 7.86-.06a2.75 2.75 0 0 0 1.94-1.94C22 14.3 22 12 22 12s0-2.3-.06-3.999zM10 15.5v-7l6 3.5-6 3.5z"/>
+                  </svg>
+                </a>
               </div>
               <div className="flex gap-8 text-xs text-gray-500">
                 <span>10K</span><span>69K</span><span>45K</span><span>69K</span><span>69K</span>
@@ -654,4 +676,4 @@ const BlogLanding = () => {
   );
 };
 
-export default BlogLanding; 
+export default BlogLanding;

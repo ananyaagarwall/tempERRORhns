@@ -13,6 +13,37 @@ import './LandingPage.css';
 const LandingPage = () => {
   const triggerRef = useRef(null);
   const [showStickyFooterNav, setShowStickyFooterNav] = useState(false);
+  const [geoStatus, setGeoStatus] = useState('');
+
+  useEffect(() => {
+    // Geolocation logic
+    if ('geolocation' in navigator) {
+      setGeoStatus('Requesting location permission...');
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setGeoStatus('Location permission granted. Sending coordinates...');
+          const { latitude, longitude } = position.coords;
+          fetch('http://localhost:5000/api/geolocation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ latitude, longitude })
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              setGeoStatus('Coordinates sent! ' + (data.message || ''));
+            })
+            .catch((err) => {
+              setGeoStatus('Failed to send coordinates.');
+            });
+        },
+        (error) => {
+          setGeoStatus('Location permission denied or unavailable.');
+        }
+      );
+    } else {
+      setGeoStatus('Geolocation is not supported by your browser.');
+    }
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -28,6 +59,12 @@ const LandingPage = () => {
 
   return (
     <div style={{ background: '#FFFBF2' }}>
+      {/* Geolocation status message */}
+      {geoStatus && (
+        <div style={{ background: '#e0f7fa', color: '#00796b', padding: '8px', textAlign: 'center', fontSize: '0.95rem' }}>
+          {geoStatus}
+        </div>
+      )}
       <HeaderSection />
       {/* Trigger ref just before PropertiesSection */}
       <div ref={triggerRef} />
