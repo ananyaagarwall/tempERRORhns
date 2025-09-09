@@ -89,53 +89,70 @@ class Agent(db.Model):
 
 class Property(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    price = db.Column(db.Float, nullable=False)
-    location = db.Column(db.String(200), nullable=False)
-    city = db.Column(db.String(100))
-    state = db.Column(db.String(100))
-    pincode = db.Column(db.String(10))
-    bedrooms = db.Column(db.Integer, nullable=False)
-    bathrooms = db.Column(db.Integer, nullable=False)
-    area_sqft = db.Column(db.Float, nullable=False)
-    furnishing = db.Column(db.String(50))  # 'Furnished', 'Semi-Furnished', etc.
-    property_type = db.Column(db.String(50))  # 'Apartment', 'Villa', etc.
-    property_status = db.Column(db.String(20))  # 'For Sale', 'For Rent'
-    availability_date = db.Column(db.Date)
-    image_urls = db.Column(db.Text)  # JSON string or comma-separated
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    primary_slug = db.Column(db.String(150), unique=True, nullable=False)
-    alias_slugs = db.Column(db.Text)  # JSON list of up to 5 alias slugs
-
-    project_id = db.Column(db.Integer, db.ForeignKey('builder_project.id'))
+    Property_Name = db.Column(db.String(100), nullable=False)
+    Location = db.Column(db.String(200), nullable=False)
+    Carpet_Area = db.Column(db.String(100))
+    Price_Starting_From = db.Column(db.String(50))
+    Pricing = db.Column(db.String(100))
+    Highlights = db.Column(db.Text)  # JSON string for list of strings
+    Extra_Charges = db.Column(db.String(100))
+    Builder_Name = db.Column(db.String(100))
+    Builder_Details = db.Column(db.Text)  # JSON string for object
+    Existing_Configurations = db.Column(db.Text)  # JSON string for list of strings
+    Built_up_Area = db.Column(db.String(100))
+    Main_Door_Facing = db.Column(db.String(50))
+    Ceiling_Height = db.Column(db.String(100))
+    Kitchen = db.Column(db.String(100))
+    Key_Highlights = db.Column(db.Text)  # JSON string for list of strings
+    Address = db.Column(db.String(200))
+    Flat_Details = db.Column(db.Text)  # JSON string for object
+    Loan_Availability = db.Column(db.Text)  # JSON string for list of strings
+    Approved_by_Authorities = db.Column(db.Text)  # JSON string for list of strings
+    Project_Status = db.Column(db.String(50))
+    Possession_Date = db.Column(db.String(50))
+    RERA_ID = db.Column(db.String(50))
+    Vastu_Compliant = db.Column(db.String(10))
+    Parking = db.Column(db.String(50))
+    Lift_Availability = db.Column(db.String(50))
+    Security = db.Column(db.String(100))
+    Connectivity = db.Column(db.Text)  # JSON string for list of strings
+    
+    # Relationships
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-
+    project_id = db.Column(db.Integer, db.ForeignKey('builder_project.id'))
     enquiries = db.relationship('Enquiry', backref='property', lazy=True)
     reviews = db.relationship('Review', backref='property', lazy=True)
 
     def to_dict(self):
         return {
             'id': self.id,
-            'title': self.title,
-            'description': self.description,
-            'price': self.price,
-            'location': self.location,
-            'city': self.city,
-            'state': self.state,
-            'pincode': self.pincode,
-            'bedrooms': self.bedrooms,
-            'bathrooms': self.bathrooms,
-            'area_sqft': self.area_sqft,
-            'furnishing': self.furnishing,
-            'property_type': self.property_type,
-            'property_status': self.property_status,
-            'availability_date': self.availability_date.isoformat() if self.availability_date else None,
-            'image_urls': self.image_urls,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'Property_Name': self.Property_Name,
+            'Location': self.Location,
+            'Carpet_Area': self.Carpet_Area,
+            'Price_Starting_From': self.Price_Starting_From,
+            'Pricing': self.Pricing,
+            'Highlights': json.loads(self.Highlights) if self.Highlights else None,
+            'Extra_Charges': self.Extra_Charges,
+            'Builder_Name': self.Builder_Name,
+            'Builder_Details': json.loads(self.Builder_Details) if self.Builder_Details else None,
+            'Existing_Configurations': json.loads(self.Existing_Configurations) if self.Existing_Configurations else None,
+            'Built_up_Area': self.Built_up_Area,
+            'Main_Door_Facing': self.Main_Door_Facing,
+            'Ceiling_Height': self.Ceiling_Height,
+            'Kitchen': self.Kitchen,
+            'Key_Highlights': json.loads(self.Key_Highlights) if self.Key_Highlights else None,
+            'Address': self.Address,
+            'Flat_Details': json.loads(self.Flat_Details) if self.Flat_Details else None,
+            'Loan_Availability': json.loads(self.Loan_Availability) if self.Loan_Availability else None,
+            'Approved_by_Authorities': json.loads(self.Approved_by_Authorities) if self.Approved_by_Authorities else None,
+            'Project_Status': self.Project_Status,
+            'Possession_Date': self.Possession_Date,
+            'RERA_ID': self.RERA_ID,
+            'Vastu_Compliant': self.Vastu_Compliant,
+            'Parking': self.Parking,
+            'Lift_Availability': self.Lift_Availability,
+            'Security': self.Security,
+            'Connectivity': json.loads(self.Connectivity) if self.Connectivity else None,
             'user_id': self.user_id,
             'project_id': self.project_id
         }
@@ -448,76 +465,41 @@ def get_property(id):
     property = Property.query.get_or_404(id)
     return jsonify(property.to_dict())
 
-# 2. Update property creation logic to use slugify for slugs
 @app.route('/api/properties', methods=['POST'])
 def create_property():
     data = request.json
-    title = data['title']
-    location = data['location']
-    project_id = data.get('project_id')
-    # Extract fields for slug patterns
-    bhk = str(data.get('bedrooms', ''))
-    property_type = str(data.get('property_type', ''))
-    locality = str(data.get('locality', ''))
-    builder = str(data.get('builder_name', ''))
-    city = str(data.get('city', ''))
-    price_range = str(data.get('price_range', ''))
-    property_type_variant = str(data.get('sub_type', property_type))
-    bhk_as_text = f"{bhk}-bedroom" if bhk else ''
-    # id will be set after commit, so use a placeholder for now
-    temp_id = 'id'
-    # Generate slugs with placeholders
-    primary_slug_pattern = f"/property/{bhk}-{property_type}-in-{locality}-{builder}-{temp_id}"
-    alias_patterns = [
-        f"/property/{bhk}-{locality}-{property_type}-{temp_id}",
-        f"/property/{locality}-{bhk}-{property_type_variant}-{builder}",
-        f"/property/{bhk_as_text}-{property_type}-{city}",
-        f"/property/{bhk}-in-{locality}-under-{price_range}",
-        f"/property/{locality}-{property_type}-{bhk}-{builder}-{temp_id}"
-    ]
-    # Use slugify for all slugs
-    primary_slug = slugify(primary_slug_pattern)
-    alias_slugs = [slugify(p) for p in alias_patterns]
     new_property = Property(
-        title=title,
-        description=data['description'],
-        price=data['price'],
-        location=location,
-        city=city,
-        state=data.get('state'),
-        pincode=data.get('pincode'),
-        bedrooms=data['bedrooms'],
-        bathrooms=data['bathrooms'],
-        area_sqft=data['area_sqft'],
-        furnishing=data.get('furnishing'),
-        property_type=property_type,
-        property_status=data.get('property_status'),
-        availability_date=datetime.strptime(data['availability_date'], '%Y-%m-%d').date() if data.get('availability_date') else None,
-        image_urls=data.get('image_urls'),
+        Property_Name=data.get('Property_Name'),
+        Location=data.get('Location'),
+        Carpet_Area=data.get('Carpet_Area'),
+        Price_Starting_From=data.get('Price_Starting_From'),
+        Pricing=data.get('Pricing'),
+        Highlights=json.dumps(data.get('Highlights')),
+        Extra_Charges=data.get('Extra_Charges'),
+        Builder_Name=data.get('Builder_Name'),
+        Builder_Details=json.dumps(data.get('Builder_Details')),
+        Existing_Configurations=json.dumps(data.get('Existing_Configurations')),
+        Built_up_Area=data.get('Built_up_Area'),
+        Main_Door_Facing=data.get('Main_Door_Facing'),
+        Ceiling_Height=data.get('Ceiling_Height'),
+        Kitchen=data.get('Kitchen'),
+        Key_Highlights=json.dumps(data.get('Key_Highlights')),
+        Address=data.get('Address'),
+        Flat_Details=json.dumps(data.get('Flat_Details')),
+        Loan_Availability=json.dumps(data.get('Loan_Availability')),
+        Approved_by_Authorities=json.dumps(data.get('Approved_by_Authorities')),
+        Project_Status=data.get('Project_Status'),
+        Possession_Date=data.get('Possession_Date'),
+        RERA_ID=data.get('RERA_ID'),
+        Vastu_Compliant=data.get('Vastu_Compliant'),
+        Parking=data.get('Parking'),
+        Lift_Availability=data.get('Lift_Availability'),
+        Security=data.get('Security'),
+        Connectivity=json.dumps(data.get('Connectivity')),
         user_id=data['user_id'],
-        project_id=project_id,
-        primary_slug=primary_slug,
-        alias_slugs=json.dumps(alias_slugs)
+        project_id=data.get('project_id')
     )
     db.session.add(new_property)
-    db.session.commit()
-    # Now update slugs with the real property id
-    real_id = new_property.id
-    primary_slug = slugify(f"/property/{bhk}-{property_type}-in-{locality}-{builder}-{real_id}")
-    alias_slugs = [
-        slugify(f"/property/{bhk}-{locality}-{property_type}-{real_id}"),
-        slugify(f"/property/{locality}-{bhk}-{property_type_variant}-{builder}"),
-        slugify(f"/property/{bhk_as_text}-{property_type}-{city}"),
-        slugify(f"/property/{bhk}-in-{locality}-under-{price_range}"),
-        slugify(f"/property/{locality}-{property_type}-{bhk}-{builder}-{real_id}")
-    ]
-    new_property.primary_slug = primary_slug
-    new_property.alias_slugs = json.dumps(alias_slugs)
-    db.session.commit()
-    # Insert slugs into Slug table
-    db.session.add(Slug(slug=primary_slug, target_type='property', target_id=new_property.id, is_primary=True))
-    for alias in alias_slugs:
-        db.session.add(Slug(slug=alias, target_type='property', target_id=new_property.id, is_primary=False))
     db.session.commit()
     return jsonify(new_property.to_dict()), 201
 
@@ -682,6 +664,42 @@ def get_builder_projects(rera_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+def _create_property_for_project(project, user_id, data):
+    new_property = Property(
+        Property_Name=project.title,
+        Location=project.location,
+        Builder_Name=project.builder_name,
+        Project_Status=project.status,
+        Possession_Date=project.possession_date.isoformat() if project.possession_date else None,
+        user_id=user_id,
+        project_id=project.id,
+        RERA_ID=data.get('RERA_ID'),
+        Carpet_Area=data.get('Carpet_Area'),
+        Price_Starting_From=data.get('Price_Starting_From'),
+        Pricing=data.get('Pricing'),
+        Highlights=json.dumps(data.get('Highlights')) if data.get('Highlights') else None,
+        Extra_Charges=data.get('Extra_Charges'),
+        Builder_Details=json.dumps(data.get('Builder_Details')),
+        Existing_Configurations=json.dumps(data.get('Existing_Configurations')),
+        Built_up_Area=data.get('Built_up_Area'),
+        Main_Door_Facing=data.get('Main_Door_Facing'),
+        Ceiling_Height=data.get('Ceiling_Height'),
+        Kitchen=data.get('Kitchen'),
+        Key_Highlights=json.dumps(data.get('Key_Highlights')),
+        Address=data.get('Address'),
+        Flat_Details=json.dumps(data.get('Flat_Details')),
+        Loan_Availability=json.dumps(data.get('Loan_Availability')),
+        Approved_by_Authorities=json.dumps(data.get('Approved_by_Authorities')),
+        Vastu_Compliant=data.get('Vastu_Compliant'),
+        Parking=data.get('Parking'),
+        Lift_Availability=data.get('Lift_Availability'),
+        Security=data.get('Security'),
+        Connectivity=json.dumps(data.get('Connectivity'))
+    )
+    db.session.add(new_property)
+    db.session.commit()
+    
+
 #-----------------STEP 1 ROUTING FETCHING DETAILS FROM FRONTEND AND PUSHING TO DATABASE------------------------
 @app.route('/api/builders/<rera_id>/projects/step1', methods=['POST'])
 def create_project_step1(rera_id):
@@ -780,8 +798,12 @@ def create_project_step4(rera_id):
 def create_project_step5(rera_id):
     data = request.json
     project_id = data.get('project_id')
+    user_id = data.get('user_id')
+
     if not project_id:
         return jsonify({'error': 'project_id is required'}), 400
+    if not user_id:
+        return jsonify({'error': 'user_id is required'}), 400
     
     # Allow updating any project, not just from the current builder
     project = BuilderProject.query.filter_by(id=project_id).first_or_404()
@@ -791,6 +813,9 @@ def create_project_step5(rera_id):
     project.form_status = 'step5_complete'
     
     db.session.commit()
+
+    _create_property_for_project(project, user_id, data)
+
     return jsonify(project.to_dict()), 200
 
 def generate_slug_with_perplexity(project, api_key):
