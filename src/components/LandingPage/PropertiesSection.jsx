@@ -1,92 +1,106 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { CiLocationOn } from "react-icons/ci";
+import initPropertyCardHandlers from '../../js/propertyCards.js';
+import './css/PropertiesSection.css';
+const propertiesNaviMumbai = [
+  {
+    img: '/Presidential Towers.jpg.png',
+    name: 'Presidential Towers',
+    address: '555 W Madison St, Vashi, IL 60661',
+    features: '3 BHK | Pool',
+    price: '₹ 1.2 Cr +',
+    confidence: '93%',
+  },
+  {
+    img: '/kalpataru Residency.jpg.png',
+    name: 'Kalpataru Residency',
+    address: '400 E South Water St, Vashi, IL 60601',
+    features: '2 BHK | Pool | Parking',
+    price: '₹ 1.5 Cr +',
+    confidence: '95%',
+  },
+  {
+    img: '/Rustomjee.jpg.png',
+    name: 'Rustomjee',
+    address: '930 W Altgeld St, Ghansoli west, IL 60614',
+    features: '2 BHK | Gym | Pool',
+    price: '₹ 1 Cr +',
+    confidence: '93%',
+  },
+  {
+    img: '/garden.jpeg',
+    name: 'Garden View Heights',
+    address: '123 Green Lane, Navi Mumbai',
+    features: '3 BHK | Garden | Pool',
+    price: '₹ 1.8 Cr +',
+    confidence: '92%',
+  },
+  {
+    img: '/presidental.jpeg',
+    name: 'Presidential Elite',
+    address: '88 Elite Ave, Navi Mumbai',
+    features: '4 BHK | Pool | Gym',
+    price: '₹ 2.1 Cr +',
+    confidence: '94%',
+  },
+  {
+    img: '/main-image.jpeg',
+    name: 'Main Residency',
+    address: '77 Main St, Navi Mumbai',
+    features: '2 BHK | Pool',
+    price: '₹ 1.3 Cr +',
+    confidence: '91%',
+  },
+  {
+    img: '/consulting.jpeg',
+    name: 'Consulting Heights',
+    address: '12 Consulting Rd, Navi Mumbai',
+    features: '3 BHK | Office | Pool',
+    price: '₹ 1.7 Cr +',
+    confidence: '90%',
+  },
+];
 
-// Hardcoded API URL to avoid ReferenceError in browser
-const API_URL = 'http://localhost:5000/api';
+const propertiesNewCity = [
+  {
+    img: '/World-View-tower.jpg',
+    name: 'World View Tower',
+    address: '123 New City Ave, New City, NY 10001',
+    features: '4 BHK | Gym | Pool',
+    price: '₹ 2 Cr +',
+    confidence: '92%',
+  },
+  {
+    img: '/Defining-Demand.jpg',
+    name: 'Defining Demand',
+    address: '456 Skyline Rd, New City, NY 10002',
+    features: '3 BHK | Pool | Parking',
+    price: '₹ 1.8 Cr +',
+    confidence: '94%',
+  },
+  {
+    img: '/famous.jpg',
+    name: 'Famous Heights',
+    address: '789 Uptown Blvd, New City, NY 10003',
+    features: '2 BHK | Gym',
+    price: '₹ 1.1 Cr +',
+    confidence: '91%',
+  },
+];
 
 const PropertiesSection = () => {
   const [activeTab, setActiveTab] = useState('navi');
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
-  const [properties, setProperties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const properties = activeTab === 'navi' ? propertiesNaviMumbai : propertiesNewCity;
   const cardsRowRef = useRef(null);
-
-  // Function to transform backend data to frontend format
-  const transformProjectData = (projects) => {
-    return projects.map(project => {
-      // Always use the sample image for now
-      const img = 'dummy_building.jpeg';
-      // Parse amenities and join them
-      let amenities = [];
-      try {
-        amenities = project.amenities ? JSON.parse(project.amenities) : [];
-        if (!Array.isArray(amenities)) amenities = [amenities];
-      } catch {
-        amenities = project.amenities ? [project.amenities] : [];
-      }
-      const features = amenities.length > 0 ? amenities.join(' | ') : 'Basic Amenities';
-      // Build address from flat_number, location, and full_address
-      const addressParts = [];
-      if (project.flat_number) addressParts.push(project.flat_number);
-      if (project.location) addressParts.push(project.location);
-      if (project.full_address) addressParts.push(project.full_address);
-      const address = addressParts.length > 0 ? addressParts.join(', ') : 'Location details coming soon';
-      return {
-        img,
-        name: project.title || 'Project Title',
-        address: address,
-        features: features,
-        price: project.price_range && project.price_range.trim() !== '' ? project.price_range : '₹ Price on request',
-        confidence: '95%',
-        id: project.id
-      };
-    });
-  };
-
-  // Fallback data in case API fails
-  const fallbackData = [
-    {
-      img: '/main-image.jpeg',
-      name: 'Sample Project',
-      address: 'Location details coming soon',
-      features: 'Basic Amenities',
-      price: '₹ Price on request',
-      confidence: '95%',
-      id: 'fallback-1'
-    }
-  ];
-
-  // Fetch projects from backend
-  const fetchProjects = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await fetch(`${API_URL}/projects`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch projects');
-      }
-      
-      const data = await response.json();
-      const transformedData = transformProjectData(data);
-      setProperties(transformedData);
-    } catch (err) {
-      console.error('Error fetching projects:', err);
-      setError('Failed to load properties. Please try again later.');
-      // Use fallback data instead of empty array
-      setProperties(fallbackData);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchProjects();
-  }, []);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 700);
     window.addEventListener('resize', handleResize);
+    
+    // Initialize property card click handlers
+    initPropertyCardHandlers();
+    
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -106,59 +120,55 @@ const PropertiesSection = () => {
         <div className={`property-header-stack${isMobile ? ' property-header-stack-mobile' : ''}`}>
           <h2 className="section-heading property-section-title-center">Properties</h2>
           <span className="section-underline" />
-          {isMobile && (
-            <div className="property-toggle-pill-group property-toggle-pill-group-mobile" style={{ marginTop: 12, marginBottom: 8 }}>
-              <button
-                className={`property-toggle-pill-btn${activeTab === 'navi' ? ' active' : ''}`}
-                onClick={() => setActiveTab('navi')}
-              >
-                BUY IN NAVI MUMBAI
-              </button>
-              <button
-                className={`property-toggle-pill-btn${activeTab === 'newcity' ? ' active' : ''}`}
-                onClick={() => setActiveTab('newcity')}
-              >
-                EXPLORE NEW CITY
-              </button>
-            </div>
-          )}
         </div>
-        {isMobile ? (
-          <a className="property-viewall-link property-viewall-mobile-below" href="#" style={{ margin: '0 0 10px 0', display: 'block', textAlign: 'right', fontWeight: 600 }}>VIEW ALL &gt;</a>
-        ) : (
-          <div className="property-header-row-responsive" style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 0, marginTop: 8, marginBottom: 8 }}>
-            <div className="property-toggle-pill-group">
-              <button
-                className={`property-toggle-pill-btn${activeTab === 'navi' ? ' active' : ''}`}
-                onClick={() => setActiveTab('navi')}
-              >
-                BUY IN NAVI MUMBAI
-              </button>
-              <button
-                className={`property-toggle-pill-btn${activeTab === 'newcity' ? ' active' : ''}`}
-                onClick={() => setActiveTab('newcity')}
-              >
-                EXPLORE NEW CITY
-              </button>
-            </div>
-            <a className="property-viewall-link" href="#">VIEW ALL &gt;</a>
-          </div>
-        )}
       </div>
       {/* Property Cards Row with Arrows */}
       <div className="property-cards-row-wrapper">
         {/* Removed left arrow button */}
-        <div className="property-cards-row" ref={cardsRowRef}>
+        <div className={`property-cards-row ${isMobile ? 'mobile-cards-row' : ''}`} ref={cardsRowRef}>
           {properties.map((prop, idx) => (
-            <div className="property-card-custom" key={prop.id || idx}>
-              <img 
-                src={prop.img} 
-                alt={prop.name} 
-                className="property-img-custom"
-                onError={(e) => {
-                  e.target.src = '/main-image.jpeg'; // Fallback image
-                }}
-              />
+            <div 
+              className={`property-card-custom ${isMobile ? 'mobile-card' : ''}`} 
+              key={idx}
+              onClick={() => {
+                // Create property data object
+                const propertyData = {
+                  name: prop.name,
+                  address: prop.address,
+                  features: prop.features,
+                  price: prop.price,
+                  confidence: prop.confidence,
+                  clickedAt: new Date().toISOString()
+                };
+                
+                // Store in localStorage
+                localStorage.setItem('lastClickedProperty', JSON.stringify(propertyData));
+                
+                // Also store in recently viewed properties array (max 5 items)
+                let recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewedProperties') || '[]');
+                
+                // Check if this property is already in the recently viewed list
+                const existingIndex = recentlyViewed.findIndex(p => p.name === prop.name && p.address === prop.address);
+                
+                // If it exists, remove it so we can add it to the front
+                if (existingIndex !== -1) {
+                  recentlyViewed.splice(existingIndex, 1);
+                }
+                
+                // Add to the beginning of the array
+                recentlyViewed.unshift(propertyData);
+                
+                // Keep only the 5 most recent properties
+                recentlyViewed = recentlyViewed.slice(0, 5);
+                
+                // Save back to localStorage
+                localStorage.setItem('recentlyViewedProperties', JSON.stringify(recentlyViewed));
+                
+                // Log property information to console
+                console.log('Property clicked and stored in localStorage:', propertyData);
+              }}
+            >
+              <img src={prop.img} alt={prop.name} className="property-img-custom" />
               {/* Confidence Badge (right, styled like previous right badge) */}
               <div className="property-confidence-badge">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 4 }}>
@@ -171,9 +181,11 @@ const PropertiesSection = () => {
               <div className="property-overlay-custom">
                 <div className="property-info-custom">
                   <h2>{prop.name}</h2>
-                  <p className="property-address-custom">📍 {prop.address}</p>
-                  <p className="property-details-custom">{prop.features}</p>
-                  <p className="property-price-custom">{prop.price}</p>
+                  <p className="property-address-custom"><CiLocationOn className="location-icon" />{prop.address}</p>
+                  <div className="property-bottom-row">
+                    <p className="property-details-custom">{prop.features}</p>
+                    <p className="property-price-custom">{prop.price}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -182,6 +194,17 @@ const PropertiesSection = () => {
         {/* Removed right arrow button */}
       </div>
       <style>{`
+        .mobile-cards-row {
+          padding: 20px 10px !important;
+          margin: -20px 0 !important;
+          gap: 12px !important;
+        }
+        .mobile-card {
+          width: 220px !important;
+          height: 300px !important;
+          margin: 0 2px !important;
+        }
+
         .section-heading {
           margin-bottom: 0 !important;
         }
@@ -200,10 +223,10 @@ const PropertiesSection = () => {
           flex-direction: column;
           align-items: center;
           gap: 0;
-          margin-bottom: 18px;
+          margin-bottom: 32px;
         }
         .property-header-stack-mobile {
-          margin-bottom: 0.5rem;
+          margin-bottom: 24px;
           margin-top: 0.5rem;
         }
         .property-toggle-pill-group-mobile {
@@ -214,6 +237,8 @@ const PropertiesSection = () => {
           margin-bottom: 0.5rem;
           display: flex;
           gap: 10px;
+          z-index: 20;
+          position: relative;
         }
         .property-toggle-pill-btn {
           background: #fcfbf7;
@@ -225,6 +250,8 @@ const PropertiesSection = () => {
           padding: 10px 18px;
           font-size: 0.85rem;
           cursor: pointer;
+          z-index: 20;
+          position: relative;
         }
         .property-toggle-pill-btn:active, .property-toggle-pill-btn:focus {
           background: #e6eaf0 !important;
@@ -248,19 +275,24 @@ const PropertiesSection = () => {
           display: inline-block;
         }
         .property-section-custom {
-          background: #f9f6ee;
-          border-radius: 18px;
-          padding: 24px;
+          padding: 24px 16px;
           box-sizing: border-box;
           max-width: 1460px;
-          margin: 0 auto;
+          margin: 24px auto 60px auto;
           transition: background 0.18s;
+          overflow: hidden;
+          border-radius: 24px;
         }
         .property-cards-row-wrapper {
           position: relative;
           width: 100%;
           display: flex;
           align-items: center;
+          padding: 40px 0;
+          margin: -40px 0;
+          overflow: hidden;
+          background: white;
+          border-radius: 8px;
         }
         .property-cards-row {
           display: flex;
@@ -273,6 +305,15 @@ const PropertiesSection = () => {
           overflow-x: auto;
           scrollbar-width: none;
           -ms-overflow-style: none;
+          padding: 40px 16px;
+          margin: -40px 0;
+          overflow-y: hidden;
+          -webkit-overflow-scrolling: touch;
+          scroll-behavior: smooth;
+          scroll-snap-type: x mandatory;
+          position: relative;
+          left: 0;
+          right: 0;
         }
         .property-cards-row::-webkit-scrollbar {
           display: none;
@@ -286,17 +327,31 @@ const PropertiesSection = () => {
           box-shadow: 0 2px 12px rgba(34,58,95,0.13);
           background: #222;
           flex-shrink: 0;
-          transition: transform 0.2s;
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           border: 10px solid #42555F;
+          cursor: pointer;
+          z-index: 1;
+          scroll-snap-align: start;
         }
         .property-card-custom:hover {
-          transform: translateY(-6px) scale(1.02);
+          transform: translateY(-8px);
+          box-shadow: 0 8px 32px rgba(34,58,95,0.25), 0 4px 16px rgba(34,58,95,0.15);
+          z-index: 10;
+        }
+        .property-card-custom:hover .property-img-custom {
+          filter: brightness(1.1);
+          transform: scale(1.02);
+        }
+        .property-card-custom:hover .property-confidence-badge {
+          transform: scale(1.05);
+          box-shadow: 0 4px 12px rgba(34,58,95,0.2);
         }
         .property-img-custom {
           width: 100%;
           height: 100%;
           object-fit: cover;
           filter: brightness(0.88);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .property-confidence-badge {
           position: absolute;
@@ -312,6 +367,7 @@ const PropertiesSection = () => {
           align-items: center;
           box-shadow: 0 2px 8px rgba(34,58,95,0.10);
           z-index: 2;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .property-overlay-custom {
           position: absolute;
@@ -319,8 +375,14 @@ const PropertiesSection = () => {
           display: flex;
           flex-direction: column;
           justify-content: flex-end;
-          padding: 20px 16px;
+          padding: 20px 16px 16px 16px;
           background: linear-gradient(180deg, rgba(0,0,0,0.10) 50%, rgba(0,0,0,0.85) 100%);
+          z-index: 1;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .property-card-custom:hover .property-overlay-custom {
+          background: linear-gradient(180deg, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.9) 100%);
         }
         .property-info-custom h2 {
           color: #fff;
@@ -335,19 +397,112 @@ const PropertiesSection = () => {
           font-size: 1.05rem;
           opacity: 0.92;
           text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+          display: flex;
+          align-items: flex-start;
+          gap: 4px;
+          line-height: 1.3;
+          word-break: break-word;
+        }
+        .property-bottom-row {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          margin-top: 16px;
+        }
+        .property-details-custom {
+          margin: 0;
+          flex: 1;
         }
         .property-price-custom {
+          margin: 0;
           font-size: 1.15rem;
           font-weight: 700;
-          margin-top: 6px;
+          text-align: right;
+        }
+        .location-icon {
+          flex-shrink: 0;
+          margin-top: 2px;
+          font-size: 1.2rem;
+          color: #ffffff;
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
+        }
+
+        .property-toggle-pill-group {
+          display: flex;
+          gap: 10px;
+          z-index: 20;
+          position: relative;
+        }
+
+        .property-header-row-responsive {
+          width: 100%;
+          display: flex;
+          flex-direction: row;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0;
+          margin-top: 8px;
+          margin-bottom: 24px;
+          z-index: 20;
+          position: relative;
+        }
+
+        /* Tablet Styles (701px - 1024px) */
+        @media (min-width: 701px) and (max-width: 1024px) {
+          .property-section-custom {
+            padding: 20px 24px;
+            margin: 16px auto 48px auto;
+            max-width: 1000px;
+          }
+          .section-heading {
+            font-size: 2.2rem;
+          }
+          .property-cards-row-wrapper {
+            padding: 36px 0;
+            margin: -36px 0;
+          }
+          .property-cards-row {
+            gap: 18px;
+            padding: 36px 16px;
+            margin: -36px 0;
+          }
+          .property-card-custom {
+            width: 280px;
+            height: 320px;
+            border-radius: 16px;
+            border: 8px solid #42555F;
+          }
+          .property-info-custom h2 { font-size: 1.25rem; }
+          .property-address-custom, .property-details-custom { font-size: 0.95rem; }
+          .property-price-custom { font-size: 1.05rem; }
+          .property-confidence-badge { padding: 3px 9px; font-size: 0.85rem; }
         }
 
         /* Mobile Styles (up to 700px) */
         @media (max-width: 700px) {
+        .property-address-custom {
+          color: #fff;
+          margin: 0 0 4px 0;
+          font-size: 1.05rem;
+          opacity: 0.92;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+          display: flex;
+          align-items: flex-start; /* <-- change from center to flex-start */
+          gap: 4px;
+          line-height: 1.3;
+          word-break: break-word;
+        }
+        .location-icon {
+          flex-shrink: 0;
+          margin-top: 2px; /* optional: tweak for perfect alignment */
+          font-size: 1.1rem;
+          color: #ffffff;
+          filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
+        }
           .property-section-custom {
-            padding: 16px;
-            margin: 0 8px;
-            border-radius: 12px;
+            padding: 16px 10px 24px 10px;
+            margin: 8px 10px 32px 10px;
+            border-radius: 18px;
           }
 
           .section-heading {
@@ -364,15 +519,41 @@ const PropertiesSection = () => {
             font-size: 0.8rem;
           }
 
+          .property-header-stack-mobile {
+            margin-bottom: 20px;
+          }
+
           .property-cards-row {
             gap: 16px;
+            padding: 32px 16px;
+            margin: -32px 0;
+            overflow-y: hidden;
+          }
+
+          .property-cards-row-wrapper {
+            padding: 32px 0;
+            margin: -32px 0;
+            overflow: visible;
           }
 
           .property-card-custom {
-            width: 280px;
-            height: 320px;
+            width: 260px;
+            height: 300px;
             border-radius: 16px;
             border: 6px solid #42555F;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+          }
+          
+          .property-card-custom:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 6px 24px rgba(34,58,95,0.25), 0 3px 12px rgba(34,58,95,0.15);
+            z-index: 10;
+          }
+          
+          .property-card-custom:hover .property-img-custom {
+            filter: brightness(1.1);
+            transform: scale(1.03);
           }
 
           .property-confidence-badge {
@@ -397,18 +578,40 @@ const PropertiesSection = () => {
             margin-bottom: 3px;
           }
 
+          .property-bottom-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 12px;
+          }
+          
+          .property-details-custom {
+            margin: 0;
+            flex: 1;
+          }
+          
           .property-price-custom {
             font-size: 1.05rem;
             margin-top: 4px;
+          }
+          
+          .property-buttons-custom {
+            gap: 6px;
+            margin-top: 8px;
+          }
+          
+          .property-btn-custom {
+            padding: 5px 8px;
+            font-size: 0.75rem;
           }
         }
 
         /* Small Mobile (320px - 480px) */
         @media (max-width: 480px) {
           .property-section-custom {
-            padding: 12px;
-            margin: 0 4px;
-            border-radius: 10px;
+            padding: 16px 10px 24px 10px;
+            margin: 8px 10px 32px 10px;
+            border-radius: 18px;
           }
 
           .section-heading {
@@ -427,6 +630,15 @@ const PropertiesSection = () => {
 
           .property-cards-row {
             gap: 12px;
+            padding: 12px 10px;
+            margin: -12px 0;
+            overflow-y: hidden;
+          }
+
+          .property-cards-row-wrapper {
+            padding: 12px 0;
+            margin: -12px 0;
+            overflow: visible;
           }
 
           .property-card-custom {
@@ -434,6 +646,19 @@ const PropertiesSection = () => {
             height: 280px;
             border-radius: 12px;
             border: 4px solid #42555F;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+          }
+          
+          .property-card-custom:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 20px rgba(34,58,95,0.25), 0 2px 8px rgba(34,58,95,0.15);
+            z-index: 10;
+          }
+          
+          .property-card-custom:hover .property-img-custom {
+            filter: brightness(1.1);
+            transform: scale(1.01);
           }
 
           .property-confidence-badge {
@@ -457,6 +682,18 @@ const PropertiesSection = () => {
             margin-bottom: 2px;
           }
 
+          .property-bottom-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 4px;
+          }
+          
+          .property-details-custom {
+            margin: 0;
+            flex: 1;
+          }
+          
           .property-price-custom {
             font-size: 0.95rem;
             margin-top: 3px;
@@ -466,8 +703,9 @@ const PropertiesSection = () => {
         /* Extra Small Mobile (below 320px) */
         @media (max-width: 319px) {
           .property-section-custom {
-            padding: 10px;
-            margin: 0 2px;
+            padding: 16px 16px 24px 16px;
+            margin: 8px 16px 32px 16px;
+            border-radius: 18px;
           }
 
           .section-heading {
@@ -479,10 +717,36 @@ const PropertiesSection = () => {
             font-size: 0.7rem;
           }
 
+          .property-cards-row {
+            gap: 10px;
+            padding: 10px 10px;
+            margin: -10px 0;
+            overflow-y: hidden;
+          }
+
+          .property-cards-row-wrapper {
+            padding: 10px 0;
+            margin: -10px 0;
+            overflow: visible;
+          }
+
           .property-card-custom {
             width: 220px;
             height: 260px;
             border: 3px solid #42555F;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1;
+          }
+          
+          .property-card-custom:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 3px 16px rgba(34,58,95,0.25), 0 2px 6px rgba(34,58,95,0.15);
+            z-index: 10;
+          }
+          
+          .property-card-custom:hover .property-img-custom {
+            filter: brightness(1.1);
+            transform: scale(1.01);
           }
 
           .property-confidence-badge {
@@ -506,9 +770,23 @@ const PropertiesSection = () => {
             margin-bottom: 2px;
           }
 
+          .property-bottom-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 10px;
+          }
+          
+          .property-details-custom {
+            margin: 0;
+            flex: 1;
+          }
+          
           .property-price-custom {
+            margin: 0;
             font-size: 0.85rem;
             margin-top: 2px;
+            text-align: right;
           }
         }
       `}</style>

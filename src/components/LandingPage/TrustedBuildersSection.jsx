@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './css/TrustedBuildersSection.css';
 
 const BUILDERS = [
   {
@@ -44,6 +45,14 @@ const TrustedBuildersSection = () => {
   const [activeIdx, setActiveIdx] = useState(2);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
+  
+  const handlePrevious = () => {
+    setActiveIdx((prevIdx) => (prevIdx === 0 ? BUILDERS.length - 1 : prevIdx - 1));
+  };
+  
+  const handleNext = () => {
+    setActiveIdx((prevIdx) => (prevIdx === BUILDERS.length - 1 ? 0 : prevIdx + 1));
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -67,178 +76,64 @@ const TrustedBuildersSection = () => {
     centerScale = 1.05;
   }
 
-  // Mobile Layout with Desktop-Style Card Content
+  // Mobile Layout with Simple Cards (No Carousel)
   if (isMobile) {
     return (
-      <section
-        style={{
-          background: '#F7F9FF',
-          borderRadius: 18,
-          padding: '24px 0 32px 0',
-          margin: '24px 0',
-          maxWidth: '100vw',
-          boxSizing: 'border-box',
-          position: 'relative',
-          overflowX: 'hidden',
-        }}
-      >
-        <div style={{
-          textAlign: 'center',
-          margin: '0 0 24px 0',
-          paddingLeft: 16,
-          paddingRight: 16,
-        }}>
-          <h2 style={{
-            fontSize: '1.8rem',
-            fontWeight: 800,
-            color: '#223A5F',
-            margin: 0,
-            letterSpacing: '-0.5px'
-          }}>
+      <section className="trusted-builders-section mobile">
+
+        <div className="trusted-builders-header mobile">
+          <h2 className="trusted-builders-heading mobile">
             Explore Trusted Builders in Area
           </h2>
-          <span style={{
-            display: 'block',
-            width: '60px',
-            height: '3px',
-            background: 'linear-gradient(90deg, #F1D97A 0%, #e6c76a 100%)',
-            margin: '8px auto 0',
-            borderRadius: '2px',
-            boxShadow: '0 2px 4px rgba(241, 217, 122, 0.3)'
-          }} />
+          <span className="trusted-builders-underline mobile" />
         </div>
 
-        {/* Mobile Cards Container with Desktop Styling */}
-        <div
-          style={{
-            display: 'flex',
-            gap: 16,
-            overflow: 'auto',
-            paddingLeft: 16,
-            paddingRight: 16,
-            scrollBehavior: 'smooth',
-            WebkitOverflowScrolling: 'touch',
-            scrollbarWidth: 'none',
-            msOverflowStyle: 'none',
-          }}
-        >
-          {BUILDERS.map((builder, idx) => (
+        {/* Mobile Cards Container with Simple Cards */}
+        <div className="mobile-cards-container">
+          {/* Simple scrollable row of cards */}
+          <div className="mobile-cards-row">
+
+            {/* Show all cards in a scrollable row */}
+            {BUILDERS.map((builder, idx) => (
             <div
               key={idx}
+              className="mobile-builder-card"
               style={{
-                minWidth: '280px',
-                width: '280px',
-                height: '320px',
-                borderRadius: BORDER_RADIUS,
-                background: `url(${builder.img}) center/cover no-repeat`,
-                boxShadow: '0 8px 32px rgba(34,58,95,0.18), 0 2px 8px #93A2B0',
-                border: '6px solid #C8D9E9',
-                position: 'relative',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'flex-end',
-                flexShrink: 0,
-                cursor: 'pointer',
+                backgroundImage: `url(${builder.img})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat'
               }}
-              onClick={() => setActiveIdx(idx)}
             >
-              {/* Desktop-style overlay with exact same styling */}
-              <div
-                style={{
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom: 20, // Same as desktop (24px scaled for mobile)
-                  height: '40%', // Same percentage as desktop
-                  background: 'rgba(241,241,241,0.85)', // Exact same background
-                  zIndex: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 0, // Same as desktop
-                  boxShadow: activeIdx === idx ? '0 2px 12px #223A5F22' : 'none', // Same active shadow
-                }}
-              >
+              {/* Card overlay with info */}
+              <div className="card-overlay">
+
                 {builder.logo && (
                   <img
                     src={builder.logo}
                     alt={builder.name}
-                    style={{
-                      width: 44, // Scaled from desktop 56px
-                      height: 44,
-                      borderRadius: '50%',
-                      marginBottom: 8, // Scaled from desktop 10px
-                      objectFit: 'cover',
-                      background: '#fff',
-                      border: '2px solid #e0e0e0',
-                    }}
+                    className="builder-logo"
                   />
                 )}
-                {/* Title with exact desktop font family and styling */}
-                <div
-                  style={{
-                    fontFamily: 'Abril Fatface, serif', // Same as desktop
-                    fontWeight: 700, // Same as desktop
-                    fontSize: 20, // Scaled from desktop 26px
-                    color: '#223A5F', // Same as desktop
-                    marginBottom: 3, // Scaled from desktop 4px
-                    textAlign: 'center',
-                  }}
-                >
+                {/* Title */}
+                <div className="builder-title">
+
                   {builder.name}
                 </div>
-                {/* Subtitle with exact desktop styling */}
-                <div
-                  style={{
-                    fontWeight: 500, // Same as desktop
-                    fontSize: 13, // Scaled from desktop 17px
-                    color: '#223A5F', // Same as desktop
-                    opacity: 0.92, // Same as desktop
-                    marginBottom: 2, // Scaled from desktop 3px
-                    textAlign: 'center',
-                  }}
-                >
+                {/* Subtitle */}
+                <div className="builder-subtitle">
+
                   {builder.subtitle}
                 </div>
-                {/* Price with exact desktop styling */}
-                <div
-                  style={{
-                    fontWeight: 700, // Same as desktop
-                    fontSize: 14, // Scaled from desktop 18px
-                    color: '#223A5F', // Same as desktop
-                    textAlign: 'center',
-                  }}
-                >
+                {/* Price */}
+                <div className="builder-price">
+
                   {builder.price}
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Mobile scroll indicator dots */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: 8,
-          marginTop: 20,
-        }}>
-          {BUILDERS.map((_, idx) => (
-            <div
-              key={idx}
-              style={{
-                width: activeIdx === idx ? 20 : 8,
-                height: 8,
-                borderRadius: 4,
-                background: activeIdx === idx ? '#223A5F' : '#e0e0e0',
-                transition: 'all 0.3s ease',
-                cursor: 'pointer',
-              }}
-              onClick={() => setActiveIdx(idx)}
-            />
-          ))}
+            ))}
+          </div>
         </div>
 
         <style jsx>{`
@@ -250,7 +145,7 @@ const TrustedBuildersSection = () => {
     );
   }
 
-  // Desktop/Tablet Layout (carousel without arrows)
+  // Desktop/Tablet Layout (carousel with navigation arrows)
   return (
     <section
       style={{
@@ -265,27 +160,32 @@ const TrustedBuildersSection = () => {
       }}
     >
       <div style={{
-        textAlign: 'center',
+        width: '100%',
+        position: 'relative',
         margin: '0 0 32px 0',
+        marginBottom: isTablet ? '40px' : '50px', // Added extra spacing between heading and content
       }}>
-        <h2 style={{
-          fontSize: isTablet ? '2.1rem' : '2.5rem',
-          fontWeight: 800,
-          color: '#223A5F',
-          margin: 0,
-          letterSpacing: '-0.5px'
-        }}>
-          Explore Trusted Builders in Area
-        </h2>
-        <span style={{
-          display: 'block',
-          width: isTablet ? '70px' : '80px',
-          height: '4px',
-          background: 'linear-gradient(90deg, #F1D97A 0%, #e6c76a 100%)',
-          margin: '12px auto 0',
-          borderRadius: '2px',
-          boxShadow: '0 2px 4px rgba(241, 217, 122, 0.3)'
-        }} />
+        <div style={{ textAlign: 'center' }}>
+          <h2 style={{
+            fontSize: isTablet ? '2.1rem' : '2.5rem',
+            fontWeight: 800,
+            color: '#223A5F',
+            margin: 0,
+            letterSpacing: '-0.5px',
+            fontFamily: "'Abril Fatface', serif"
+          }}>
+            Explore Trusted Builders in Area
+          </h2>
+          <span style={{
+            display: 'block',
+            width: isTablet ? '70px' : '80px',
+            height: '4px',
+            background: 'linear-gradient(90deg, #F1D97A 0%, #e6c76a 100%)',
+            margin: '12px auto 0',
+            borderRadius: '2px',
+            boxShadow: '0 2px 4px rgba(241, 217, 122, 0.3)'
+          }} />
+        </div>
       </div>
 
       <div
@@ -300,6 +200,74 @@ const TrustedBuildersSection = () => {
           boxSizing: 'border-box',
         }}
       >
+        {/* Navigation Buttons */}
+        <button 
+          onClick={handlePrevious}
+          className="carousel-nav-button prev-button"
+          aria-label="Previous"
+          style={{
+            position: 'absolute',
+            left: isTablet ? '10%' : '15%',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 30,
+            background: 'rgba(255, 255, 255, 0.9)',
+            border: 'none',
+            borderRadius: '50%',
+            width: isTablet ? '44px' : '50px',
+            height: isTablet ? '44px' : '50px',
+            display: isMobile ? 'flex' : 'none',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease-in-out',
+              opacity: 0.9,
+              '&:hover': {
+                opacity: 1,
+                transform: 'translateY(-50%) scale(1.05)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)'
+              }
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M15 18L9 12L15 6" stroke="#223A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
+        
+        <button 
+          onClick={handleNext}
+          className="carousel-nav-button next-button"
+          aria-label="Next"
+          style={{
+            position: 'absolute',
+            right: isTablet ? '10%' : '15%',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            zIndex: 30,
+            background: 'rgba(255, 255, 255, 0.9)',
+            border: 'none',
+            borderRadius: '50%',
+            width: isTablet ? '44px' : '50px',
+            height: isTablet ? '44px' : '50px',
+            display: isMobile ? 'flex' : 'none',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+            cursor: 'pointer',
+            transition: 'all 0.3s ease-in-out',
+              opacity: 0.9,
+              '&:hover': {
+                opacity: 1,
+                transform: 'translateY(-50%) scale(1.05)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)'
+              }
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 6L15 12L9 18" stroke="#223A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        </button>
         {/* Carousel Container */}
         <div
           style={{
@@ -314,8 +282,26 @@ const TrustedBuildersSection = () => {
           }}
         >
           {BUILDERS.map((builder, idx) => {
-            const offset = idx - activeIdx;
-            if (Math.abs(offset) > 2) return null;
+            // Calculate offset considering circular carousel
+            let offset = idx - activeIdx;
+            
+            // Handle circular wrapping for the last card
+            if (activeIdx === BUILDERS.length - 1) {
+              if (idx === 0) offset = 1; // Position the first card to the right
+              else if (idx === 1) offset = 2; // Position the second card further right
+            }
+            
+            // Handle circular wrapping for the first card
+            if (activeIdx === 0) {
+              if (idx === BUILDERS.length - 1) offset = -1; // Position the last card to the left
+              else if (idx === BUILDERS.length - 2) offset = -2; // Position the second-to-last card further left
+            }
+            
+            // Skip cards that are too far away
+            if (Math.abs(offset) > 2 && 
+                !(activeIdx === BUILDERS.length - 1 && (idx === 0 || idx === 1)) && 
+                !(activeIdx === 0 && (idx === BUILDERS.length - 1 || idx === BUILDERS.length - 2))
+               ) return null;
 
             let translateX = offset < 0 ? -cardWidth * 0.55 : offset > 0 ? cardWidth * 0.55 : 0;
             let scale = offset === 0 ? centerScale : Math.abs(offset) === 2 ? 0.88 : 0.92;
@@ -343,7 +329,7 @@ const TrustedBuildersSection = () => {
                   top: 0,
                   left: '50%',
                   transform: `translateX(-50%) scale(${scale}) translateX(${translateX}px)`,
-                  transition: 'all 0.45s cubic-bezier(.4,2,.6,1)',
+                  transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
                   overflow: 'hidden',
                   display: 'flex',
                   flexDirection: 'column',
@@ -424,6 +410,19 @@ const TrustedBuildersSection = () => {
           })}
         </div>
       </div>
+      
+      <style jsx>{`
+        .carousel-nav-button:hover {
+          background: rgba(255, 255, 255, 1) !important;
+          transform: translateY(-50%) scale(1.05) !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25) !important;
+        }
+        
+        .carousel-nav-button:active {
+          transform: translateY(-50%) scale(0.95) !important;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+        }
+      `}</style>
     </section>
   );
 };

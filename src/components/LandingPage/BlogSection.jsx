@@ -87,7 +87,7 @@ const BlogSection = () => {
         ))}
       </div>
 
-      <style>{`
+      <style jsx>{`
         .blog-section {
           padding: 40px 20px;
           max-width: 1200px;
@@ -151,7 +151,7 @@ const BlogSection = () => {
           position: absolute;
           left: 24px;
           top: 24px;
-          z-index: 3;
+          z-index: ;
         }
         .latest-badge span {
           background: #F9D87A;

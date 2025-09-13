@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import './css/BuildersSection.css';
 
 const TABS = [
   { label: 'Western Mumbai', key: 'western' },
@@ -159,75 +160,48 @@ const BuildersSection = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Get responsive margins based on screen size
+  const getResponsiveMargins = () => {
+    const width = window.innerWidth;
+    if (width <= 480) {
+      return { padding: '12px', margin: '0 4px', paddingRight: '20px' };
+    } else if (width <= 768) {
+      return { padding: '16px', margin: '0 8px', paddingRight: '24px' };
+    } else {
+      return { padding: '20px', margin: '0 auto' };
+    }
+  };
+
+  const responsiveStyles = getResponsiveMargins();
+
   return (
     <section 
-      className="landing-section bg-cream" 
+      className={`landing-section bg-cream builders-section ${isMobile ? 'mobile' : ''}`}
       style={{
-        paddingTop: isMobile ? 20 : 32, 
-        paddingBottom: isMobile ? 4 : 8, // Reduced from 8:12 to 4:8
-        marginBottom: isMobile ? 12 : 16, // Added margin bottom
-        width: '100vw', 
-        maxWidth: '100vw', 
-        overflowX: 'hidden'
+        padding: responsiveStyles.padding,
+        margin: responsiveStyles.margin
       }}
     >
-      <div style={{
-        textAlign: 'center', 
-        margin: isMobile ? '0 0 20px 0' : '0 0 32px 0'
-      }}>
-        <h2 className="section-heading">Near You</h2>
-        <span className="section-underline" />
+      <div className={`builders-section-header ${isMobile ? 'mobile' : ''}`}>
+        <div style={{ textAlign: 'center' }}>
+          <h2 className="section-heading">Near You</h2>
+          <span className="section-underline" />
+        </div>
       </div>
       
-      {/* Tab Row - Fixed for Mobile */}
+      {/* Tab Row - Subtle left margin adjustment */}
       <div 
-        className="builders-tab-row-container" 
-        style={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          width: '100%', 
-          position: 'relative', 
-          marginBottom: isMobile ? 16 : 12,
-          paddingLeft: isMobile ? 16 : 24,
-          paddingRight: isMobile ? 16 : 24,
-          overflow: 'visible'
-        }}
+        className={`builders-tab-row-container ${isMobile ? 'mobile' : ''} ${isTablet ? 'tablet' : ''}`}
       >
         <div
-          className="builders-tab-row-scrollable"
+          className={`builders-tab-row-scrollable ${isMobile ? 'mobile' : ''}`}
           ref={tabRowRef}
-          style={{
-            display: 'flex',
-            gap: isMobile ? 12 : 12,
-            overflow: isMobile ? 'auto' : 'hidden',
-            scrollBehavior: 'smooth',
-            width: '100%',
-            paddingBottom: isMobile ? 4 : 0,
-            WebkitOverflowScrolling: 'touch'
-          }}
         >
           {TABS.map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className="tab-button"
-              style={{
-                background: 'none',
-                color: '#23487c',
-                border: 'none',
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: isMobile ? 13 : (isTablet ? 15 : 16),
-                padding: isMobile ? '8px 16px' : (isTablet ? '9px 15px' : '10px 18px'),
-                boxShadow: 'none',
-                cursor: 'pointer',
-                outline: 'none',
-                transition: 'all 0.18s',
-                borderBottom: activeTab === tab.key ? '3px solid #F9D87A' : '3px solid transparent',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-                minWidth: isMobile ? 'auto' : 'fit-content'
-              }}
+              className={`tab-button ${activeTab === tab.key ? 'active' : ''} ${isMobile ? 'mobile' : ''} ${isTablet ? 'tablet' : ''}`}
             >
               {tab.label}
             </button>
@@ -235,170 +209,14 @@ const BuildersSection = () => {
         </div>
       </div>
       
-      <style>{`
-        .section-heading {
-          font-size: ${isMobile ? '1.8rem' : (isTablet ? '2.1rem' : '2.5rem')};
-          font-weight: 800;
-          color: #223A5F;
-          margin: 0;
-          letter-spacing: -0.5px;
-        }
-        
-        .section-underline {
-          display: block;
-          width: ${isMobile ? '60px' : (isTablet ? '70px' : '80px')};
-          height: ${isMobile ? '3px' : '4px'};
-          background: linear-gradient(90deg, #F1D97A 0%, #e6c76a 100%);
-          margin: ${isMobile ? '8px auto 0' : '12px auto 0'};
-          border-radius: 2px;
-          box-shadow: 0 2px 4px rgba(241, 217, 122, 0.3);
-        }
-        
-        .builders-tab-row-scrollable::-webkit-scrollbar {
-          height: ${isMobile ? '2px' : '0'};
-        }
-        
-        .builders-tab-row-scrollable::-webkit-scrollbar-track {
-          background: rgba(241, 217, 122, 0.1);
-          border-radius: 4px;
-        }
-        
-        .builders-tab-row-scrollable::-webkit-scrollbar-thumb {
-          background: rgba(241, 217, 122, 0.5);
-          border-radius: 4px;
-        }
-        
-        .tab-button:hover {
-          color: #16386d !important;
-          background: rgba(241, 217, 122, 0.05) !important;
-        }
-        
-        .tab-button:active {
-          transform: translateY(1px);
-        }
-        
-        .builders-card-title,
-        .builders-card-projects,
-        .builders-card-price {
-          color: #E6E1E1 !important;
-        }
-        .builders-card-btn {
-          color: #223A5F !important;
-          border-color: #E6E1E1 !important;
-        }
-        
-        .builders-property-card {
-          width: ${isMobile ? '280px' : (isTablet ? '300px' : (isLaptop ? '320px' : '340px'))};
-          height: ${isMobile ? '240px' : (isTablet ? '210px' : (isLaptop ? '260px' : '220px'))};
-          border-radius: ${isMobile ? '16px' : '22px'};
-          flex-shrink: 0;
-          overflow: hidden;
-          position: relative;
-          transition: transform 0.3s ease;
-        }
-        
-        .builders-property-card.hoverable:hover {
-          transform: translateY(-8px);
-        }
-        
-        .builders-card-inner {
-          width: 100%;
-          height: 100%;
-          position: relative;
-          border-radius: ${isMobile ? '16px' : '22px'};
-        }
-        
-        .builders-card-overlay {
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.8) 100%);
-          border-radius: ${isMobile ? '16px' : '22px'};
-        }
-        
-        .builders-card-content {
-          position: absolute;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          padding: ${isMobile ? '14px' : (isTablet ? '18px' : (isLaptop ? '22px' : '20px'))};
-          z-index: 2;
-        }
-        
-        .builders-card-title {
-          font-size: ${isMobile ? '1.1rem' : (isTablet ? '1.3rem' : (isLaptop ? '1.35rem' : '1.4rem'))};
-          font-weight: 700;
-          margin-bottom: ${isMobile ? '4px' : (isLaptop ? '10px' : '8px')};
-          text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .builders-card-projects {
-          font-size: ${isMobile ? '0.8rem' : (isTablet ? '0.9rem' : (isLaptop ? '0.92rem' : '0.95rem'))};
-          margin-bottom: ${isMobile ? '3px' : (isLaptop ? '6px' : '5px')};
-          opacity: 0.9;
-          text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-        }
-        
-        .builders-card-price {
-          font-size: ${isMobile ? '0.95rem' : (isTablet ? '1.05rem' : (isLaptop ? '1.08rem' : '1.1rem'))};
-          font-weight: 600;
-          margin-bottom: ${isMobile ? '8px' : (isLaptop ? '14px' : '12px')};
-          text-shadow: 0 1px 2px rgba(0,0,0,0.5);
-        }
-        
-        .builders-card-buttons {
-          display: flex;
-          gap: ${isMobile ? '6px' : (isLaptop ? '12px' : '10px')};
-          flex-wrap: ${isMobile ? 'wrap' : 'nowrap'};
-          justify-content: ${isMobile ? 'flex-start' : 'flex-start'};
-        }
-        
-        .builders-card-btn {
-          background: rgba(255,255,255,0.9);
-          border: 1px solid #E6E1E1;
-          border-radius: ${isMobile ? '5px' : '8px'};
-          padding: ${isMobile ? '5px 8px' : (isTablet ? '7px 12px' : (isLaptop ? '8px 15px' : '8px 14px'))};
-          font-size: ${isMobile ? '0.7rem' : (isTablet ? '0.8rem' : (isLaptop ? '0.82rem' : '0.85rem'))};
-          font-weight: 600;
-          cursor: pointer;
-          transition: all 0.2s ease;
-          backdrop-filter: blur(10px);
-          flex: ${isMobile ? '1' : 'none'};
-          min-width: ${isMobile ? '0' : 'auto'};
-          text-align: center;
-        }
-        
-        .builders-card-btn:hover {
-          background: rgba(255,255,255,1);
-          transform: translateY(-1px);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-      `}</style>
+
       
       <div 
-        className="builders-cards-container" 
-        style={{ 
-          position: 'relative', 
-          width: '100vw', 
-          maxWidth: '100vw', 
-          overflowX: 'auto', 
-          WebkitOverflowScrolling: 'touch' 
-        }}
+        className={`builders-cards-container ${isMobile ? 'mobile' : ''}`}
       >
         <div
-          className="builders-cards-row"
+          className={`builders-cards-row ${isMobile ? 'mobile' : ''} ${isTablet ? 'tablet' : ''} ${isLaptop ? 'laptop' : ''}`}
           ref={cardsRowRef}
-          style={{
-            display: 'flex',
-            gap: isMobile ? 16 : (isTablet ? 24 : (isLaptop ? 28 : 32)),
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            paddingLeft: isMobile ? 16 : (isTablet ? 18 : 24),
-            paddingRight: isMobile ? 16 : (isTablet ? 18 : 24),
-            scrollBehavior: 'smooth',
-            overflowX: 'auto',
-            flexWrap: 'nowrap',
-            WebkitOverflowScrolling: 'touch',
-          }}
         >
           {visibleAreas.map((area, idx) => (
             <div 
@@ -406,7 +224,7 @@ const BuildersSection = () => {
               className={`builders-property-card group${area.img ? ' hoverable' : ''}`}
             >
               {area.img ? (
-                <div className="builders-card-inner" style={{background: `url(${area.img}) center/cover no-repeat`}}>
+                <div className="builders-card-inner" style={{background: `url(${area.img}) center/cover no-repeat`, border: 'none'}}>
                   <div className="builders-card-overlay" />
                   
                   <div className="builders-card-content">
@@ -420,12 +238,7 @@ const BuildersSection = () => {
                   </div>
                 </div>
               ) : (
-                <div style={{
-                  width: '100%', 
-                  height: '100%', 
-                  background: '#f5f7fa', 
-                  borderRadius: isMobile ? 16 : 22
-                }} />
+                <div className={`builders-card-empty ${isMobile ? 'mobile' : ''}`} />
               )}
             </div>
           ))}
