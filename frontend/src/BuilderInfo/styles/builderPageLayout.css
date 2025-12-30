@@ -1,0 +1,247 @@
+/* ========================================
+   BUILDER PAGE FULL-WIDTH LAYOUT
+   ======================================== */
+
+/* Remove the max-w-6xl constraint and add full-width styling */
+.builder-page-container {
+  width: 100%;
+  max-width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Component spacing - add consistent padding */
+.builder-section {
+  padding: 25px !important;
+  margin-bottom: 4px !important;
+}
+
+@media (min-width: 640px) {
+  .builder-section {
+    padding: 24px;
+    margin-bottom: 6px;
+  }
+}
+
+@media (min-width: 768px) {
+  .builder-section {
+    padding: 32px;
+    margin-bottom: 8px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .builder-section {
+    padding: 40px;
+    margin-bottom: 12px;
+  }
+}
+
+/* Override rounded corners for full-width */
+.full-width-section {
+  border-radius: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* Desktop view - maintain some padding on very large screens */
+@media (min-width: 1920px) {
+  .builder-section {
+    padding: 48px 80px;
+  }
+}
+
+/* Override TrustedBuildersSection margins */
+.trusted-builders-section.mobile {
+  margin: 4px 0 !important;
+}
+
+.trusted-builders-section.tablet,
+.trusted-builders-section.desktop {
+  margin: 8px 0 !important;
+}
+
+/* Page title styling */
+.builder-page-title {
+  padding: 16px;
+  margin-bottom: 0;
+}
+
+@media (min-width: 768px) {
+  .builder-page-title {
+    padding: 24px 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .builder-page-title {
+    padding: 32px 40px;
+  }
+}
+
+/* Remove all max-width constraints from sections */
+.projects-grid-section,
+.floor-plans-section,
+.resource-hub-section,
+.property-comparison-section,
+.schedule-visit-section,
+.search-filter-section,
+.who-we-are-section {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* Ensure cards and content respect full width */
+.builder-card-container {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ========================================
+   CONSISTENT SECTION HEADINGS
+   Based on landing page .section-heading
+   ======================================== */
+.builder-section-heading {
+  font-family: 'Abril Fatface', serif;
+  font-size: 1.75rem;
+  color: #223A5F;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+}
+
+.builder-section-subheading {
+  font-family: 'Abril Fatface', serif;
+  font-size: 1.25rem;
+  color: #223A5F;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+@media (min-width: 768px) {
+  .builder-section-heading {
+    font-size: 2rem;
+  }
+  .builder-section-subheading {
+    font-size: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .builder-section-heading {
+    font-size: 2.25rem;
+  }
+}
+
+/* ========================================
+   DYNAMIC SECTION CONTAINER
+   Uses flexbox gap for automatic spacing
+   ======================================== */
+.builder-sections-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .builder-sections-container {
+    gap: 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .builder-sections-container {
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .builder-sections-container {
+    gap: 20px;
+  }
+}
+
+/* Remove margin-bottom from builder-section when inside container */
+.builder-sections-container > .builder-section {
+  margin-bottom: 0 !important;
+}
+
+/* ========================================
+   BUILDER HERO STRIP
+   Compact hero strip at top of page
+   ======================================== */
+.builder-hero-strip {
+  width: 100%;
+  background: linear-gradient(135deg, #223A5F 0%, #1a2d4a 50%, #162538 100%);
+  padding: 20px 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.builder-hero-strip::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent 0%, rgba(249, 216, 122, 0.1) 100%);
+  pointer-events: none;
+}
+
+.builder-hero-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1400px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+.builder-hero-text h1 {
+  font-family: 'Abril Fatface', serif;
+  font-size: 1.5rem;
+  color: #F3ECDC;
+  margin: 0 0 4px 0;
+  letter-spacing: 0.5px;
+}
+
+.builder-hero-text p {
+  font-family: 'Quicksand', sans-serif;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
+}
+
+.builder-hero-accent {
+  width: 60px;
+  height: 4px;
+  background: #F9D87A;
+  border-radius: 2px;
+}
+
+@media (min-width: 768px) {
+  .builder-hero-strip {
+    padding: 24px 40px;
+  }
+  .builder-hero-text h1 {
+    font-size: 1.75rem;
+  }
+  .builder-hero-text p {
+    font-size: 1rem;
+  }
+  .builder-hero-accent {
+    width: 80px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .builder-hero-strip {
+    padding: 28px 48px;
+  }
+  .builder-hero-text h1 {
+    font-size: 2rem;
+  }
+}

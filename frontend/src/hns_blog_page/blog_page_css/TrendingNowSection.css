@@ -1,0 +1,226 @@
+.trending-section {
+  margin-bottom: 3rem;
+  padding: 2.5rem 1.5rem;
+  background: #F7F9FF;
+  border: 2px solid rgba(34, 58, 95, 0.1);
+  border-radius: 22px;
+  box-shadow: 0 4px 24px rgba(34, 58, 95, 0.08), 0 2px 8px rgba(34, 58, 95, 0.08);
+}
+
+.trending-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.trending-icon { 
+  width: 2rem; 
+  height: 2rem; 
+  color: #223A5F; 
+  animation: bounce 1.5s infinite; 
+}
+
+.trending-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #223A5F; 
+  font-family: 'Abril Fatface', serif; 
+  letter-spacing: 1px;
+}
+
+.trending-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.trending-cards::-webkit-scrollbar {
+  display: none;
+}
+
+.trending-card-link {
+  text-decoration: none;
+  min-width: 320px;
+}
+
+.trending-card {
+  position: relative;
+  background: white;
+  border: 2px solid transparent;
+  border-radius: 22px;
+  box-shadow: 0 4px 16px rgba(34, 58, 95, 0.1), 0 2px 6px rgba(34, 58, 95, 0.1);
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  min-width: 320px;
+  height: 320px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+.trending-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 36px rgba(34, 58, 95, 0.2), 0 4px 16px rgba(34, 58, 95, 0.15);
+  border-color: #F9D87A;
+}
+
+.card-image-container {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  border-radius: 1rem 1rem 0 0;
+}
+
+.card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease-in-out;
+}
+
+.trending-card:hover .card-image {
+  transform: scale(1.1);
+}
+
+.image-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.4), transparent);
+}
+
+.badge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.25rem 1rem;
+  border-radius: 999px;
+  border: 2px solid white;
+  text-transform: uppercase;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.badge-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.card-content {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.card-title {
+  font-weight: 700;
+  font-size: 1.125rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.3;
+  color: #223A5F;
+  font-family: 'Abril Fatface', serif;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #9ca3af;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+
+.read-more {
+  color: #223A5F;
+  font-weight: 600;
+  font-size: 0.875rem;
+  margin-right: 0.5rem;
+  font-family: 'Quicksand', sans-serif;
+}
+
+.read-more-icon {
+  width: 1rem;
+  height: 1rem;
+  color: #223A5F;
+}
+
+.card-date {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-left: auto;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+
+/*  Mobile  */
+@media (max-width: 768px) {
+  .trending-section {
+    padding: 1rem 0.5rem;
+    border-radius: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .trending-title {
+    font-size: 1.25rem; /* smaller heading */
+  }
+
+  .trending-cards {
+    gap: 1rem;
+  }
+
+  .trending-card-link {
+    min-width: 240px; /* smaller card */
+  }
+
+  .trending-card {
+    width: 240px;
+    min-width: 240px;
+    height: 260px; /* reduced height */
+  }
+
+  .card-image-container {
+    height: 120px; /* smaller image height */
+  }
+
+  .card-title {
+    font-size: 1rem;
+  }
+
+  .card-meta,
+  .read-more,
+  .card-date {
+    font-size: 0.7rem;
+  }
+
+  .badge {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.5rem;
+  }
+
+  .trending-header {
+    margin-bottom: 1rem;
+  }
+}
+

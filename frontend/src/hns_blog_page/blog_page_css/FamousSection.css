@@ -1,0 +1,218 @@
+.famous-section {
+  margin-bottom: 2.5rem;
+   overflow: visible;
+   height: auto
+}
+
+.famous-heading {
+  font-size: 1.875rem;
+  font-weight: 800;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  color: #1e3a8a; 
+  font-family: 'Poppins', sans-serif; 
+}
+@media screen and (width: 768px) {
+  .famous-heading {
+    font-size: 1.25rem;
+  }
+}
+
+
+
+.famous-highlight {
+  color: #1e3a8a; 
+  filter: drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.2));
+}
+
+.famous-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  color:  #1e3a8a; 
+  animation: bounce 1s infinite;
+}
+
+/* Famous Cards Container */
+.famous-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 1.5rem;
+  overflow-x: auto;
+  overflow-y: visible; /* Ensure vertical overflow is visible */
+  scrollbar-width: none;
+}
+
+.famous-cards::-webkit-scrollbar {
+  display: none;
+}
+
+/* Famous Card */
+.famous-card {
+  position: relative;
+  background: white;
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  min-width: 320px;
+  height: 320px;
+  transition: transform 0.3s, z-index 0.3s;
+   overflow: visible !important;
+  height: auto;
+  z-index: 1;
+}
+
+.famous-card:hover {
+  transform: translateY(-1px);
+  z-index: 10;
+}
+
+@media screen and (width: 768px) {
+  .famous-card {
+    width: 240px;
+    min-width: 240px;
+    height: 260px;
+  }
+}
+
+.famous-img-container {
+  position: relative;
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+}
+
+@media screen and (width: 768px) {
+  .famous-img-container {
+    height: 300px;
+  }
+}
+
+@media screen and (width: 768px){
+.famous-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s;
+}}
+
+.group:hover .famous-img {
+  transform: scale(1.1);
+}
+
+.famous-img-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.4), transparent);
+  border-top-left-radius: 1rem;
+  border-top-right-radius: 1rem;
+  pointer-events: none;
+}
+
+.famous-card-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.famous-title {
+  font-weight: bold;
+  font-size: 1.125rem;
+  margin-bottom: 0.5rem;
+  line-height: 1.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.famous-date {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-bottom: 0.5rem;
+}
+
+.famous-intro {
+  font-size: 0.75rem;
+  color: #374151;
+  margin-bottom: 1rem;
+}
+
+.famous-link {
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+}
+
+.famous-view {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #2563eb;
+  margin-right: 0.5rem;
+  text-decoration: none;
+}
+
+.famous-view:hover {
+  text-decoration: underline;
+}
+
+.famous-arrow {
+  width: 1rem;
+  height: 1rem;
+  color: #2563eb;
+}
+
+/* Bounce Animation */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@media (max-width: 640px) {
+  .famous-heading {
+    font-size: 1.12rem;
+    margin-bottom: 1rem;
+  }
+
+  .famous-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .famous-card {
+    width: 240px;
+    min-width: 240px;
+    height: 260px;
+  }
+
+  .famous-img-container {
+    height: 120px;
+  }
+
+  .famous-card-body {
+    padding: 0.75rem;
+  }
+
+  .famous-title {
+    font-size: 1rem;
+  }
+
+  .famous-intro,
+  .famous-date,
+  .famous-view {
+    font-size: 0.7rem;
+  }
+}
+

@@ -7,4 +7,6 @@ Werkzeug==2.0.1
 Flask-Migrate==4.0.4
 SQLAlchemy==1.4.23
 psycopg2-binary==2.9.9
-requests==2.31.0 
+requests==2.31.0
+python-slugify==8.0.1 
+pandas==2.3.2

@@ -1,0 +1,86 @@
+.popular-reads-container {
+    background: white;
+    border-radius: 12px;
+    padding: 1rem;
+  }
+  
+  .popular-reads-title {
+    font-weight: bold;
+    margin-bottom: 0.75rem;
+    color: black;
+    font-size: 1.125rem; /* text-lg */
+  }
+  
+  .popular-reads-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem; /* space-y-3 */
+  }
+  
+  .popular-reads-item {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+  
+  .popular-reads-icon {
+    width: 3rem;
+    height: 3rem;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  
+  /* Colors */
+  .green { background-color: #bbf7d0; }   /* bg-green-200 */
+  .blue { background-color: #bfdbfe; }    /* bg-blue-200 */
+  .yellow { background-color: #fef08a; }  /* bg-yellow-200 */
+  .purple { background-color: #e9d5ff; }  /* bg-purple-200 */
+  .red { background-color: #fecaca; }     /* bg-red-200 */
+  .indigo { background-color: #c7d2fe; }  /* bg-indigo-200 */
+  
+  .popular-reads-article-title {
+    font-weight: 500;
+    font-size: 1rem; /* text-base */
+    color: black;
+    margin-bottom: 0.25rem;
+  }
+  
+  .popular-reads-time {
+    font-size: 0.875rem; /* text-sm */
+    color: black;
+  }
+
+  @media (width: 768px) {
+  .popular-reads-container {
+    padding: 0.9rem;
+    border-radius: 10px;
+  }
+
+  .popular-reads-title {
+    font-size: 1.05rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .popular-reads-list {
+    gap: 0.6rem;
+  }
+
+  .popular-reads-item {
+    gap: 0.6rem;
+  }
+
+  .popular-reads-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 6px;
+  }
+
+  .popular-reads-article-title {
+    font-size: 0.95rem;
+    margin-bottom: 0.2rem;
+  }
+
+  .popular-reads-time {
+    font-size: 0.825rem;
+  }
+}

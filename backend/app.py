@@ -23,7 +23,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}})
+CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}})
 
 # Configure Flask to use UTF-8
 app.config['JSON_AS_ASCII'] = False
@@ -116,6 +116,7 @@ class Property(db.Model):
     Lift_Availability = db.Column(db.String(50))
     Security = db.Column(db.String(100))
     Connectivity = db.Column(db.Text)  # JSON string for list of strings
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
     # Relationships
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -124,6 +125,37 @@ class Property(db.Model):
     reviews = db.relationship('Review', backref='property', lazy=True)
 
     def to_dict(self):
+        # Get builder project image if available
+        builder_project_image = None
+        
+        # Try to find matching builder project by property name and builder name
+        # since project_id is not set in the database
+        if self.Property_Name and self.Builder_Name:
+            project = BuilderProject.query.filter_by(
+                title=self.Property_Name.strip(),
+                builder_name=self.Builder_Name.strip()
+            ).first()
+            
+            if project:
+                # Get the first image from image_urls or use project_image
+                if project.image_urls:
+                    try:
+                        images = json.loads(project.image_urls)
+                        if images and len(images) > 0:
+                            builder_project_image = images[0]
+                    except:
+                        # If JSON parsing fails, treat as single URL string
+                        builder_project_image = project.image_urls
+                
+                if not builder_project_image and project.project_image:
+                    builder_project_image = project.project_image
+                
+                # Add some basic validation for image URLs
+                if builder_project_image:
+                    # Check if it's a valid URL format
+                    if not (builder_project_image.startswith('http://') or builder_project_image.startswith('https://')):
+                        builder_project_image = None
+        
         return {
             'id': self.id,
             'Property_Name': self.Property_Name,
@@ -154,7 +186,9 @@ class Property(db.Model):
             'Security': self.Security,
             'Connectivity': json.loads(self.Connectivity) if self.Connectivity else None,
             'user_id': self.user_id,
-            'project_id': self.project_id
+            'project_id': self.project_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'builder_project_image': builder_project_image
         }
 
 class Enquiry(db.Model):
@@ -167,7 +201,7 @@ class Enquiry(db.Model):
 
 class Review(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    rating = db.Column(db.Integer, nullable=False)  # 1 to 5
+    rating = db.Column(db.Integer, nullable=False)  
     comment = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -199,13 +233,22 @@ class Builder(db.Model):
     ongoing_projects = db.Column(db.Integer)
     awards = db.Column(db.Text)  # JSON string of awards
     verified = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = db.relationship('User', backref='builder_profiles')
     projects = db.relationship('BuilderProject', backref='builder', lazy=True)
 
     def to_dict(self):
+        def safe_iso(dt):
+            try:
+                if dt is None:
+                    return None
+                if hasattr(dt, 'isoformat'):
+                    return dt.isoformat()
+                if isinstance(dt, str):
+                    return dt
+                return str(dt)
+            except Exception:
+                return str(dt)
         return {
             'rera_id': self.rera_id,
             'user_id': self.user_id,
@@ -230,9 +273,7 @@ class Builder(db.Model):
             'completed_projects': self.completed_projects,
             'ongoing_projects': self.ongoing_projects,
             'awards': self.awards,
-            'verified': self.verified,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'verified': self.verified
         }
 
 class BuilderProject(db.Model):
@@ -454,11 +495,23 @@ def login():
     }), 200
 
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
+@app.route('/api/properties/location/<string:loc>', methods=['GET'])
+def get_properties_by_location(loc):
+    properties = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
+    return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/properties', methods=['GET'])
 def get_properties():
     properties = Property.query.all()
     return jsonify([property.to_dict() for property in properties])
+
+@app.route('/api/locations', methods=['GET']) 
+def get_locations(): 
+    locations = db.session.query(Property.Location).distinct().all() 
+    unique_locations = [loc[0].strip() for loc in locations if loc[0] and loc[0].strip()] 
+    unique_locations = sorted(set(unique_locations))
+    return jsonify(unique_locations)
+
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
 def get_property(id):
@@ -522,6 +575,47 @@ def get_builders():
         return jsonify(builders_data)
     except Exception as e:
         print(f"Error in get_builders: {str(e)}")  # Debug log
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/builders/all', methods=['GET']) # Temporary route for debugging
+def get_all_builders_debug():
+    try:
+        builders = Builder.query.all()
+        return jsonify([b.to_dict() for b in builders])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# New endpoint to fetch builder by company_name
+@app.route('/api/builders/name/<company_name>', methods=['GET'])
+def get_builder_by_name(company_name):
+    try:
+        # Support underscores and hyphens as spaces for flexible matching
+        normalized_name = company_name.replace('_', ' ').replace('-', ' ')
+        
+        print(f"Searching for builder: '{normalized_name}' (from URL: '{company_name}')")
+        
+        # Try exact match first on company_name
+        builder = Builder.query.filter_by(company_name=normalized_name).first()
+        
+        # If not found, try case-insensitive match on company_name
+        if not builder:
+            builder = Builder.query.filter(Builder.company_name.ilike(normalized_name)).first()
+        
+        # If still not found, try searching by brand_name
+        if not builder:
+            builder = Builder.query.filter(Builder.brand_name.ilike(normalized_name)).first()
+        
+        if not builder:
+            # List all available builders for debugging
+            all_builders = Builder.query.all()
+            builder_names = [b.company_name for b in all_builders]
+            print(f"Builder not found. Available builders: {builder_names}")
+            return jsonify({'error': 'Builder not found', 'available_builders': builder_names}), 404
+        
+        print(f"Found builder: {builder.company_name}")
+        return jsonify(builder.to_dict())
+    except Exception as e:
+        print(f"Error in get_builder_by_name: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>', methods=['GET'])
@@ -659,7 +753,12 @@ def delete_builder(rera_id):
 @app.route('/api/builders/<rera_id>/projects', methods=['GET'])
 def get_builder_projects(rera_id):
     try:
-        projects = BuilderProject.query.filter_by(builder_id=rera_id).all()
+        status = request.args.get('status')
+        query = BuilderProject.query.filter_by(builder_id=rera_id)
+        if status:
+            # Allow partial, case-insensitive match for status
+            query = query.filter(BuilderProject.status.ilike(f"%{status}%"))
+        projects = query.all()
         return jsonify([project.to_dict() for project in projects])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1000,7 +1099,7 @@ def get_admin_stats():
         for property in recent_properties:
             activities.append({
                 'type': 'property',
-                'title': property.title,
+                'title': property.Property_Name,
                 'description': 'New property listed',
                 'timestamp': property.created_at.isoformat() if property.created_at else None
             })
@@ -1074,6 +1173,12 @@ def get_user(id):
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/api/projects/<int:project_id>', methods=['GET'])
+def get_builder_project_by_id(project_id):
+    project = BuilderProject.query.get(project_id)
+    if not project:
+        return jsonify({'error': 'Builder project not found'}), 404
+    return jsonify(project.to_dict())
 
 @app.route('/api/users/<int:id>', methods=['PUT'])
 def update_user(id):
@@ -1482,6 +1587,19 @@ def summarize_blog(slug):
     if not blog:
         return jsonify({'error': 'Blog not found'}), 404
 
+    # If no API key, return a simple summary
+    if not api_key:
+        content_parts = []
+        if blog.title:
+            content_parts.append(blog.title)
+        if blog.intro_paragraph:
+            content_parts.append(blog.intro_paragraph)
+        
+        # Create a simple summary from the first 200 characters
+        content = '\n'.join([str(part) for part in content_parts if part])
+        simple_summary = content[:200] + "..." if len(content) > 200 else content
+        return jsonify({'summary': simple_summary})
+
     content_parts = []
     if blog.title:
         content_parts.append(blog.title)
@@ -1519,7 +1637,373 @@ def summarize_blog(slug):
         summary = response.json()['choices'][0]['message']['content'].strip()
         return jsonify({'summary': summary})
     except Exception as e:
-        return jsonify({'error': f'AI summarization failed: {str(e)}'}), 500
+        # Fallback to simple summary if API fails
+        simple_summary = content[:200] + "..." if len(content) > 200 else content
+        return jsonify({'summary': simple_summary})
+
+
+# ------------------------------------------------------- Property Search API -------------------------------------------------- ---
+
+
+# ---- Helpers for amenities/status normalization and society type derivation ----
+def _normalize_amenities(value):
+    try:
+        if not value:
+            return []
+        # Accept JSON list or plain string
+        if isinstance(value, list):
+            raw = value
+        elif isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                raw = parsed if isinstance(parsed, list) else [str(parsed)]
+            except Exception:
+                raw = [value]
+        else:
+            raw = [str(value)]
+
+        result = []
+        for item in raw:
+            if not item:
+                continue
+            text = str(item)
+            # Split only on commas or explicit conjunctions that usually combine two amenities in one index
+            # Avoid splitting multi-word amenities like "kids play area"
+            parts = []
+            for part in re.split(r",|\sand\s|\s&\s|/", text, flags=re.IGNORECASE):
+                part = part.strip().strip('-').strip()
+                if part:
+                    parts.append(part)
+            for p in parts:
+                normalized = p.lower()
+                # Canonical mappings with synonym grouping
+                canonical = {
+                    # Security-related (kept for completeness though society types come from Property.Security)
+                    'cctv security': 'cctv',
+                    'cctv': 'cctv',
+                    'security': 'security',
+                    'manned security': 'security',
+                    'multi-tier security': 'security',
+                    'access control': 'security',
+
+                    # Club/Gym
+                    'club house': 'clubhouse',
+                    'clubhouse': 'clubhouse',
+                    'gymnasium': 'gym',
+                    'gym': 'gym',
+
+                    # Kids area
+                    'kids play area': 'kids play area',
+                    'children play area': 'kids play area',
+
+                    # Pools (group variants under swimming pool)
+                    'swimming pool': 'swimming pool',
+                    'pool': 'swimming pool',
+                    'podium pool': 'swimming pool',
+                    'rooftop pool': 'swimming pool',
+
+                    # Amphitheatre
+                    'amphitheatre': 'amphitheatre',
+                    'open-air amphitheatre': 'amphitheatre',
+
+                    # Sky amenities
+                    'sky deck': 'sky deck',
+                    'sky park': 'sky deck',
+
+                    # Party spaces
+                    'party hall': 'party hall',
+                    'party lawn': 'party hall',
+
+                    # Courts and tracks
+                    'jogging track': 'jogging track',
+                    'tennis court': 'tennis court',
+                    'badminton court': 'badminton court',
+                    'basketball court': 'basketball court',
+
+                    # Other amenities
+                    'indoor games': 'indoor games',
+                    'library': 'library',
+                    'yoga room': 'yoga room',
+                    'spa': 'spa',
+                    'sauna': 'sauna',
+                    'multipurpose hall': 'multipurpose hall',
+                    'landscaped garden': 'landscaped garden',
+                    'gated community': 'gated community',
+                    'intercom': 'intercom',
+                    'power backup': 'power backup',
+                    'lift': 'lift',
+                    'elevator': 'lift',
+                    'parking': 'covered parking',
+                    'covered parking': 'covered parking',
+                    'mini-golf': 'mini golf',
+                }.get(normalized, normalized)
+                result.append(canonical)
+        # Deduplicate while preserving order
+        seen = set()
+        deduped = []
+        for x in result:
+            if x and x not in seen:
+                seen.add(x)
+                deduped.append(x)
+        return deduped
+    except Exception:
+        return []
+
+def _derive_society_types(amenities_list):
+    items = [a.lower() for a in amenities_list or []]
+    derived = set()
+    if any(x in items for x in ['gated community', 'access control']):
+        derived.add('Gated')
+    if any(x in items for x in ['security', 'cctv']):
+        derived.add('Advanced Security')
+    if any(x in items for x in ['clubhouse', 'community hall', 'multipurpose hall']):
+        derived.add('Lounge')
+    if any(x in items for x in ['senior citizen area']):
+        derived.add('Senior Citizen')
+    return sorted(list(derived))
+
+def _normalize_security_types(value):
+    try:
+        if not value:
+            return []
+        # Accept list or string
+        if isinstance(value, list):
+            raw = value
+        else:
+            raw = [value]
+        tokens = []
+        for item in raw:
+            if not item:
+                continue
+            text = str(item)
+            parts = re.split(r",|\sand\s|\s&\s|/", text, flags=re.IGNORECASE)
+            for p in parts:
+                p = p.strip().strip('-').strip()
+                if p:
+                    tokens.append(p)
+        # Canonical minimal mapping while preserving descriptive labels
+        mapped = []
+        for t in tokens:
+            low = t.lower()
+            canonical = {
+                'cctv security': 'CCTV',
+                'cctv': 'CCTV',
+                'manned security': 'Manned Security',
+                'multi-tier security': 'Advanced Security',
+                'access control': 'Access Control',
+                'gated community': 'Gated',
+                'security': 'Advanced Security',
+            }.get(low, t.title())
+            mapped.append(canonical)
+        # Dedupe preserving order
+        seen = set()
+        result = []
+        for x in mapped:
+            if x and x not in seen:
+                seen.add(x)
+                result.append(x)
+        return result
+    except Exception:
+        return []
+
+def _canonical_property_status(value: str) -> str:
+    try:
+        if not value:
+            return ''
+        text = str(value).strip().lower()
+        # Explicit mappings first
+        explicit = {
+            'completed': 'Completed',
+            'completed/ready': 'Completed',
+            'ready to move': 'Completed',
+            'ready-to-move': 'Completed',
+            'ready': 'Completed',
+            'ongoing': 'Ongoing',
+            'mixed': 'Mixed',
+            'ongoing/completed': 'Ongoing/Completed',
+            'ongoing/completed (varies)': 'Ongoing/Completed',
+            'ongoing/ready': 'Ongoing/Completed',
+        }
+        if text in explicit:
+            return explicit[text]
+        # Heuristics
+        if 'mixed' in text:
+            return 'Mixed'
+        if 'ongoing' in text and ('completed' in text or 'ready' in text or 'varies' in text):
+            return 'Ongoing/Completed'
+        if 'ongoing' in text:
+            return 'Ongoing'
+        if 'ready' in text or 'completed' in text:
+            return 'Completed'
+        # Fallback to title case original
+        return str(value).strip().title()
+    except Exception:
+        return ''
+
+@app.route('/api/properties/filters', methods=['GET'])
+def get_filters():
+    """Return unique filter options sourced from BuilderProject and Property tables.
+    Includes amenities (normalized), property_status, project status, and derived society types.
+    Optional query: location= filters to projects/properties matching location.
+    """
+    location = request.args.get('location', '', type=str)
+
+    # Collect amenities from BuilderProject
+    project_query = BuilderProject.query
+    if location:
+        project_query = project_query.filter(BuilderProject.location.ilike(f"%{location}%"))
+    projects = project_query.all()
+
+    amenities_all = []
+    property_status_all = []
+    society_types_all = []
+
+    for prj in projects:
+        amenities_all.extend(_normalize_amenities(prj.amenities))
+        # property status is sourced from Property table per requirements
+
+    # Collect from Property table for status and society types
+    prop_query = Property.query
+    if location:
+        prop_query = prop_query.filter(Property.Location.ilike(f"%{location}%"))
+    for prop in prop_query.all():
+        if prop.Project_Status:
+            property_status_all.append(_canonical_property_status(prop.Project_Status))
+        if prop.Security:
+            society_types_all.extend(_normalize_security_types(prop.Security))
+
+    # Build unique, nicely-cased amenities list
+    amen_set = []
+    seen = set()
+    for a in sorted(set(amenities_all)):
+        label = a.title() if a.isalpha() or ' ' in a else a
+        if label not in seen:
+            seen.add(label)
+            amen_set.append(label)
+
+    # Society types come from Property.Security
+    society_types = sorted(set([s for s in society_types_all if s]))
+
+    return jsonify({
+        'amenities': amen_set,
+        'propertyStatus': sorted(set([s for s in property_status_all if s])),
+        'societyTypes': society_types,
+    })
+
+# Simplified property search endpoint: direct filtering only
+@app.route('/api/properties/search', methods=['GET'])
+def search_properties():
+    location = request.args.get('location', '', type=str)
+    price = request.args.get('price', 0, type=float)  # price in Cr
+    bhk_types = request.args.getlist('type')  # e.g., ['1BHK', '2BHK']
+    amenities_filter = [a.lower().strip() for a in request.args.getlist('amenities') if a]
+    property_status_filter = [s.lower().strip() for s in request.args.getlist('property_status') if s]
+    # Canonicalize requested property status values
+    property_status_filter_canonical = set(_canonical_property_status(s) for s in property_status_filter)
+    society_type_filter = [t.lower().strip() for t in request.args.getlist('society_type') if t]
+
+    query = Property.query
+
+    # ---- LOCATION FILTER ----
+    if location:
+        query = query.filter(Property.Location.ilike(f"%{location}%"))
+
+    # Fetch all rows first (filtered by location)
+    results = query.all()
+
+    # ---- PRICE FILTER ----
+    if price and price > 0:
+        def price_matches(prop, max_price_cr):
+            val = getattr(prop, "Price_Starting_From", "") or ""
+            val_clean = val.replace('₹','').replace(',','').replace('+','').strip().lower()
+            try:
+                if 'cr' in val_clean:
+                    price_val = float(val_clean.replace('cr','').strip())
+                elif 'lakh' in val_clean:
+                    price_val = float(val_clean.replace('lakh','').strip()) / 100  # Lakh → Cr
+                else:
+                    price_val = float(val_clean)
+                return price_val <= max_price_cr
+            except Exception:
+                return False
+
+        results = [p for p in results if price_matches(p, price)]
+
+    # ---- BHK FILTER ----
+    if bhk_types and any(bhk_types):
+        def matches_bhk_type(prop):
+            try:
+                configs = json.loads(prop.Existing_Configurations) if prop.Existing_Configurations else []
+                
+                # Handle both formats:
+                # 1. Simple array format: ["2", "3"] 
+                # 2. Object format: [{"type": "2BHK"}, {"type": "3BHK"}]
+                
+                if isinstance(configs, list) and len(configs) > 0:
+                    if isinstance(configs[0], dict):
+                        # Object format: [{"type": "2BHK"}, {"type": "3BHK"}]
+                        types = [c.get('type','').lower() for c in configs if isinstance(c, dict) and 'type' in c]
+                    else:
+                        # Simple array format: ["2", "3"]
+                        types = [str(c).lower() for c in configs if c]
+                    
+                    # Check if any of the requested BHK types match
+                    requested_types = [bt.lower().replace('bhk', '').strip() for bt in bhk_types]
+                    return any(any(req_type in t for req_type in requested_types) for t in types)
+                
+                return False
+            except Exception as e:
+                print(f"Error parsing BHK configs: {e}")
+                return False
+
+        results = [p for p in results if matches_bhk_type(p)]
+
+    # ---- AMENITIES / PROPERTY STATUS / SOCIETY TYPE FILTERS ----
+    if amenities_filter or property_status_filter or society_type_filter:
+        def get_matching_project(prop):
+            # Prefer explicit relationship, else best-effort match by builder and title
+            if prop.project_id:
+                return BuilderProject.query.get(prop.project_id)
+            if prop.Property_Name and prop.Builder_Name:
+                return BuilderProject.query.filter_by(
+                    title=prop.Property_Name.strip(),
+                    builder_name=prop.Builder_Name.strip()
+                ).first()
+            return None
+
+        def matches_extra_filters(prop):
+            prj = get_matching_project(prop)
+            prj_amenities = _normalize_amenities(prj.amenities) if prj else []
+            # Property Status must be from Property.Project_Status
+            # Canonicalize property status value for comparison
+            prop_status_value = _canonical_property_status(prop.Project_Status) if prop.Project_Status else None
+
+            # Amenities: require all requested to be present (subset)
+            if amenities_filter:
+                prj_amen_lower = set([a.lower() for a in prj_amenities])
+                if not all(a in prj_amen_lower for a in amenities_filter):
+                    return False
+
+            # Property status: match against Property.Project_Status only
+            if property_status_filter_canonical:
+                if (prop_status_value or '') not in property_status_filter_canonical:
+                    return False
+
+            # Society type derived from Property.Security values
+            if society_type_filter:
+                derived = _normalize_security_types(prop.Security)
+                derived_lower = set([d.lower() for d in derived])
+                if not all(t in derived_lower for t in society_type_filter):
+                    return False
+
+            return True
+
+        results = [p for p in results if matches_extra_filters(p)]
+
+    # Return JSON
+    return jsonify([p.to_dict() for p in results])
+
+
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    app.run(debug=True)
