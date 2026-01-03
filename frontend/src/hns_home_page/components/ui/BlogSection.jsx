@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const featured = {
   img: '/building.webp',
@@ -43,8 +44,12 @@ const articles = [
 ];
 
 const BlogSection = () => {
+  const navigate = useNavigate();
+
   const handleFeaturedClick = () => {
-    console.log('Featured article clicked');
+    // Navigate to article page - sample route for now
+    // navigate('/article/featured');
+    console.log('Featured article clicked - navigation commented out');
   };
 
   const handleArticleClick = (article) => {
@@ -61,17 +66,19 @@ const BlogSection = () => {
       </div>
 
       {/* Featured Article Card */}
-      <button className="featured-card" onClick={handleFeaturedClick}>
+      <div className="featured-card">
         <img src={featured.img} alt={featured.title} className="featured-image" />
         <div className="featured-overlay" />
-        <div className="latest-badge"><span>Latest</span></div>
+        <div className="latest-badge">LATEST</div>
         <div className="featured-content">
           <h2 className="featured-title">{featured.title}</h2>
           <p className="featured-subtitle">{featured.subtitle}</p>
           <p className="featured-tagline">{featured.tagline}</p>
-          <div className="featured-button">VIEW ARTICLE</div>
+          <button className="featured-button" onClick={handleFeaturedClick}>
+            VIEW ARTICLE
+          </button>
         </div>
-      </button>
+      </div>
 
       {/* Grid of Other Articles */}
       <div className="articles-grid">
@@ -80,14 +87,12 @@ const BlogSection = () => {
             key={idx}
             className="article-card"
             onClick={() => handleArticleClick(article)}
-            // The background image is now handled in CSS for better control
           >
             <img src={article.img} alt={article.title} className="article-image" />
             <div className="article-content">
               <h3 className="article-title">{article.title}</h3>
               <p className="article-subtitle">{article.subtitle}</p>
             </div>
-            {/*{article.icon && <div className="article-icon">{article.icon}</div>}*/}
           </button>
         ))}
       </div>
@@ -101,7 +106,7 @@ const BlogSection = () => {
         }
         .section-header {
           text-align: center;
-          margin-bottom: 40px;
+          margin-bottom: 60px;
         }
         .section-title {
           font-size: 2.5rem;
@@ -124,16 +129,15 @@ const BlogSection = () => {
         /* --- Featured Card Styles --- */
         .featured-card {
           width: 100%;
-          height: 350px;
+          height: 450px;
           border-radius: 24px;
           overflow: hidden;
           position: relative;
           display: block;
-          border: none;
           cursor: pointer;
           transition: transform 0.3s ease, box-shadow 0.3s ease;
           text-align: left;
-          margin-bottom: 32px;
+          margin-bottom: 48px;
           background: #223A5F;
         }
         .featured-card:hover {
@@ -144,7 +148,6 @@ const BlogSection = () => {
           width: 100%;
           height: 100%;
           object-fit: cover;
-        
           transition: transform 0.4s ease;
         }
         .featured-card:hover .featured-image {
@@ -153,61 +156,74 @@ const BlogSection = () => {
         .featured-overlay {
           position: absolute;
           inset: 0;
-          background: linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.4) 100%);
+          background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%);
           z-index: 2;
         }
         .latest-badge {
           position: absolute;
-          left: 24px;
-          top: 24px;
+          left: 0;
+          top: 0;
           z-index: 3;
-        }
-        .latest-badge span {
           background: #F9D87A;
           color: #223A5F;
           font-weight: 700;
-          font-size: 14px;
-          border-radius: 20px;
-          padding: 8px 16px;
-          letter-spacing: 0.5px;
+          font-size: 13px;
+          border-radius: 0 0 16px 0;
+          padding: 10px 20px;
+          letter-spacing: 1px;
           text-transform: uppercase;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
         .featured-content {
           position: absolute;
-          left: 24px;
-          bottom: 24px;
-          right: 24px;
+          left: 32px;
+          top: 50%;
+          transform: translateY(-50%);
+          right: 32px;
           z-index: 3;
           color: #fff;
         }
         .featured-title {
-          font-size: clamp(1.25rem, 4vw, 1.75rem);
+          font-size: 2rem;
           font-weight: 700;
-          margin: 0 0 8px 0;
+          margin: 0 0 12px 0;
           line-height: 1.2;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+          text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+          color: #fff;
         }
-        .featured-subtitle, .featured-tagline {
-          font-size: clamp(0.9rem, 2vw, 1rem);
+        .featured-subtitle {
+          font-size: 1.1rem;
           margin: 0 0 8px 0;
-          opacity: 0.9;
+          opacity: 0.95;
           line-height: 1.4;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.5);
         }
         .featured-tagline {
+          font-size: 1rem;
           font-weight: 600;
-          margin-bottom: 20px;
+          margin: 0 0 24px 0;
+          opacity: 0.9;
           font-style: italic;
+          text-shadow: 0 1px 4px rgba(0,0,0,0.5);
         }
         .featured-button {
           background: #F9D87A;
           color: #223A5F;
           font-weight: 700;
           font-size: 14px;
-          border-radius: 20px;
-          padding: 10px 20px;
-          display: inline-block;
+          border-radius: 24px;
+          padding: 12px 28px;
+          border: none;
+          cursor: pointer;
           text-transform: uppercase;
-          letter-spacing: 0.5px;
+          letter-spacing: 1px;
+          transition: all 0.3s ease;
+          box-shadow: 0 2px 8px rgba(249, 216, 122, 0.3);
+        }
+        .featured-button:hover {
+          background: #f1d06b;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(249, 216, 122, 0.4);
         }
 
         /* --- Articles Grid (Desktop First) --- */
@@ -229,7 +245,7 @@ const BlogSection = () => {
           flex-direction: column;
           justify-content: flex-end;
           transition: transform 0.3s ease, box-shadow 0.3s ease;
-          background: #223A5F; /* Fallback color */
+          background: #223A5F;
         }
         .article-card:hover {
           transform: translateY(-4px);
@@ -269,36 +285,40 @@ const BlogSection = () => {
           font-weight: 400;
           text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
-        .article-icon {
-          position: absolute;
-          right: 16px;
-          bottom: 16px;
-          background: #F9D87A;
-          color: #223A5F;
-          border-radius: 50%;
-          width: 36px;
-          height: 36px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 18px;
-          font-weight: 700;
-          z-index: 3;
-        }
 
-        /* --- Tablet Responsiveness (<= 1024px) --- */
-        @media (min-width: 426px) and (max-width: 1025px) {
-          
+        /* --- Tablet Responsiveness (426px - 1024px) --- */
+        @media (min-width: 426px) and (max-width: 1024px) {
+          .featured-card {
+            height: 380px;
+            margin-bottom: 40px;
+          }
+          .featured-content {
+            left: 24px;
+            bottom: 24px;
+            right: 24px;
+          }
+          .featured-title {
+            font-size: 1.6rem;
+          }
+          .featured-subtitle {
+            font-size: 1rem;
+          }
+          .featured-tagline {
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+          }
+          .latest-badge {
+            font-size: 12px;
+            padding: 8px 16px;
+          }
           .articles-grid {
             grid-template-columns: repeat(2, 1fr);
           }
-          
           .article-card:first-child {
-            grid-column: span 1; /* Reset column span for 2-col layout */
-            height: 300px; /* Keep it taller */
+            height: 280px;
           }
           .article-card:first-child .article-title {
-            font-size: 1.3rem; /* Keep title larger */
+            font-size: 1.2rem;
           }
         }
 
@@ -307,17 +327,47 @@ const BlogSection = () => {
           .section-title {
             font-size: 2rem;
           }
+          .section-header {
+            margin-bottom: 40px;
+          }
           .featured-card {
-            height: 300px;
-            margin-bottom: 24px;
+            height: 320px;
+            margin-bottom: 32px;
+            border-radius: 18px;
+          }
+          .featured-content {
+            left: 20px;
+            bottom: 20px;
+            right: 20px;
+          }
+          .featured-title {
+            font-size: 1.3rem;
+            margin-bottom: 8px;
+          }
+          .featured-subtitle {
+            font-size: 0.9rem;
+            margin-bottom: 6px;
+          }
+          .featured-tagline {
+            font-size: 0.85rem;
+            margin-bottom: 16px;
+          }
+          .featured-button {
+            font-size: 12px;
+            padding: 10px 20px;
+          }
+          .latest-badge {
+            font-size: 11px;
+            padding: 8px 14px;
+            border-radius: 0 0 12px 0;
           }
           .articles-grid {
             grid-template-columns: 1fr;
             gap: 16px;
           }
           .article-card {
-            flex-direction: row; /* Key change for mobile */
-            height: auto; /* Key change for mobile */
+            flex-direction: row;
+            height: auto;
             min-height: 120px;
             background: #ffffff;
             border: 1px solid #e0e0e0;
@@ -326,18 +376,18 @@ const BlogSection = () => {
              box-shadow: 0 4px 12px rgba(34, 58, 95, 0.1);
           }
           .article-image {
-            position: relative; /* Unset absolute positioning */
-            width: 100px; /* Give image a fixed width */
+            position: relative;
+            width: 100px;
             height: auto;
             flex-shrink: 0;
             object-fit: cover;
           }
           .article-card:hover .article-image {
-            transform: none; /* Disable zoom on mobile list view */
+            transform: none;
           }
           .article-content {
-            color: #223A5F; /* Change text color for light background */
-            background: none; /* Remove gradient */
+            color: #223A5F;
+            background: none;
             padding: 16px;
             display: flex;
             flex-direction: column;
@@ -345,21 +395,33 @@ const BlogSection = () => {
           }
           .article-title {
             font-size: 1rem;
-            text-shadow: none; /* Remove shadow */
+            text-shadow: none;
           }
           .article-subtitle {
             font-size: 0.85rem;
             color: #556278;
             opacity: 1;
-            text-shadow: none; /* Remove shadow */
+            text-shadow: none;
           }
-          .article-icon {
-            position: absolute;
-            width: 32px;
-            height: 32px;
-            font-size: 16px;
-            right: 12px;
-            bottom: 12px;
+        }
+
+        /* --- Extra Small Mobile (<= 375px) --- */
+        @media (max-width: 375px) {
+          .featured-card {
+            height: 280px;
+          }
+          .featured-title {
+            font-size: 1.15rem;
+          }
+          .featured-subtitle {
+            font-size: 0.85rem;
+          }
+          .featured-tagline {
+            font-size: 0.8rem;
+          }
+          .latest-badge {
+            font-size: 10px;
+            padding: 6px 12px;
           }
         }
       `}</style>

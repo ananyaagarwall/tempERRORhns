@@ -104,6 +104,7 @@
   width: 100%;
   padding-left: 16px;
   padding-right: 16px;
+  padding: 20px;    /* added padding for better touch area */
 }
 
 .mobile-cards-row {

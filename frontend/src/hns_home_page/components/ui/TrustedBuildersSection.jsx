@@ -89,6 +89,7 @@ const TrustedBuildersSection = ({ location }) => {
               className="mobile-builder-card"
               style={{
                 backgroundImage: `url(${builder.img})`,
+                height: '360px',      // Fixed height to prevent any vertical shifting
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat'

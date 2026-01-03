@@ -29,6 +29,8 @@ const ChevronRight = ({ size = 16 }) => (
 
 const PropertyCard = ({ property }) => {
   const [currentThumbnail, setCurrentThumbnail] = useState(0);
+  const [isAddedToList, setIsAddedToList] = useState(false);
+  const [isVisitScheduled, setIsVisitScheduled] = useState(false);
 
   const thumbnailImages = [
     { src: '/Defining-Demand.jpg', alt: `${property.name} exterior view` },

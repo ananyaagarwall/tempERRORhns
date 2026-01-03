@@ -1,10 +1,8 @@
-// temporary test change
 import React from 'react';
-import { SocialIcon } from 'react-social-icons'
+import { SocialIcon } from 'react-social-icons';
 import { FaPhoneAlt, FaMapMarkerAlt, FaEnvelope } from "react-icons/fa";
 import "../../home_page_css/FooterSection.css";
-; 
-console.log("Testing if Git detects this change");
+
 const footerLinks = [
   { label: 'Home', to: '/' },
   { label: 'About Us', to: '/about' },
@@ -51,13 +49,13 @@ const socialLinks = [
 const FooterSection = () => (
   <footer className="footer">
     <div className="footer-container">
-      {/* Brand & Info */}
+      {/* Brand & Info - Always visible */}
       <div className="footer-brand">
-      <img 
-  src="/HouseNSeek.png"
-  alt="HouseNSeek Logo"
-  className="footer-logo"
-/>
+        <img 
+          src="/HouseNSeek.png"
+          alt="HouseNSeek Logo"
+          className="footer-logo"
+        />
         <div className="footer-description">
           The best real estate platform for buying, selling, and renting apartments and homes in India.
         </div>
@@ -68,15 +66,16 @@ const FooterSection = () => (
               url={s.url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{height: 35, width: 35}}
+              style={{ height: 35, width: 35 }}
               fgColor="#fff"
               bgColor="transparent"
             />
           ))}
         </div>
       </div>
-      {/* Quick Links */}
-      <div className="footer-links">
+
+      {/* Quick Links - Hidden on mobile */}
+      <div className="footer-links footer-links-desktop">
         <div className="footer-heading">Quick Links</div>
         <ul className="footer-list">
           {footerLinks.map((l, i) => (
@@ -87,8 +86,9 @@ const FooterSection = () => (
           ))}
         </ul>
       </div>
-      {/* Site Links */}
-      <div className="footer-links">
+
+      {/* Site Links - Hidden on mobile */}
+      <div className="footer-links footer-links-desktop">
         <div className="footer-heading">Site Links</div>
         <ul className="footer-list">
           {siteLinks.map((l, i) => (
@@ -99,9 +99,10 @@ const FooterSection = () => (
           ))}
         </ul>
       </div>
-      {/* Contact Links */}
-      <div className="footer-links">
-        <div className="footer-heading">Contact links</div>
+
+      {/* Contact Links - Hidden on mobile */}
+      <div className="footer-links footer-links-desktop">
+        <div className="footer-heading">Contact</div>
         <ul className="footer-list">
           {contactLinks.map((c, i) => (
             <li key={i} className="footer-contact-item">
@@ -114,6 +115,7 @@ const FooterSection = () => (
         </ul>
       </div>
     </div>
+
     <div className="footer-divider" />
     <div className="footer-copyright">
       © {new Date().getFullYear()} HouseNSeek. All rights reserved.

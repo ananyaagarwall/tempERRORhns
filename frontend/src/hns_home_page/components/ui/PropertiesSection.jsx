@@ -113,7 +113,7 @@ const PropertiesSection = ({ searchFilters }) => {
 
   return (
     <section className="property-section-custom">
-      <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+      <div style={{ textAlign: 'center', marginBottom: '120px' }}>
         <h2 style={{ 
           fontSize: '2.5rem',
           fontWeight: 800,
@@ -130,6 +130,7 @@ const PropertiesSection = ({ searchFilters }) => {
           height: '4px',
           background: 'linear-gradient(90deg, #F1D97A 0%, #e6c76a 100%)',
           margin: '12px auto 0',
+          marginBottom: '20px',
           borderRadius: '2px',
           boxShadow: '0 2px 4px rgba(241, 217, 122, 0.3)'
         }} />
@@ -328,8 +329,8 @@ const PropertiesSection = ({ searchFilters }) => {
           width: 100%;
           display: flex;
           align-items: center;
-          padding: 40px 0;
-          margin: -40px 0;
+         padding: 20px 0;        /* Reduced from 40px */
+          margin: 20px 0 0 0;    /* Add positive top margin instead of negative */
           overflow: hidden;
           background: white;
           border-radius: 8px;
@@ -345,8 +346,8 @@ const PropertiesSection = ({ searchFilters }) => {
           overflow-x: auto;
           scrollbar-width: none;
           -ms-overflow-style: none;
-          padding: 40px 16px;
-          margin: -40px 0;
+          padding: 20px 16px;     /* Reduced from 40px */
+          margin: 0;              /* Remove negative margin */
           overflow-y: hidden;
           -webkit-overflow-scrolling: touch;
           scroll-behavior: smooth;

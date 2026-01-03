@@ -1,7 +1,6 @@
 /* ========================================
    MAIN PROPERTY LISTING LAYOUT
    ======================================== */
-
 .listing-layout {
   display: flex;
   padding: 24px;
@@ -26,7 +25,6 @@
 /* ========================================
    PROJECTS NEAR YOU SECTION
    ======================================== */
-
 .property-section-custom {
   padding: 0 !important;
   margin: 24px 0 !important;
@@ -49,12 +47,13 @@
   font-size: 2.2rem !important;
   line-height: 1.2;
   padding: 0 !important;
+  color: #1E3A8A;
+  font-weight: 700;
 }
 
 /* ========================================
    PROPERTY CARDS CONTAINERS
    ======================================== */
-
 .search-results-container,
 .properties-grid,
 .property-cards-container {
@@ -93,29 +92,40 @@
 }
 
 /* ========================================
-   SEARCH RESULTS PROPERTY CARDS
+   PROPERTY CARD - WHITE + DARK BLUE THEME
    ======================================== */
-
 .property-card {
-  background: #FFF9ED;
+  background: #FFFFFF;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  padding: 16px;
+  box-shadow: 0 2px 8px rgba(30, 58, 138, 0.08);
+  padding: 20px;
   width: 100%;
   max-width: 1000px;
   box-sizing: border-box;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  border: none;
+  transition: all 0.3s ease;
+  margin-bottom: 24px;
+  cursor: pointer;
+}
+
+/* POP EFFECT - Desktop */
+.property-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 32px rgba(30, 58, 138, 0.2);
 }
 
 .property-images {
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .main-image {
   position: relative;
   flex: 1.2;
+  overflow: hidden;
+  border-radius: 10px;
 }
 
 .status-badge {
@@ -123,22 +133,24 @@
   top: 12px;
   left: 12px;
   z-index: 10;
-  font-weight: 500;
-  font-size: 12px;
-  padding: 4px 12px;
-}
-
-.ready-to-move-badge {
-  background-color: #ffe135;
-  color: #000000;
-  border: none;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 6px 14px;
+  background: #1E3A8A;
+  color: #FFFFFF;
+  border-radius: 6px;
 }
 
 .main-property-image {
   width: 100%;
-  height: 200px;
+  height: 220px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 10px;
+  transition: transform 0.3s ease;
+}
+
+.property-card:hover .main-property-image {
+  transform: scale(1.03);
 }
 
 .thumbnail-slider {
@@ -150,9 +162,9 @@
 }
 
 .thumbnail-container {
-  height: 160px;
+  height: 180px;
   width: 416px;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
   position: relative;
   background-color: #f8f9fa;
@@ -162,17 +174,17 @@
   display: flex;
   flex-direction: row;
   height: 100%;
-  transition: transform 0.3s ease-in-out;
-  position: relative;
+  transition: transform 0.3s ease;
 }
 
 .thumbnail-image {
   width: 200px;
-  height: 160px;
-  border-radius: 8px;
+  height: 180px;
+  border-radius: 10px;
   display: block;
   flex-shrink: 0;
   margin-right: 8px;
+  object-fit: cover;
 }
 
 .thumbnail-image:last-child {
@@ -184,204 +196,241 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  height: 24px;
+  height: 32px;
 }
 
 .thumbnail-btn {
-  background: #ffffff;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  width: 24px;
-  height: 24px;
+  background: #FFFFFF;
+  border: 1px solid #1E3A8A;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #212529;
+  color: #1E3A8A;
 }
 
 .thumbnail-btn:hover {
-  background: #f1f3f5;
-  border-color: #228be6;
+  background: #1E3A8A;
+  color: #FFFFFF;
+}
+
+.thumbnail-btn:active {
+  transform: scale(0.95);
 }
 
 .thumbnail-dots {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
 }
 
 .thumbnail-dot {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #adb5bd;
+  background: #cbd5e1;
   border: none;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
+.thumbnail-dot:hover {
+  background: #94a3b8;
+}
+
 .thumbnail-dot.active {
-  background: #228be6;
+  background: #1E3A8A;
   transform: scale(1.2);
 }
 
 .property-details {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .property-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 16px;
+  gap: 20px;
 }
 
 .property-name {
-  font-size: 30px;
+  font-size: 28px;
   font-weight: 600;
-  color: #212529;
+  color: #1E3A8A;
   margin: 0;
   font-family: 'Poppins', sans-serif;
+  line-height: 1.3;
 }
 
 .property-price {
-  font-size: 25px;
+  font-size: 24px;
   font-weight: 600;
-  color: #000000;
+  color: #1E3A8A;
   white-space: nowrap;
 }
 
 .price-amount {
-  color: black;
+  color: #1E3A8A;
 }
 
 .price-separator {
-  color: #868e96;
-  margin: 0 4px;
+  color: #94a3b8;
+  margin: 0 6px;
 }
 
 .price-per-sqft {
-  color: #000000;
+  color: #1E3A8A;
 }
 
 .property-info {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
 }
 
 .carpet-area {
-  font-size: 20px;
-  color: #212529;
+  font-size: 16px;
+  color: #1E3A8A;
   margin: 0;
   font-weight: 500;
   font-family: 'Raleway', sans-serif;
+  line-height: 1.5;
 }
 
 .description {
-  font-size: 20px;
-  color: black;
+  font-size: 16px;
+  color: #475569;
   margin: 0;
   font-family: 'Raleway', sans-serif;
+  line-height: 1.5;
 }
 
 .premium-features {
-  font-size: 20px;
-  color: #212529;
+  font-size: 16px;
+  color: #475569;
   margin: 0;
   font-weight: 500;
   font-family: 'Raleway', sans-serif;
+  line-height: 1.5;
 }
 
 .age-maintenance {
-  font-size: 20px;
-  color: #212529;
+  font-size: 16px;
+  color: #475569;
   margin: 0;
   font-family: 'Raleway', sans-serif;
+  line-height: 1.5;
 }
 
 .highlights-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
   font-family: 'Raleway', sans-serif;
 }
 
 .highlights-label {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
-  color: #212529;
+  color: #1E3A8A;
 }
 
 .highlights-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
 }
 
 .highlight-badge {
-  background-color: #ffe135;
-  color: #212529;
+  background-color: #1E3A8A;
+  color: #FFFFFF;
   border: none;
   font-size: 14px;
-  padding: 6px 12px;
+  padding: 8px 14px;
   font-weight: 500;
   border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.highlight-badge:hover {
+  background-color: #2563EB;
 }
 
 .more-highlights {
   cursor: pointer;
 }
 
-.more-highlights:hover {
-  background-color: #f1f3f5;
-}
-
+/* INTERACTIVE BUTTONS - POP EFFECT */
 .action-buttons {
   display: flex;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
-.add-to-list-btn {
+.add-to-list-btn,
+.schedule-visit-btn {
   flex: 1;
-  border: 1px solid #dee2e6;
-  background-color: transparent;
-  color: #212529;
-  font-weight: 500;
-  padding: 12px 16px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  padding: 14px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* Add to My List - White with Blue Border */
+.add-to-list-btn {
+  border: 2px solid #1E3A8A;
+  background-color: #FFFFFF;
+  color: #1E3A8A;
 }
 
 .add-to-list-btn:hover {
-  background-color: #f1f3f5;
-  border-color: #adb5bd;
+  background-color: #F8FAFC;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(30, 58, 138, 0.18);
 }
 
+.add-to-list-btn:active {
+  transform: translateY(0);
+}
+
+.add-to-list-btn.active {
+  background-color: #1E3A8A;
+  color: #FFFFFF;
+}
+
+/* Schedule a Visit - Solid Dark Blue */
 .schedule-visit-btn {
-  flex: 1;
-  background-color: #ffd43b;
-  color: #000000;
-  border: none;
-  font-weight: 600;
-  padding: 12px 16px;
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  background-color: #1E3A8A;
+  color: #FFFFFF;
+  border: 2px solid #1E3A8A;
 }
 
 .schedule-visit-btn:hover {
-  background-color: #fcc419;
-  opacity: 0.95;
-  transform: translateY(-1px);
+  background-color: #2563EB;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(30, 58, 138, 0.2);
+}
+
+.schedule-visit-btn:active {
+  transform: translateY(0);
+}
+
+.schedule-visit-btn.active {
+  background-color: #FFFFFF;
+  color: #1E3A8A;
 }
 
 /* ========================================
-   RESPONSIVE BREAKPOINTS
+   RESPONSIVE DESIGN
    ======================================== */
 
 /* Desktop to Tablet */
@@ -389,10 +438,7 @@
   .property-section-custom .property-section-title-center {
     font-size: 1.9rem !important;
   }
-}
-
-/* Tablet and below */
-@media (max-width: 1024px) {
+  
   .listing-layout {
     flex-direction: column;
     padding: 1.25rem;
@@ -402,12 +448,98 @@
   .main-content {
     margin-left: 0 !important;
   }
+
+  /* Maintain pop effect */
+  .property-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(30, 58, 138, 0.2);
+  }
+
+  .add-to-list-btn:hover,
+  .schedule-visit-btn:hover {
+    transform: translateY(-3px);
+  }
 }
 
-/* Mid Mobile */
+/* Tablet and Mid Mobile */
 @media (max-width: 768px) {
   .property-section-custom .property-section-title-center {
     font-size: 1.6rem !important;
+  }
+
+  .property-card {
+    padding: 16px;
+    margin: 0 auto 20px;
+    width: 100%;
+    max-width: 95%;
+  }
+
+  /* Pop effect for tablet */
+  .property-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(30, 58, 138, 0.2);
+  }
+
+  .property-images {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .thumbnail-slider {
+    display: none;
+  }
+
+  .main-property-image {
+    height: 200px;
+  }
+
+  .property-header {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .property-name {
+    font-size: 20px;
+  }
+
+  .property-price {
+    font-size: 18px;
+  }
+
+  .property-details {
+    gap: 12px;
+  }
+
+  .carpet-area,
+  .description,
+  .premium-features,
+  .age-maintenance {
+    font-size: 14px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .add-to-list-btn,
+  .schedule-visit-btn {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  /* Button pop effect for tablet */
+  .add-to-list-btn:hover,
+  .schedule-visit-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(30, 58, 138, 0.18);
+  }
+
+  .add-to-list-btn:active,
+  .schedule-visit-btn:active {
+    transform: translateY(0);
   }
 }
 
@@ -418,33 +550,28 @@
   }
 
   .property-section-custom {
-    padding: 16px 10px 0 10px !important;
+    padding: 12px 8px 0 8px !important;
     margin: 8px 0 0 0 !important;
-    border-radius: 18px !important;
   }
 
   .property-card {
-    padding: 10px;
-    margin: 8px 0;
-    border-radius: 10px;
+    padding: 14px;
+    margin: 0 auto 16px;
+    max-width: 98%;
+  }
+
+  /* Pop effect for small mobile */
+  .property-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(30, 58, 138, 0.2);
   }
 
   .property-images {
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .thumbnail-slider {
-    display: none;
+    margin-bottom: 12px;
   }
 
   .main-property-image {
-    height: 140px;
-  }
-
-  .property-header {
-    flex-direction: column;
-    gap: 6px;
+    height: 170px;
   }
 
   .property-name {
@@ -455,52 +582,69 @@
     font-size: 16px;
   }
 
+  .property-details {
+    gap: 10px;
+  }
+
   .carpet-area,
   .description,
   .premium-features,
   .age-maintenance {
-    font-size: 12px;
+    font-size: 13px;
   }
 
   .highlight-badge {
-    font-size: 10px;
-    padding: 4px 8px;
-    border-radius: 4px;
+    font-size: 12px;
+    padding: 6px 10px;
   }
 
   .action-buttons {
-    flex-direction: column;
     gap: 8px;
+    margin-top: 8px;
   }
 
   .add-to-list-btn,
   .schedule-visit-btn {
-    width: 100%;
-    font-size: 12px;
-    padding: 9px 12px;
+    padding: 11px 14px;
+    font-size: 13px;
+  }
+
+  /* Button pop effect for small mobile */
+  .add-to-list-btn:hover,
+  .schedule-visit-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(30, 58, 138, 0.18);
+  }
+
+  .add-to-list-btn:active,
+  .schedule-visit-btn:active {
+    transform: translateY(0);
   }
 }
 
 /* Extra Small Mobile */
 @media (max-width: 360px) {
   .property-section-custom .property-section-title-center {
-    font-size: 1.25rem !important;
+    font-size: 1.2rem !important;
   }
 
   .property-section-custom {
-    padding: 12px 6px 0 6px !important;
-    margin: 4px 0 0 0 !important;
-    border-radius: 16px !important;
+    padding: 10px 6px 0 6px !important;
+    margin: 6px 0 0 0 !important;
   }
 
   .property-card {
-    padding: 8px;
-    margin: 6px 0;
-    border-radius: 8px;
+    padding: 12px;
+  }
+
+  /* Pop effect for extra small mobile */
+  .property-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 12px 32px rgba(30, 58, 138, 0.2);
   }
 
   .main-property-image {
-    height: 120px;
+    height: 150px;
   }
 
   .property-name {
@@ -508,29 +652,37 @@
   }
 
   .property-price {
-    font-size: 14px;
+    font-size: 15px;
   }
 
   .carpet-area,
   .description,
   .premium-features,
   .age-maintenance {
-    font-size: 11px;
-    line-height: 1.3;
+    font-size: 12px;
+    line-height: 1.4;
   }
 
   .highlight-badge {
-    font-size: 9px;
-    padding: 3px 7px;
-  }
-
-  .action-buttons {
-    gap: 6px;
+    font-size: 11px;
+    padding: 5px 9px;
   }
 
   .add-to-list-btn,
   .schedule-visit-btn {
-    font-size: 11px;
-    padding: 8px 10px;
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+
+  /* Button pop effect for extra small mobile */
+  .add-to-list-btn:hover,
+  .schedule-visit-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 16px rgba(30, 58, 138, 0.18);
+  }
+
+  .add-to-list-btn:active,
+  .schedule-visit-btn:active {
+    transform: translateY(0);
   }
 }

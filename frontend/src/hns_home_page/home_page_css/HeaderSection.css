@@ -1334,32 +1334,64 @@
   }
 }
 
+/* Small Mobile (up to 360px) */
 @media (max-width: 360px) {
-  .budget-pill {
-    height: 38px;
-    font-size: 14px;
+  .header-section {
+    height: 100vh !important;
+    min-height: 100vh !important;
   }
-  .mobile-budget-container { gap: 8px; }
+
+  .header-main {
+    height: 100vh !important;
+    padding-top: 100px !important;
+  }
+
+  .hero-text-container {
+    margin-top: 0 !important;
+  }
+
+  .hero-heading {
+    font-size: 2.1rem !important;
+  }
+
+  .hero-subheading {
+    font-size: 1rem !important;
+  }
+
+  .searchbar-responsive {
+    bottom: 24px !important;
+    width: 92% !important;
+  }
 }
 
+/* Extra Small Mobile (below 350px) */
 @media (max-width: 350px) {
+  .header-section {
+    height: 100vh !important;
+    min-height: 100vh !important;
+  }
+
+  .header-main {
+    height: 100vh !important;
+    padding-top: 90px !important;
+  }
+
+  .hero-text-container {
+    margin-top: 0 !important;
+    padding: 0 16px !important;
+  }
+
+  .hero-heading {
+    font-size: 1.95rem !important;
+    letter-spacing: -0.5px;
+  }
+
+  .hero-subheading {
+    font-size: 0.95rem !important;
+  }
+
   .searchbar-responsive {
-    bottom: 8px;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px 0 rgba(34, 58, 95, 0.10);
-    flex-wrap: wrap;
+    bottom: 20px !important;
+    width: 94% !important;
   }
-  
-  .searchbar-input,
-  .searchbar-select {
-    font-size: 0.75rem;
-    height: 26px;
-  }
-  
-  .searchbar-btn {
-    font-size: 0.75rem;
-    padding: 0 4px;
-    height: 26px;
-    line-height: 26px;
-}
 }
