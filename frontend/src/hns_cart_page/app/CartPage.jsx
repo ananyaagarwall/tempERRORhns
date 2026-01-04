@@ -4,10 +4,12 @@ import CompareModal from '../components/ui/CompareModal';
 import MortgageCalculator from '../components/ui/MortgageCalculator';
 import AgentSidebar from '../components/ui/AgentSidebar';
 import SimilarProperties from '../components/ui/SimilarProperties';
+import FooterNavBar from '../../hns_home_page/components/layout/FooterNavBar';     // Top sticky nav
+import FooterSection from '../../hns_home_page/components/layout/FooterSection';   // Main footer
+import MobileFooter from '../../components/ui/MobileFooter';                        // Mobile bottom nav
 import '../css/CartPage.css';
 
 const CartPage = () => {
-  // Sample cart data - in real app, this would come from state management or API
   const [cartProperties, setCartProperties] = useState([
     {
       id: 1,
@@ -71,8 +73,12 @@ const CartPage = () => {
   const propertiesToCompare = cartProperties.filter(prop => compareList.includes(prop.id));
 
   return (
-    <div className="cart-page">
-      <div className="cart-container">
+    <div className="cart-page-wrapper">
+      {/* Sticky Top Navigation - appears on scroll */}
+      <FooterNavBar />
+
+      {/* Main Page Content */}
+      <div className="cart-page-container max-w-[1320px] mx-auto px-4 py-8">
         <div className="cart-header">
           <h1>My Cart</h1>
           <p className="cart-subtitle">Manage your saved properties</p>
@@ -90,7 +96,9 @@ const CartPage = () => {
               ) : (
                 <>
                   <div className="cart-actions-header">
-                    <span className="cart-count">{cartProperties.length} {cartProperties.length === 1 ? 'Property' : 'Properties'}</span>
+                    <span className="cart-count">
+                      {cartProperties.length} {cartProperties.length === 1 ? 'Property' : 'Properties'}
+                    </span>
                     {compareList.length > 0 && (
                       <button 
                         className="compare-button"
@@ -100,6 +108,7 @@ const CartPage = () => {
                       </button>
                     )}
                   </div>
+
                   <div className="cart-properties-list">
                     {cartProperties.map(property => (
                       <CartPropertyCard
@@ -115,7 +124,7 @@ const CartPage = () => {
               )}
             </div>
 
-            {/* Similar Properties Section */}
+            {/* Similar Properties */}
             <SimilarProperties currentProperties={cartProperties} />
           </div>
 
@@ -126,6 +135,12 @@ const CartPage = () => {
           </div>
         </div>
       </div>
+
+      {/* Main Footer */}
+      <FooterSection />
+
+      {/* Mobile Bottom Navigation */}
+      <MobileFooter />
 
       {/* Compare Modal */}
       {showCompareModal && (
@@ -139,4 +154,3 @@ const CartPage = () => {
 };
 
 export default CartPage;
-
