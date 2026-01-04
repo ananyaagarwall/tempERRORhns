@@ -4,7 +4,7 @@
 .header-section {
   position: relative;
   width: 100%;
-  height: 100vh;
+  height: 100vh !important;
   min-height: 600px;
   background-size: cover;
   background-position: center;
@@ -15,8 +15,8 @@
 
 @media (max-width: 768px) {
   .header-section {
-    height: 60vh !important;
-    min-height: 400px;
+    height: 100vh !important;
+    min-height: 100dvh !important; /* Better for mobile with dynamic viewport */
   }
 }
 
@@ -93,6 +93,8 @@
   font-family: 'Inter, Arial, sans-serif';
   overflow: hidden;
 }
+
+
 
 /* Welcome Card in Mobile Menu */
 .welcome-card {

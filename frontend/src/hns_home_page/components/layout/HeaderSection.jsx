@@ -362,33 +362,18 @@ const HeaderSection = () => {
   }
 
   return (
-    <div className="header-section relative w-full text-white bg-cover bg-center overflow-hidden"
-      style={{
-        background: '#FFFFFF',
-        backgroundImage: isMobile ? 'none' : `url(${headerBg})`,
-        backgroundSize: 'cover',
-        backgroundRepeat: 'no-repeat',
-        backgroundPosition: 'center',
-        height: isMobile ? '60vh' : '100vh',
-      }}
-    >
-      {/* Mobile Hero Image Container - Limited to 60% height */}
-      {isMobile && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: '60vh',
-            backgroundImage: `url(${headerBg})`,
-            backgroundSize: 'cover',
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'center',
-            zIndex: 0,
-          }}
-        />
-      )}
+<div 
+  className="header-section relative w-full text-white overflow-hidden"
+  style={{
+    backgroundImage: `url(${headerBg})`,
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
+    backgroundRepeat: 'no-repeat',
+    height: '100vh',           // Full height on all devices
+    minHeight: '100dvh',       // Better for mobile (accounts for address bar)
+  }}
+>
+
       {/* Overlay */}
       <div 
         className="absolute bg-gradient-to-r from-[#16386d] to-[rgba(0,0,0,0.1)] z-0"
@@ -403,25 +388,24 @@ const HeaderSection = () => {
       />
 
       {/* Main Navbar */}
-      {!(isMobile && showMenu) && (
-        <nav
-          className="custom-navbar header-navbar"
-          style={{
-            position: 'absolute',
-            ...navbarStyles,
-            background: 'rgba(30, 48, 80, 0.18)',
-            border: '1px solid rgba(255,255,255,0.35)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            zIndex: 50,
-            boxSizing: 'border-box',
-            boxShadow: '0 2px 16px rgba(34,58,95,0.10)',
-            overflow: 'hidden',
-          }}
-        >
+     {!(isMobile && showMenu) && (
+    <nav
+      className="custom-navbar header-navbar"
+      style={{
+        position: 'absolute',
+        ...navbarStyles,
+        background: 'rgba(30, 48, 80, 0.18)',
+        border: '1px solid rgba(255,255,255,0.35)',
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        zIndex: 50,
+        boxSizing: 'border-box',
+        boxShadow: '0 2px 16px rgba(34,58,95,0.10)',
+      }}
+    >
           {/* Logo inside navbar */}
           <img 
             src="/HouseNSeek.png" 
