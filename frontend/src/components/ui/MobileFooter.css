@@ -1,0 +1,111 @@
+/* Mobile Footer - Fixed bottom navigation for mobile only */
+.mobile-footer {
+    display: none;
+}
+
+/* Show only on mobile (< 768px) */
+@media (max-width: 767px) {
+    .mobile-footer {
+        display: flex;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 1000;
+        background: linear-gradient(to top, #ffffff, #fafafa);
+        border-top: 1px solid #e5e7eb;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08);
+        padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+        justify-content: space-around;
+        align-items: center;
+    }
+
+    .mobile-footer-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        padding: 8px 16px;
+        text-decoration: none;
+        color: #6b7280;
+        transition: all 0.2s ease;
+        border-radius: 12px;
+        min-width: 60px;
+    }
+
+    .mobile-footer-item:active {
+        transform: scale(0.95);
+        background-color: #f3f4f6;
+    }
+
+    .mobile-footer-item.active {
+        color: #2563eb;
+    }
+
+    .mobile-footer-item.active .mobile-footer-icon {
+        color: #2563eb;
+    }
+
+    .mobile-footer-icon {
+        font-size: 20px;
+        transition: color 0.2s ease;
+    }
+
+    .mobile-footer-label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+    }
+
+    /* Chatbot button - extends above footer */
+    .mobile-footer-item.chatbot-button {
+        position: relative;
+        margin-top: -15px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        z-index: 1001;
+        border: none;
+        color: white;
+        padding: 0;
+        min-width: 56px;
+    }
+
+    .mobile-footer-item.chatbot-button:hover {
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.5);
+        transform: translateY(-2px);
+    }
+
+    .mobile-footer-item.chatbot-button:active {
+        transform: translateY(0) scale(0.95);
+        background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+    }
+
+    .mobile-footer-item.chatbot-button .mobile-footer-icon {
+        font-size: 24px;
+        color: white;
+        margin-bottom: 2px;
+    }
+
+    .mobile-footer-item.chatbot-button.active .mobile-footer-icon {
+        color: white;
+    }
+
+    .mobile-footer-item.chatbot-button .mobile-footer-label {
+        color: white;
+        font-size: 10px;
+    }
+
+    .mobile-footer-item.chatbot-button.active .mobile-footer-label {
+        color: white;
+    }
+
+    /* Add padding to body to prevent content from being hidden behind footer */
+    body {
+        padding-bottom: 70px;
+    }
+}

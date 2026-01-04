@@ -1,0 +1,132 @@
+.similar-properties {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.similar-properties-header {
+  margin-bottom: 24px;
+}
+
+.similar-properties-header h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 8px;
+}
+
+.similar-properties-subtitle {
+  font-size: 0.9375rem;
+  color: #718096;
+}
+
+.similar-properties-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.similar-property-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+  background: white;
+}
+
+.similar-property-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-4px);
+}
+
+.similar-property-image {
+  width: 100%;
+  height: 180px;
+  overflow: hidden;
+}
+
+.similar-property-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.similar-property-card:hover .similar-property-image img {
+  transform: scale(1.05);
+}
+
+.similar-property-content {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.similar-property-name {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+}
+
+.similar-property-location {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #718096;
+  font-size: 0.875rem;
+  margin: 4px 0;
+}
+
+.similar-property-location .location-icon {
+  font-size: 1rem;
+}
+
+.similar-property-details {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: #4a5568;
+  padding: 8px 0;
+  border-top: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.similar-property-spec {
+  color: #4a5568;
+}
+
+.similar-property-separator {
+  color: #cbd5e0;
+}
+
+.similar-property-price {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #2563eb;
+  margin-top: 4px;
+}
+
+@media (max-width: 768px) {
+  .similar-properties {
+    padding: 20px;
+  }
+
+  .similar-properties-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .similar-properties-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .similar-property-image {
+    height: 200px;
+  }
+}
+
