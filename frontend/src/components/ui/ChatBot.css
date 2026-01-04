@@ -765,3 +765,15 @@
     min-width: 160px;
   }
 }
+
+
+/* Force hide only the floating trigger on mobile */
+@media (max-width: 1024px) {
+  .chatbot-trigger-container,
+  .chatbot-trigger {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+}

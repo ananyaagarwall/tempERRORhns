@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+
 import FooterNavBar from '../../hns_home_page/components/layout/FooterNavBar';
 import FooterSection from '../../hns_home_page/components/layout/FooterSection';
 import DynamicBreadcrumb from '../../components/ui/DynamicBreadcrumb';
+import MobileFooter from '../../components/ui/MobileFooter';  // ← Added from second version
+
 import Header from '../components/layout/Header';
 import BuilderHero from '../components/sections/BuilderHero';
 import BuilderHeaderCard from '../components/sections/BuilderHeaderCard';
@@ -16,11 +19,12 @@ import SearchByFilter from '../components/sections/SearchByFilter';
 import ResourceHub from '../components/sections/ResourceHub';
 import PropertyComparison from '../components/sections/PropertyComparison';
 import ScheduleVistSection from '../components/sections/ScheduleVisit';
+
 import { fetchBuilderByName } from '../../services/api';
+
 import '../../hns_home_page/home_page_css/TrustedBuildersSection.css';
 import '../../hns_home_page/home_page_css/FooterSection.css';
-import '../styles/builderPageLayout.css'
-
+import '../styles/builderPageLayout.css';
 
 function BuilderInfoIndex() {
   const [builder, setBuilder] = useState(null);
@@ -46,7 +50,9 @@ function BuilderInfoIndex() {
           setError(null);
         } catch (fetchError) {
           console.log(`Builder "${builderName}" not found in database`);
-          setError(`Builder "${builderName.replace(/-/g, ' ')}" information is not available. This might be because the builder profile hasn't been added yet.`);
+          setError(
+            `Builder "${builderName.replace(/-/g, ' ')}" information is not available. This might be because the builder profile hasn't been added yet.`
+          );
         }
       } catch (err) {
         console.log('Error fetching builder data:', err);
@@ -78,7 +84,9 @@ function BuilderInfoIndex() {
   return (
     <div className="min-h-screen" style={{ background: '#ffff' }}>
       <FooterNavBar sticky={true} />
-      <DynamicBreadcrumb customLabels={{ [`/builder/${builderName}`]: builder?.company_name || 'Builder' }} />
+      <DynamicBreadcrumb
+        customLabels={{ [`/builder/${builderName}`]: builder?.company_name || 'Builder' }}
+      />
 
       {/* Hero Strip */}
       <BuilderHero builder={builder} />
@@ -113,15 +121,27 @@ function BuilderInfoIndex() {
           </div>
 
           <div className="builder-section projects-grid-section">
-            <ProjectsGrid title="Our ongoing Projects" builderId={builder?.rera_id} statusFilter={["under construction", "ongoing", "in progress"]} />
+            <ProjectsGrid
+              title="Our ongoing Projects"
+              builderId={builder?.rera_id}
+              statusFilter={['under construction', 'ongoing', 'in progress']}
+            />
           </div>
 
           <div className="builder-section projects-grid-section">
-            <ProjectsGrid title="Our completed Projects" builderId={builder?.rera_id} statusFilter={["completed", "ready-to-move", "ready to move"]} />
+            <ProjectsGrid
+              title="Our completed Projects"
+              builderId={builder?.rera_id}
+              statusFilter={['completed', 'ready-to-move', 'ready to move']}
+            />
           </div>
 
           <div className="builder-section projects-grid-section">
-            <ProjectsGrid title="Our upcoming Projects" builderId={builder?.rera_id} statusFilter={["upcoming", "pre-launch", "pre launch"]} />
+            <ProjectsGrid
+              title="Our upcoming Projects"
+              builderId={builder?.rera_id}
+              statusFilter={['upcoming', 'pre-launch', 'pre launch']}
+            />
           </div>
 
           <div className="builder-section who-we-are-section">
@@ -152,6 +172,7 @@ function BuilderInfoIndex() {
 
       {/* Footer */}
       <FooterSection />
+      <MobileFooter />  {/* ← Restored from second version */}
     </div>
   );
 }

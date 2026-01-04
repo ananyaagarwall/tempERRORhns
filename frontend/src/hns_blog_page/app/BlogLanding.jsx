@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import FooterNavBar from "../../hns_home_page/components/layout/FooterNavBar";
 import FooterSection from '../../hns_home_page/components/layout/FooterSection';
-import BlogTitle from '../components/layout/BlogTitle';
-import TrendingNow from '../components/ui/TrendingNowSection';
-import FamousSection from '../components/ui/FamousSection';
 import KnowBeforeYouBuySection from '../components/ui/KnowBeforeYouBuySection';
 import DynamicBreadcrumb from '../../components/ui/DynamicBreadcrumb';
 import LatestBlog from '../components/ui/LatestBlog';
+import TrendingNow from '../components/ui/TrendingNowSection';
+import FamousSection from '../components/ui/FamousSection';
+import MobileFooter from '../../components/ui/MobileFooter';
 import '../blog_page_css/BlogPage.css';
 
 import { fetchBlogs } from '../../services/api';
@@ -17,7 +17,9 @@ const BlogLanding = () => {
   const [category, setCategory] = useState('All');
 
   useEffect(() => {
-    fetchBlogs().then(setBlogs).catch(console.error);
+    fetchBlogs()
+      .then(setBlogs)
+      .catch(console.error);
   }, []);
 
   const filteredBlogs = category === "All"
@@ -28,7 +30,7 @@ const BlogLanding = () => {
     <div className="blog-page-container">
       <FooterNavBar />
 
-      <div >
+      <div>
         <DynamicBreadcrumb />
       </div>
 
@@ -43,6 +45,7 @@ const BlogLanding = () => {
       </div>
 
       <FooterSection />
+      <MobileFooter />  {/* Kept from the first version — important for mobile view */}
     </div>
   );
 };
