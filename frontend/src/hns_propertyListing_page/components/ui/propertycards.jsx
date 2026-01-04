@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useCart } from '../../../hns_cart_page/js/CartContent';
 import { fetchProperties } from '../../../services/api';
 import '../../hns_propertylisting_css/propertycards.css';
 
-// Minimal UI shims to avoid external dependencies
 const Button = ({ children, className = '', variant = 'default', ...props }) => (
   <button
     className={`ui-btn ${variant === 'outline' ? 'ui-btn-outline' : 'ui-btn-solid'} ${className}`}
@@ -21,16 +21,23 @@ const ChevronLeft = ({ size = 16 }) => (
     <path d="M15 6L9 12L15 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
+
 const ChevronRight = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
+// Heart Icon Component
+const HeartIcon = ({ filled }) => (
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+  </svg>
+);
+
 const PropertyCard = ({ property }) => {
   const [currentThumbnail, setCurrentThumbnail] = useState(0);
-  const [isAddedToList, setIsAddedToList] = useState(false);
-  const [isVisitScheduled, setIsVisitScheduled] = useState(false);
+  const { addToCart, removeFromCart, isInCart } = useCart();
 
   const thumbnailImages = [
     { src: '/Defining-Demand.jpg', alt: `${property.name} exterior view` },
@@ -41,7 +48,7 @@ const PropertyCard = ({ property }) => {
 
   const nextThumbnail = () => {
     setCurrentThumbnail((prev) => {
-      const maxPosition = Math.max(0, thumbnailImages.length - 2); // show 2 at a time
+      const maxPosition = Math.max(0, thumbnailImages.length - 2);
       return prev >= maxPosition ? 0 : prev + 1;
     });
   };
@@ -53,10 +60,39 @@ const PropertyCard = ({ property }) => {
     });
   };
 
+  const handleHeartClick = () => {
+    if (isInCart(property.id)) {
+      removeFromCart(property.id);
+    } else {
+      addToCart(property);
+    }
+  };
+
+  const handleAddToList = () => {
+    if (!isInCart(property.id)) {
+      addToCart(property);
+    }
+  };
+
   return (
     <div className="property-card">
       <div className="property-images">
-        <div className="main-image">
+        <div className="main-image" style={{ position: 'relative' }}>
+          {/* Heart Button - TOP RIGHT */}
+          <button
+            className={`property-heart-button ${isInCart(property.id) ? 'in-cart' : ''}`}
+            onClick={handleHeartClick}
+            aria-label={isInCart(property.id) ? 'Remove from cart' : 'Add to cart'}
+            style={{
+              position: 'absolute',
+              top: '14px',
+              right: '14px',
+              zIndex: 3
+            }}
+          >
+            <HeartIcon filled={isInCart(property.id)} />
+          </button>
+
           {property.status && (
             <Badge className="status-badge ready-to-move-badge">
               {property.status}
@@ -68,6 +104,7 @@ const PropertyCard = ({ property }) => {
             className="main-property-image"
           />
         </div>
+        
         <div className="thumbnail-slider">
           <div className="thumbnail-container">
             <div 
@@ -121,12 +158,12 @@ const PropertyCard = ({ property }) => {
           <h2 className="property-name">{property.name}</h2>
           <div className="property-price">
             <span className="price-amount">{property.price}</span>
-            {property.pricePerSqft ? (
+            {property.pricePerSqft && (
               <>
                 <span className="price-separator"> | </span>
                 <span className="price-per-sqft">{property.pricePerSqft}</span>
               </>
-            ) : null}
+            )}
           </div>
         </div>
         
@@ -166,8 +203,12 @@ const PropertyCard = ({ property }) => {
         </div>
         
         <div className="action-buttons">
-          <Button variant="outline" className="add-to-list-btn">
-            Add to My List
+          <Button 
+            variant="outline" 
+            className="add-to-list-btn"
+            onClick={handleAddToList}
+          >
+            {isInCart(property.id) ? '✓ Added to List' : 'Add to My List'}
           </Button>
           <Button className="schedule-visit-btn">Schedule a Visit</Button>
         </div>
@@ -184,7 +225,18 @@ const SearchResults = ({ searchFilters = { location: '', priceRange: 0, bhkTypes
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchProperties({ location: searchFilters.location, priceRange: searchFilters.priceRange, bhkTypes: searchFilters.bhkTypes });
+        const data = await fetchProperties({ 
+          location: searchFilters.location, 
+          priceRange: searchFilters.priceRange, 
+          bhkTypes: searchFilters.bhkTypes 
+        });
+        const handleHeartClick = () => {
+        if (isInCart(property.id)) {
+          removeFromCart(property.id);
+        } else {
+          addToCart(property, 'listing'); // Mark as listing
+        }
+      };
         const mapped = (Array.isArray(data) ? data : []).map((p) => {
           const highlights = [];
           if (Array.isArray(p.Highlights)) highlights.push(...p.Highlights);

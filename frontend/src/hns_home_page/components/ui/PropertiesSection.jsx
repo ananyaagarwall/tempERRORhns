@@ -1,12 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CiLocationOn } from "react-icons/ci";
+import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import initPropertyCardHandlers from '../../home_page_js/propertyCards.js';
 import '../../home_page_css/PropertiesSection.css';
 import { fetchProperties } from '../../../services/api';
-import SectionHeading from './SectionHeading';
 
-// Dummy sample property for fallback
+// Heart Icon Component
+const HeartIcon = ({ filled }) => (
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+  </svg>
+);
+
 const sampleProperty = {
   img: '/Presidential Towers.jpg.png',
   name: 'Sample Property',
@@ -16,34 +22,6 @@ const sampleProperty = {
   confidence: '93%',
 };
 
-const propertiesNewCity = [
-  {
-    img: '/World-View-tower.jpg',
-    name: 'World View Tower',
-    address: '123 New City Ave, New City, NY 10001',
-    features: '4 BHK | Gym | Pool',
-    price: '₹ 2 Cr +',
-    confidence: '92%',
-  },
-  {
-    img: '/Defining-Demand.jpg',
-    name: 'Defining Demand',
-    address: '456 Skyline Rd, New City, NY 10002',
-    features: '3 BHK | Pool | Parking',
-    price: '₹ 1.8 Cr +',
-    confidence: '94%',
-  },
-  {
-    img: '/famous.jpg',
-    name: 'Famous Heights',
-    address: '789 Uptown Blvd, New City, NY 10003',
-    features: '2 BHK | Gym',
-    price: '₹ 1.1 Cr +',
-    confidence: '91%',
-  },
-];
-
-// Helper to robustly parse price in Cr from string
 function parsePriceInCr(priceStr) {
   if (!priceStr) return 0;
   let val = priceStr.toString().replace(/₹|,|\+|\s/g, '').toLowerCase();
@@ -61,20 +39,19 @@ function parsePriceInCr(priceStr) {
 }
 
 const PropertiesSection = ({ searchFilters }) => {
-  const [activeTab, setActiveTab] = useState('navi');
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const cardsRowRef = useRef(null);
   const navigate = useNavigate();
+  const { addToCart, removeFromCart, isInCart } = useCart();
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 700);
     window.addEventListener('resize', handleResize);
     initPropertyCardHandlers();
 
-    // Only send location to backend
     const getProperties = async () => {
       try {
         const data = await fetchProperties({ location: searchFilters.location });
@@ -84,7 +61,7 @@ const PropertiesSection = ({ searchFilters }) => {
           address: p.Address || p.Location || '',
           price: p.Price_Starting_From || p.Pricing || '',
           confidence: p.confidence || '',
-          img: p.image || '/Presidential Towers.jpg.png', // fallback image
+          img: p.image || '/Presidential Towers.jpg.png',
           features: p.Features || '',
           Existing_Configurations: p.Existing_Configurations || [],
         })) : [];
@@ -102,14 +79,73 @@ const PropertiesSection = ({ searchFilters }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, [searchFilters.location]);
 
-  const scrollByCard = (direction) => {
-    const row = cardsRowRef.current;
-    if (!row) return;
-    const card = row.querySelector('.property-card-custom');
-    if (!card) return;
-    const scrollAmount = card.offsetWidth + 20;
-    row.scrollBy({ left: direction * scrollAmount, behavior: 'smooth' });
+  const handleHeartClick = (e, property) => {
+    e.stopPropagation();
+    if (isInCart(property.id)) {
+      removeFromCart(property.id);
+    } else {
+      addToCart(property);
+    }
   };
+
+  const renderPropertyCard = (prop, idx) => (
+    <div
+      className={`property-card-custom ${isMobile ? 'mobile-card' : ''}`}
+      key={idx}
+      onClick={() => {
+        const propertyData = {
+          id: prop.id,
+          name: prop.name,
+          address: prop.address,
+          features: prop.features,
+          price: prop.price,
+          confidence: prop.confidence,
+          clickedAt: new Date().toISOString()
+        };
+        localStorage.setItem('lastClickedProperty', JSON.stringify(propertyData));
+        let recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewedProperties') || '[]');
+        const existingIndex = recentlyViewed.findIndex(p => p.name === prop.name && p.address === prop.address);
+        if (existingIndex !== -1) {
+          recentlyViewed.splice(existingIndex, 1);
+        }
+        recentlyViewed.unshift(propertyData);
+        recentlyViewed = recentlyViewed.slice(0, 5);
+        localStorage.setItem('recentlyViewedProperties', JSON.stringify(recentlyViewed));
+        navigate(`/property/${prop.id}`);
+      }}
+    >
+      <img src={prop.img} alt={prop.name} className="property-img-custom" />
+      
+      {/* Heart Button - TOP RIGHT */}
+      <button
+        className={`property-heart-button ${isInCart(prop.id) ? 'in-cart' : ''}`}
+        onClick={(e) => handleHeartClick(e, prop)}
+        aria-label={isInCart(prop.id) ? 'Remove from cart' : 'Add to cart'}
+      >
+        <HeartIcon filled={isInCart(prop.id)} />
+      </button>
+
+      <div className="property-confidence-badge">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 4 }}>
+          <rect x="2" y="3" width="20" height="18" rx="6" fill="none" />
+          <path d="M12 17.5L7.5 15.5V7.5C7.5 6.39543 8.39543 5.5 9.5 5.5H14.5C15.6046 5.5 16.5 6.39543 16.5 7.5V15.5L12 17.5Z" stroke="#223A5F" strokeWidth="1.5" />
+          <path d="M12 10.5L12.866 12.134C12.9472 12.2872 13.0906 12.3978 13.2598 12.4292L15.0711 12.7712C15.4952 12.8492 15.6682 13.3722 15.3522 13.6682L13.9522 14.9682C13.8252 15.0862 13.7652 15.2662 13.8002 15.4412L14.1712 17.2412C14.2562 17.6652 13.8032 17.9902 13.4292 17.7712L12 16.9412L10.5708 17.7712C10.1968 17.9902 9.74377 17.6652 9.82877 17.2412L10.1998 15.4412C10.2348 15.2662 10.1748 15.0862 10.0478 14.9682L8.64777 13.6682C8.33177 13.3722 8.50477 12.8492 8.92877 12.7712L10.7402 12.4292C10.9094 12.3978 11.0528 12.2872 11.134 12.134L12 10.5Z" stroke="#223A5F" strokeWidth="1.2" />
+        </svg>
+        <span>{prop.confidence}</span>
+      </div>
+      
+      <div className="property-overlay-custom">
+        <div className="property-info-custom">
+          <h2>{prop.name}</h2>
+          <p className="property-address-custom"><CiLocationOn className="location-icon" />{prop.address}</p>
+          <div className="property-bottom-row">
+            <p className="property-details-custom">{prop.features}</p>
+            <p className="property-price-custom">{prop.price}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <section className="property-section-custom">
@@ -135,6 +171,7 @@ const PropertiesSection = ({ searchFilters }) => {
           boxShadow: '0 2px 4px rgba(241, 217, 122, 0.3)'
         }} />
       </div>
+      
       <div className="property-cards-row-wrapper">
         <div className={`property-cards-row ${isMobile ? 'mobile-cards-row' : ''}`} ref={cardsRowRef}>
           {loading ? (
@@ -142,36 +179,12 @@ const PropertiesSection = ({ searchFilters }) => {
           ) : error ? (
             <div style={{ color: 'red', padding: '2rem', fontWeight: 600 }}>{error}</div>
           ) : properties.length === 0 ? (
-            // Render sample property card if no properties fetched
-            <div className={`property-card-custom ${isMobile ? 'mobile-card' : ''}`}>
-              <img src={sampleProperty.img} alt={sampleProperty.name} className="property-img-custom" />
-              <div className="property-confidence-badge">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 4 }}>
-                  <rect x="2" y="3" width="20" height="18" rx="6" fill="none" />
-                  <path d="M12 17.5L7.5 15.5V7.5C7.5 6.39543 8.39543 5.5 9.5 5.5H14.5C15.6046 5.5 16.5 6.39543 16.5 7.5V15.5L12 17.5Z" stroke="#223A5F" strokeWidth="1.5" />
-                  <path d="M12 10.5L12.866 12.134C12.9472 12.2872 13.0906 12.3978 13.2598 12.4292L15.0711 12.7712C15.4952 12.8492 15.6682 13.3722 15.3522 13.6682L13.9522 14.9682C13.8252 15.0862 13.7652 15.2662 13.8002 15.4412L14.1712 17.2412C14.2562 17.6652 13.8032 17.9902 13.4292 17.7712L12 16.9412L10.5708 17.7712C10.1968 17.9902 9.74377 17.6652 9.82877 17.2412L10.1998 15.4412C10.2348 15.2662 10.1748 15.0862 10.0478 14.9682L8.64777 13.6682C8.33177 13.3722 8.50477 12.8492 8.92877 12.7712L10.7402 12.4292C10.9094 12.3978 11.0528 12.2872 11.134 12.134L12 10.5Z" stroke="#223A5F" strokeWidth="1.2" />
-                </svg>
-                <span>{sampleProperty.confidence}</span>
-              </div>
-              <div className="property-overlay-custom">
-                <div className="property-info-custom">
-                  <h2>{sampleProperty.name}</h2>
-                  <p className="property-address-custom"><CiLocationOn className="location-icon" />{sampleProperty.address}</p>
-                  <div className="property-bottom-row">
-                    <p className="property-details-custom">{sampleProperty.features}</p>
-                    <p className="property-price-custom">{sampleProperty.price}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+            renderPropertyCard(sampleProperty, 0)
           ) : (
             properties
               .filter(prop => {
-                // Location already filtered by backend
-                // Price filter (frontend)
                 const priceValue = parsePriceInCr(prop.price);
                 const priceMatch = !searchFilters.priceRange || (priceValue && priceValue <= searchFilters.priceRange);
-                // Type filter (frontend)
                 let bhkMatch = true;
                 if (searchFilters.bhkTypes && searchFilters.bhkTypes.length > 0) {
                   if (prop.Existing_Configurations && Array.isArray(prop.Existing_Configurations)) {
@@ -184,57 +197,11 @@ const PropertiesSection = ({ searchFilters }) => {
                 }
                 return priceMatch && bhkMatch;
               })
-              .map((prop, idx) => (
-                <div
-                  className={`property-card-custom ${isMobile ? 'mobile-card' : ''}`}
-                  key={idx}
-                  onClick={() => {
-                    const propertyData = {
-                      id: prop.id,
-                      name: prop.name,
-                      address: prop.address,
-                      features: prop.features,
-                      price: prop.price,
-                      confidence: prop.confidence,
-                      clickedAt: new Date().toISOString()
-                    };
-                    localStorage.setItem('lastClickedProperty', JSON.stringify(propertyData));
-                    let recentlyViewed = JSON.parse(localStorage.getItem('recentlyViewedProperties') || '[]');
-                    const existingIndex = recentlyViewed.findIndex(p => p.name === prop.name && p.address === prop.address);
-                    if (existingIndex !== -1) {
-                      recentlyViewed.splice(existingIndex, 1);
-                    }
-                    recentlyViewed.unshift(propertyData);
-                    recentlyViewed = recentlyViewed.slice(0, 5);
-                    localStorage.setItem('recentlyViewedProperties', JSON.stringify(recentlyViewed));
-                    console.log('Property clicked and stored in localStorage:', propertyData);
-                    navigate(`/property/${prop.id}`);
-                  }}
-                >
-                  <img src={prop.img} alt={prop.name} className="property-img-custom" />
-                  <div className="property-confidence-badge">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 4 }}>
-                      <rect x="2" y="3" width="20" height="18" rx="6" fill="none" />
-                      <path d="M12 17.5L7.5 15.5V7.5C7.5 6.39543 8.39543 5.5 9.5 5.5H14.5C15.6046 5.5 16.5 6.39543 16.5 7.5V15.5L12 17.5Z" stroke="#223A5F" strokeWidth="1.5" />
-                      <path d="M12 10.5L12.866 12.134C12.9472 12.2872 13.0906 12.3978 13.2598 12.4292L15.0711 12.7712C15.4952 12.8492 15.6682 13.3722 15.3522 13.6682L13.9522 14.9682C13.8252 15.0862 13.7652 15.2662 13.8002 15.4412L14.1712 17.2412C14.2562 17.6652 13.8032 17.9902 13.4292 17.7712L12 16.9412L10.5708 17.7712C10.1968 17.9902 9.74377 17.6652 9.82877 17.2412L10.1998 15.4412C10.2348 15.2662 10.1748 15.0862 10.0478 14.9682L8.64777 13.6682C8.33177 13.3722 8.50477 12.8492 8.92877 12.7712L10.7402 12.4292C10.9094 12.3978 11.0528 12.2872 11.134 12.134L12 10.5Z" stroke="#223A5F" strokeWidth="1.2" />
-                    </svg>
-                    <span>{prop.confidence}</span>
-                  </div>
-                  <div className="property-overlay-custom">
-                    <div className="property-info-custom">
-                      <h2>{prop.name}</h2>
-                      <p className="property-address-custom"><CiLocationOn className="location-icon" />{prop.address}</p>
-                      <div className="property-bottom-row">
-                        <p className="property-details-custom">{prop.features}</p>
-                        <p className="property-price-custom">{prop.price}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
+              .map((prop, idx) => renderPropertyCard(prop, idx))
           )}
         </div>
       </div>
+
       <style>{`
         .mobile-cards-row {
           padding: 20px 10px ;

@@ -1,5 +1,6 @@
 import React, { createContext, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { CartProvider } from './hns_cart_page/js/CartContent'; // Import CartProvider
 import Navbar from './hns_admin_page/Navbar';
 import Login from './hns_admin_page/Login';
 import Signup from './hns_admin_page/Signup';
@@ -18,7 +19,6 @@ import BlogLanding from './hns_blog_page/app/BlogLanding';
 import BlogDetail from './hns_blog_page/app/BlogDetail';
 import FooterNavBar from './hns_home_page/components/layout/FooterNavBar';
 import ProjectList from './hns_admin_page/ProjectList';
-// Swap to HnS property listing page
 import PropertyListing from './hns_propertyListing_page/app/PropertyListing';
 import GeoLocation from './Builder.jsx/geoLocation';
 import BuilderInfoIndex from './BuilderInfo/pages/Index';
@@ -28,7 +28,7 @@ import ChatBot from './components/ui/ChatBot';
 import AboutUs from './hns_home_page/components/ui/AboutUs';
 import BuildersListing from './hns_home_page/components/ui/BuildersListing';
 
-// Chatbot Context - MUST be exported for ChatBot.jsx to use it
+// Chatbot Context
 export const ChatbotContext = createContext();
 
 const ProtectedRoute = ({ children }) => {
@@ -51,119 +51,121 @@ function App() {
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
 
   return (
-    <ChatbotContext.Provider value={{ isChatbotOpen, setIsChatbotOpen }}>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route
-          path="/builder-dashboard"
-          element={
-            <ProtectedRoute>
-              <BuilderDashboard />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Protected Dashboard Routes */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout />
-            </ProtectedRoute>
-          }
-        >
+    <CartProvider>
+      <ChatbotContext.Provider value={{ isChatbotOpen, setIsChatbotOpen }}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
           <Route
-            path="admin"
-            element={
-              <AdminRoute>
-                <AdminDashboard />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="add-builder"
-            element={
-              <AdminRoute>
-                <AddBuilder />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="blogs"
-            element={
-              <AdminRoute>
-                <BlogManagement />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="create-blog"
-            element={
-              <AdminRoute>
-                <AdminBlog />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="builders"
-            element={
-              <AdminRoute>
-                <ManagePropertyInBuilderProfile />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="properties"
-            element={
-              <AdminRoute>
-                <PropertiesManagement />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="add-project"
-            element={
-              <AdminRoute>
-                <ProjectAdd />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="projects"
-            element={
-              <AdminRoute>
-                <ProjectList />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="geo-location"
+            path="/builder-dashboard"
             element={
               <ProtectedRoute>
-                <GeoLocation />
+                <BuilderDashboard />
               </ProtectedRoute>
             }
           />
-        </Route>
 
-        {/* Public Routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/properties" element={<PropertyListing />} />
-        <Route path="/property/:id" element={<PropertyListingPage />} />
-        <Route path="/builder" element={<BuilderInfoIndex />} />
-        <Route path="/builder-info" element={<BuilderInfoIndex />} />
-        <Route path="/builder/:builderName" element={<BuilderInfoIndex />} />
-        <Route path="/blogs" element={<BlogLanding />} />
-        <Route path="/blog/:slug" element={<BlogDetail />} />
-        <Route path="/cart" element={<CartPage />} />
-        <Route path="/about" element={<AboutUs />} />
-        <Route path="/builders-page" element={<BuildersListing />} />
-      </Routes>
+          {/* Protected Dashboard Routes */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route
+              path="admin"
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="add-builder"
+              element={
+                <AdminRoute>
+                  <AddBuilder />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="blogs"
+              element={
+                <AdminRoute>
+                  <BlogManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="create-blog"
+              element={
+                <AdminRoute>
+                  <AdminBlog />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="builders"
+              element={
+                <AdminRoute>
+                  <ManagePropertyInBuilderProfile />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="properties"
+              element={
+                <AdminRoute>
+                  <PropertiesManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="add-project"
+              element={
+                <AdminRoute>
+                  <ProjectAdd />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="projects"
+              element={
+                <AdminRoute>
+                  <ProjectList />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="geo-location"
+              element={
+                <ProtectedRoute>
+                  <GeoLocation />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
 
-      {/* ChatBot rendered outside Routes but inside Context Provider */}
-      <ChatBot />
-    </ChatbotContext.Provider>
+          {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/properties" element={<PropertyListing />} />
+          <Route path="/property/:id" element={<PropertyListingPage />} />
+          <Route path="/builder" element={<BuilderInfoIndex />} />
+          <Route path="/builder-info" element={<BuilderInfoIndex />} />
+          <Route path="/builder/:builderName" element={<BuilderInfoIndex />} />
+          <Route path="/blogs" element={<BlogLanding />} />
+          <Route path="/blog/:slug" element={<BlogDetail />} />
+          <Route path="/cart" element={<CartPage />} />
+          <Route path="/about" element={<AboutUs />} />
+          <Route path="/builders-page" element={<BuildersListing />} />
+        </Routes>
+
+        {/* ChatBot rendered outside Routes but inside Context Provider */}
+        <ChatBot />
+      </ChatbotContext.Provider>
+    </CartProvider>
   );
 }
 

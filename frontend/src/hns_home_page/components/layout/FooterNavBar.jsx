@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaBars, FaTimes, FaUserCircle, FaRegUserCircle } from 'react-icons/fa';
+import { FaBars, FaTimes, FaUserCircle, FaRegUserCircle, FaShoppingCart } from 'react-icons/fa'; // ← Added FaShoppingCart
 import { MdTravelExplore, MdHome, MdBusiness, MdArticle } from 'react-icons/md';
 import { Link } from 'react-router-dom';
 import "../../home_page_css/FooterNavBar.css";
@@ -17,9 +17,11 @@ const FooterNavBar = ({ sticky = false }) => {
 
   const isMobile = windowWidth <= 768;
 
+  // Updated actionCards with Cart
   const actionCards = [
     { label: 'Builders', icon: <MdBusiness size={38} color="#A21CAF" style={{ filter: 'drop-shadow(0 0 6px #A21CAF99)' }} />, to: '/builders-page', desc: 'Explore trusted builders' },
     { label: 'Projects', icon: <MdHome size={38} color="#22C55E" style={{ filter: 'drop-shadow(0 0 6px #22C55E99)' }} />, to: '/properties', desc: 'View all projects' },
+    { label: 'Cart', icon: <FaShoppingCart size={38} color="#F97316" style={{ filter: 'drop-shadow(0 0 6px #F9731699)' }} />, to: '/cart', desc: 'View saved properties' }, // ← NEW
     { label: 'Blogs', icon: <MdArticle size={38} color="#F59E42" style={{ filter: 'drop-shadow(0 0 6px #F59E4299)' }} />, to: '/blogs', desc: 'Read property news & tips' },
     { label: 'About Us', icon: <MdTravelExplore size={38} color="#3B82F6" style={{ filter: 'drop-shadow(0 0 6px #3B82F6AA)' }} />, to: '/about', desc: 'Learn about us' },
   ];
@@ -49,11 +51,15 @@ const FooterNavBar = ({ sticky = false }) => {
           />
         </Link>
 
-        {/* Desktop Navigation - ALL using Link component */}
+        {/* Desktop Navigation - Now includes Cart */}
         {!isMobile && (
           <nav className="footer-nav">
             <Link to="/builders-page" className="footer-nav-link">Builders</Link>
             <Link to="/properties" className="footer-nav-link">Projects</Link>
+            <Link to="/cart" className="footer-nav-link flex items-center gap-2">
+              <FaShoppingCart size={18} />
+              Cart
+            </Link>
             <Link to="/blogs" className="footer-nav-link">Blogs</Link>
             <Link to="/about" className="footer-nav-link">About Us</Link>
             <Link 
@@ -81,7 +87,7 @@ const FooterNavBar = ({ sticky = false }) => {
         <div style={{ height: isMobile ? 64 : 72 }} />
       )}
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay - Now includes Cart */}
       {isMobile && showMenu && (
         <div className="mobile-menu-overlay">
           {/* Welcome card */}
@@ -119,7 +125,7 @@ const FooterNavBar = ({ sticky = false }) => {
             )}
           </div>
 
-          {/* Action cards - ALL using Link component */}
+          {/* Action cards - Now includes Cart */}
           <div className="action-cards-container">
             {actionCards.map((card) => (
               <Link

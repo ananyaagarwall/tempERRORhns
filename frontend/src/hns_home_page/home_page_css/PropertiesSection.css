@@ -742,3 +742,95 @@
     border-radius: 0 !important;
   }
 }
+
+
+
+/* Add these styles to your PropertiesSection.css or propertycards.css */
+
+.property-heart-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.property-heart-button:hover {
+  transform: scale(1.15);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.property-heart-button:active {
+  transform: scale(0.95);
+}
+
+.property-heart-button svg {
+  width: 22px;
+  height: 22px;
+  transition: all 0.3s ease;
+}
+
+.property-heart-button.in-cart svg {
+  fill: #FF4D4F;
+  stroke: #FF4D4F;
+  animation: heartBeat 0.3s ease;
+}
+
+.property-heart-button:not(.in-cart) svg {
+  fill: none;
+  stroke: #FF4D4F;
+  stroke-width: 2;
+}
+
+@keyframes heartBeat {
+  0%, 100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.3);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .property-heart-button {
+    width: 36px;
+    height: 36px;
+    top: 10px;
+    right: 10px;
+  }
+
+  .property-heart-button svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .property-heart-button {
+    width: 32px;
+    height: 32px;
+    top: 8px;
+    right: 8px;
+  }
+
+  .property-heart-button svg {
+    width: 16px;
+    height: 16px;
+  }
+}
