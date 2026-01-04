@@ -25,6 +25,8 @@ import BuilderInfoIndex from './BuilderInfo/pages/Index';
 import PropertyListingPage from './property_page/app/page';
 import CartPage from './hns_cart_page/app/CartPage';
 import ChatBot from './components/ui/ChatBot';
+import AboutUs from './hns_home_page/components/ui/AboutUs';
+import BuildersListing from './hns_home_page/components/ui/BuildersListing';
 
 // Chatbot Context - MUST be exported for ChatBot.jsx to use it
 export const ChatbotContext = createContext();
@@ -155,6 +157,8 @@ function App() {
         <Route path="/blogs" element={<BlogLanding />} />
         <Route path="/blog/:slug" element={<BlogDetail />} />
         <Route path="/cart" element={<CartPage />} />
+        <Route path="/about" element={<AboutUs />} />
+        <Route path="/builders-page" element={<BuildersListing />} />
       </Routes>
 
       {/* ChatBot rendered outside Routes but inside Context Provider */}
