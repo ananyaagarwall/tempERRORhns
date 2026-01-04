@@ -65,6 +65,22 @@ const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
         { label: builderName, path: pathname, isLast: true }
       ];
     }
+
+        // Cart / Saved Properties page
+    if (pathname === '/cart' || pathname === '/saved-properties') {
+      return [
+        { label: 'Home', path: '/', isLast: false },
+        { label: 'My Saved Properties', path: pathname, isLast: true }
+      ];
+    }
+
+        // Cart / Saved Properties page
+    if (pathname === '/cart') {
+      return [
+        { label: 'Home', path: '/', isLast: false },
+        { label: 'My Saved Properties', path: '/cart', isLast: true }
+      ];
+    }
     
     // Default fallback - show Home only
     return [
