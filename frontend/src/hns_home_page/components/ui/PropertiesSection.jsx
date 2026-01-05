@@ -79,15 +79,14 @@ const PropertiesSection = ({ searchFilters }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, [searchFilters.location]);
 
-  const handleHeartClick = (e, property) => {
-    e.stopPropagation();
-    if (isInCart(property.id)) {
-      removeFromCart(property.id);
-    } else {
-      addToCart(property);
-    }
-  };
-
+const handleHeartClick = (e, property) => {
+  e.stopPropagation();
+  if (isInCart(property.id)) {
+    removeFromCart(property.id);
+  } else {
+    addToCart(property, 'featured'); // Mark as featured
+  }
+};
   const renderPropertyCard = (prop, idx) => (
     <div
       className={`property-card-custom ${isMobile ? 'mobile-card' : ''}`}

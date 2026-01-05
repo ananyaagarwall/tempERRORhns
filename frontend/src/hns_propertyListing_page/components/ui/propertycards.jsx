@@ -1,3 +1,4 @@
+// src/hns_propertyListing_page/components/ui/propertycards.jsx
 import React, { useEffect, useState } from 'react';
 import { useCart } from '../../../hns_cart_page/js/CartContent';
 import { fetchProperties } from '../../../services/api';
@@ -64,13 +65,15 @@ const PropertyCard = ({ property }) => {
     if (isInCart(property.id)) {
       removeFromCart(property.id);
     } else {
-      addToCart(property);
+      // Mark as 'listing' source when adding from search results
+      addToCart(property, 'listing');
     }
   };
 
   const handleAddToList = () => {
     if (!isInCart(property.id)) {
-      addToCart(property);
+      // Mark as 'listing' source when adding from search results
+      addToCart(property, 'listing');
     }
   };
 
@@ -230,13 +233,7 @@ const SearchResults = ({ searchFilters = { location: '', priceRange: 0, bhkTypes
           priceRange: searchFilters.priceRange, 
           bhkTypes: searchFilters.bhkTypes 
         });
-        const handleHeartClick = () => {
-        if (isInCart(property.id)) {
-          removeFromCart(property.id);
-        } else {
-          addToCart(property, 'listing'); // Mark as listing
-        }
-      };
+        
         const mapped = (Array.isArray(data) ? data : []).map((p) => {
           const highlights = [];
           if (Array.isArray(p.Highlights)) highlights.push(...p.Highlights);

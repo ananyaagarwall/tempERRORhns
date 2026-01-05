@@ -1,11 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { useCart } from '../js/CartContent.jsx';
-import { Trash2, Heart, MapPin, Home, Maximize, Calculator, X, ArrowRight, Sparkles } from 'lucide-react';
+import { Trash2, Heart, MapPin, Home, Maximize, Calculator, X, ArrowRight, Sparkles, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import FooterNavBar from '../../hns_home_page/components/layout/FooterNavBar.jsx';
 import FooterSection from '../../hns_home_page/components/layout/FooterSection.jsx';
 import MobileFooter from '../../components/ui/MobileFooter.jsx';
-import '../css/CartPage.css';
-import { useNavigate } from 'react-router-dom';
 import DynamicBreadcrumb from '../../components/ui/DynamicBreadcrumb.jsx';
 
 const CartPage = () => {
@@ -76,7 +75,7 @@ const CartPage = () => {
   };
 
   const handleCalculatorClick = () => {
-    if (window.innerWidth < 1024) { // Tailwind 'lg' breakpoint
+    if (window.innerWidth < 1024) {
       scrollToMobileCalculator();
     } else {
       setShowCalculator(prev => !prev);
@@ -90,8 +89,21 @@ const CartPage = () => {
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
           <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-6 flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-white">Compare Properties</h2>
-            <button onClick={() => setShowCompare(false)} className="text-white hover:bg-white/20 p-2 rounded-lg transition">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setShowCompare(false)} 
+                className=" text-gray-800 hover:bg-white/20 p-2 rounded-lg transition flex items-center gap-2"
+              >
+                <ArrowLeft size={20} />
+                <span className="font-medium">Back</span>
+              </button>
+              <div className="h-6 w-px bg-white/30"></div>
+              <h2 className="text-2xl font-bold text-white">Compare Properties</h2>
+            </div>
+            <button 
+              onClick={() => setShowCompare(false)} 
+              className="text-white hover:bg-white/20 p-2 rounded-lg transition"
+            >
               <X size={24} />
             </button>
           </div>
@@ -141,7 +153,7 @@ const CartPage = () => {
   };
 
   const EMICalculatorContent = () => (
-    <div className="bg-white rounded-2xl shadow-lg p-6">
+    <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-24">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-bold text-gray-900">EMI Calculator</h3>
         <button 
@@ -239,184 +251,189 @@ const CartPage = () => {
   );
 
   return (
-    <>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-        <FooterNavBar sticky={true} />
-
-        {/* Custom Navbar */}
-        <div className="bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-gray-900">My Saved Properties</h1>
-              </div>
-              <div className="text-sm text-gray-600">
-                <span className="font-semibold text-gray-900">{cartItems.length}</span> properties saved
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      <FooterNavBar />
+      <DynamicBreadcrumb />
+      {/* Custom Navbar */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-3">
+              <Heart className="text-red-500" fill="currentColor" size={24} />
+              <h1 className="text-xl font-bold text-gray-900">My Saved Properties</h1>
+            </div>
+            <div className="text-sm text-gray-600">
+              <span className="font-semibold text-gray-900">{cartItems.length}</span> properties saved
             </div>
           </div>
         </div>
+      </div>
 
-        <DynamicBreadcrumb/>
+      {/* Tab Navigation */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-4">
+            <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
+              <button onClick={() => setActiveTab('all')} className={`px-4 sm:px-6 py-2.5 rounded-lg font-medium transition whitespace-nowrap ${activeTab === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                All ({allProperties.length})
+              </button>
+              <button onClick={() => setActiveTab('listing')} className={`px-4 sm:px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'listing' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                <Home size={16} /> Search ({listingProperties.length})
+              </button>
+              <button onClick={() => setActiveTab('featured')} className={`px-4 sm:px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'featured' ? 'bg-amber-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                <Sparkles size={16} /> Featured ({featuredProperties.length})
+              </button>
+            </div>
 
-        {/* Tab Navigation */}
-        <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-4">
-              <div className="flex gap-2">
-                <button onClick={() => setActiveTab('all')} className={`px-6 py-2.5 rounded-lg font-medium transition ${activeTab === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                  All Properties ({allProperties.length})
+            <div className="flex gap-3">
+              {compareList.length >= 2 && (
+                <button onClick={() => setShowCompare(true)} className="bg-gradient-to-r from-purple-600 to-purple-700 text-gray-800 px-4 sm:px-5 py-2.5 rounded-lg hover:from-purple-700 hover:to-purple-800 transition shadow-md font-medium text-sm whitespace-nowrap">
+                  Compare ({compareList.length})
                 </button>
-                <button onClick={() => setActiveTab('listing')} className={`px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2 ${activeTab === 'listing' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                  <Home size={16} /> Search Results ({listingProperties.length})
-                </button>
-                <button onClick={() => setActiveTab('featured')} className={`px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2 ${activeTab === 'featured' ? 'bg-amber-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                  <Sparkles size={16} /> Featured ({featuredProperties.length})
-                </button>
-              </div>
+              )}
+              <button 
+                onClick={handleCalculatorClick}
+                className="bg-gradient-to-r from-blue-600 to-blue-700  text-gray-800 px-4 sm:px-5 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 transition shadow-md font-medium flex items-center gap-2 text-sm whitespace-nowrap"
+              >
+                <Calculator size={18} />
+                <span className="hidden sm:inline">EMI Calculator</span>
+                <span className="sm:hidden">EMI</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-              <div className="flex gap-3">
-                {compareList.length >= 2 && (
-                  <button onClick={() => setShowCompare(true)} className="bg-gradient-to-r from-purple-600 to-purple-700 text-gray-600 px-5 py-2.5 rounded-lg hover:from-purple-700 hover:to-purple-800 transition shadow-md font-medium text-sm">
-                    Compare ({compareList.length})
-                  </button>
-                )}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Properties List */}
+          <div className="lg:col-span-2 space-y-4">
+            {displayedProperties.length === 0 ? (
+              <div className="bg-white rounded-2xl shadow-lg p-12 sm:p-16 text-center">
+                <Heart size={64} className="mx-auto text-gray-300 mb-4" />
+                <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
+                  {activeTab === 'all' ? 'No saved properties yet' :
+                   activeTab === 'listing' ? 'No properties from search results' :
+                   'No featured properties saved'}
+                </h3>
+                <p className="text-gray-600 mb-6">Start exploring and save properties you love!</p>
                 <button 
-                  onClick={handleCalculatorClick}
-                  className="bg-gradient-to-r from-blue-600 to-blue-700 text-gray-600 px-5 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 transition shadow-md font-medium flex items-center gap-2 text-sm"
+                  onClick={() => navigate('/properties')} 
+                  className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition font-medium"
                 >
-                  <Calculator size={18} />
-                  EMI Calculator
+                  Browse Properties
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Properties List */}
-            <div className="lg:col-span-2 space-y-4">
-              {displayedProperties.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-lg p-16 text-center">
-                  <Heart size={64} className="mx-auto text-gray-300 mb-4" />
-                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                    {activeTab === 'all' ? 'No saved properties yet' :
-                     activeTab === 'listing' ? 'No properties from search results' :
-                     'No featured properties saved'}
-                  </h3>
-                  <p className="text-gray-600 mb-6">Start exploring and save properties you love!</p>
-                  <button onClick={() => navigate('/properties')} className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition font-medium">
-                    Browse Properties
-                  </button>
-                </div>
-              ) : (
-                displayedProperties.map(property => (
-                  <div key={property.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition overflow-hidden">
-                    <div className="flex flex-col sm:flex-row">
-                      <div className="sm:w-80 h-64 sm:h-auto relative overflow-hidden group">
-                        <img 
-                          src={property.image || '/main-image.jpeg'} 
-                          alt={property.name}
-                          className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
-                        />
-                        <div className={`absolute top-4 left-4 ${getAvailabilityColor(property.availability)} text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg`}>
-                          {property.availability}
+            ) : (
+              displayedProperties.map(property => (
+                <div key={property.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition overflow-hidden">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="sm:w-80 h-64 sm:h-auto relative overflow-hidden group">
+                      <img 
+                        src={property.image || '/main-image.jpeg'} 
+                        alt={property.name}
+                        className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
+                      />
+                      <div className={`absolute top-4 left-4 ${getAvailabilityColor(property.availability)} text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg`}>
+                        {property.availability}
+                      </div>
+                      {property.source === 'featured' && (
+                        <div className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                          <Sparkles size={12} /> Featured
                         </div>
-                        {property.source === 'featured' && (
-                          <div className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
-                            <Sparkles size={12} /> Featured
+                      )}
+                      {property.source === 'listing' && (
+                        <div className="absolute bottom-4 right-4 bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+                          <Home size={12} /> Search Result
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 p-6">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{property.name}</h3>
+                          <div className="flex items-center text-gray-600 mb-3">
+                            <MapPin size={16} className="mr-1" />
+                            <span className="text-sm">{property.location}</span>
                           </div>
-                        )}
+                        </div>
+                        <button 
+                          onClick={() => removeFromCart(property.id)}
+                          className="text-red-500 hover:bg-red-50 p-2.5 rounded-lg transition"
+                          title="Remove from cart"
+                        >
+                          <Trash2 size={20} />
+                        </button>
                       </div>
 
-                      <div className="flex-1 p-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h3 className="text-2xl font-bold text-gray-900 mb-2">{property.name}</h3>
-                            <div className="flex items-center text-gray-600 mb-3">
-                              <MapPin size={16} className="mr-1" />
-                              <span className="text-sm">{property.location}</span>
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => removeFromCart(property.id)}
-                            className="text-red-500 hover:bg-red-50 p-2.5 rounded-lg transition"
-                            title="Remove from cart"
-                          >
-                            <Trash2 size={20} />
+                      <div className="flex flex-wrap gap-4 mb-4">
+                        <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
+                          <Home size={18} className="text-blue-600" />
+                          <span className="font-semibold text-gray-900">{property.bhk}</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">
+                          <Maximize size={18} className="text-green-600" />
+                          <span className="font-semibold text-gray-900">{property.area}</span>
+                        </div>
+                      </div>
+
+                      {property.amenities && property.amenities.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {property.amenities.slice(0, 4).map((amenity, i) => (
+                            <span key={i} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
+                              {amenity}
+                            </span>
+                          ))}
+                          {property.amenities.length > 4 && (
+                            <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
+                              +{property.amenities.length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4 border-t border-gray-200">
+                        <div className="text-2xl sm:text-3xl font-bold text-blue-600">{property.price}</div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <label className="flex items-center gap-2 cursor-pointer bg-purple-50 px-4 py-2 rounded-lg hover:bg-purple-100 transition flex-1 sm:flex-initial">
+                            <input 
+                              type="checkbox"
+                              checked={compareList.includes(property.id)}
+                              onChange={() => toggleCompare(property.id)}
+                              className="w-4 h-4 accent-purple-600"
+                            />
+                            <span className="text-sm font-medium text-purple-900">Compare</span>
+                          </label>
+                          <button className="bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2">
+                            Details <ArrowRight size={16} />
                           </button>
-                        </div>
-
-                        <div className="flex flex-wrap gap-4 mb-4">
-                          <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
-                            <Home size={18} className="text-blue-600" />
-                            <span className="font-semibold text-gray-900">{property.bhk}</span>
-                          </div>
-                          <div className="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">
-                            <Maximize size={18} className="text-green-600" />
-                            <span className="font-semibold text-gray-900">{property.area}</span>
-                          </div>
-                        </div>
-
-                        {property.amenities && property.amenities.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mb-4">
-                            {property.amenities.slice(0, 4).map((amenity, i) => (
-                              <span key={i} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
-                                {amenity}
-                              </span>
-                            ))}
-                            {property.amenities.length > 4 && (
-                              <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
-                                +{property.amenities.length - 4} more
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="flex justify-between items-center pt-4 border-t border-gray-200">
-                          <div className="text-3xl font-bold text-blue-600">{property.price}</div>
-                          <div className="flex gap-2">
-                            <label className="flex items-center gap-2 cursor-pointer bg-purple-50 px-4 py-2 rounded-lg hover:bg-purple-100 transition">
-                              <input 
-                                type="checkbox"
-                                checked={compareList.includes(property.id)}
-                                onChange={() => toggleCompare(property.id)}
-                                className="w-4 h-4 accent-purple-600"
-                              />
-                              <span className="text-sm font-medium text-purple-900">Compare</span>
-                            </label>
-                            <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2">
-                              View Details <ArrowRight size={16} />
-                            </button>
-                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                ))
-              )}
-            </div>
-
-            {/* Desktop Sidebar Calculator - Only visible on lg+ */}
-            <div className="hidden lg:block lg:col-span-1">
-              {showCalculator && <EMICalculatorContent />}
-            </div>
+                </div>
+              ))
+            )}
           </div>
 
-          {/* Mobile Full-Width Calculator at Bottom */}
-          <div ref={mobileCalculatorRef} className="lg:hidden mt-12">
+          {/* Desktop Sidebar Calculator */}
+          <div className="hidden lg:block lg:col-span-1">
             {showCalculator && <EMICalculatorContent />}
           </div>
         </div>
 
-        {/* Compare Modal */}
-        {showCompare && <CompareModal />}
+        {/* Mobile Calculator */}
+        <div ref={mobileCalculatorRef} className="lg:hidden mt-12">
+          {showCalculator && <EMICalculatorContent />}
+        </div>
       </div>
 
+      {/* Compare Modal */}
+      {showCompare && <CompareModal />}
       <FooterSection />
       <MobileFooter />
-    </>
+    </div>
   );
 };
 
