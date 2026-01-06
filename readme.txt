@@ -3,3 +3,6 @@ so...
 1. create a file naming ".env"
 2. edit the file and add simply like this.. please see the attached file - 
 "backend\uploads\Screenshot 2025-08-01 230203.png"
+
+# FOR CHATBOT Testing:
+1.use GOOGLE_API_KEY
