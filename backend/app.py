@@ -46,7 +46,17 @@ CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://lo
 app.config['JSON_AS_ASCII'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/hns.db'
+import os
+
+# Get absolute path to the backend folder (where app.py lives)
+basedir = os.path.abspath(os.path.dirname(__file__))
+
+# Create 'instance' folder if it doesn't exist
+instance_dir = os.path.join(basedir, 'instance')
+os.makedirs(instance_dir, exist_ok=True)  # This line fixes most issues
+
+# Use FULL absolute path for the SQLite file
+app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(instance_dir, 'hns.db')}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize SQLAlchemy first

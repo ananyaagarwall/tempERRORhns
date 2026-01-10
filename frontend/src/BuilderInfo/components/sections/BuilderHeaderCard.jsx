@@ -1,10 +1,24 @@
 import React from 'react';
+import { Heart } from 'lucide-react';
+import { useCart } from '../../../hns_cart_page/js/CartContent.jsx'; 
 
 const Tag = ({ children }) => (
   <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[10px] sm:text-[11px] text-gray-700 border-2 border-yellow-400">{children}</span>
 );
 
 const BuilderHeaderCard = ({ builder }) => {
+  const { addBuilder, removeBuilder, isBuilderSaved } = useCart();
+
+  const handleHeartClick = () => {
+    if (!builder || !builder.rera_id) return;
+    
+    if (isBuilderSaved(builder.rera_id)) {
+      removeBuilder(builder.rera_id);
+    } else {
+      addBuilder(builder);
+    }
+  };
+
   if (!builder) {
     return (
       <div className="bg-white rounded-none md:rounded-2xl shadow-sm border-0 md:border md:border-gray-100">
@@ -14,8 +28,28 @@ const BuilderHeaderCard = ({ builder }) => {
       </div>
     );
   }
+
+  const isSaved = isBuilderSaved(builder.rera_id);
+
   return (
-    <div className="bg-white rounded-none md:rounded-2xl shadow-sm border-0 md:border md:border-gray-100">
+    <div className="bg-white rounded-none md:rounded-2xl shadow-sm border-0 md:border md:border-gray-100 relative">
+      {/* Heart Button */}
+      <button
+        onClick={handleHeartClick}
+        className={`absolute top-4 right-4 z-10 p-3 rounded-full backdrop-blur-md transition-all duration-300 shadow-lg ${
+          isSaved
+            ? 'bg-red-500 text-white scale-110'
+            : 'bg-white/90 text-gray-600 hover:bg-red-50 hover:text-red-500'
+        }`}
+        aria-label={isSaved ? 'Remove from saved builders' : 'Save builder'}
+      >
+        <Heart
+          size={24}
+          fill={isSaved ? 'currentColor' : 'none'}
+          className="transition-all duration-300"
+        />
+      </button>
+
       <div className="p-4 md:p-5">
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row md:items-start md:gap-0">
           <div className="flex flex-col items-center text-center gap-4 md:flex-row md:items-center md:text-left md:gap-4">
@@ -27,7 +61,7 @@ const BuilderHeaderCard = ({ builder }) => {
               />
             ) : (
               <div className="h-24 w-24 rounded-full bg-gray-200 border-4 border-gray-100 shadow-sm md:h-24 md:w-24 flex items-center justify-center">
-                {/*<span className="text-gray-500 text-xs">No Logo</span>*/}
+                <span className="text-gray-400 text-xs">No Logo</span>
               </div>
             )}
             <div>
@@ -51,7 +85,7 @@ const BuilderHeaderCard = ({ builder }) => {
               </div>
             </div>
           </div>
-          <div className="flex w-full items-center justify-center gap-3 md:mt-0 md:w-auto md:gap-3">
+          <div className="flex w-full items-center justify-center gap-3 md:mt-0 md:w-auto md:gap-3 pr-12 md:pr-0">
             <div className="h-24 w-36 rounded-lg overflow-hidden md:h-24 md:w-36">
               {builder.cover_banner ? (
                 <img src={(builder.cover_banner.startsWith('http') ? builder.cover_banner : `http://localhost:5000${builder.cover_banner.startsWith('/uploads/') ? builder.cover_banner : `/uploads/${builder.cover_banner}`}`)} alt={builder.company_name} className="h-full w-full object-cover" />
@@ -70,5 +104,3 @@ const BuilderHeaderCard = ({ builder }) => {
 };
 
 export default BuilderHeaderCard;
-
-

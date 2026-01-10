@@ -54,7 +54,7 @@ const KnowBeforeYouBuySection = () => {
   return (
     <section className="kbyb-section">
       {/* Section Header */}
-      <div className="kbyb-header">
+      <div>
         <h2 className="kbyb-header">Know Before You Buy</h2>
       </div>
 

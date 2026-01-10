@@ -48,12 +48,13 @@
   min-width: 320px;
 }
 
+/* Remove white background and heavy shadow from individual cards */
 .trending-card {
   position: relative;
-  background: white;
-  border: 2px solid transparent;
+  background: transparent; /* ← Remove white background */
+  border: 2px solid rgba(34, 58, 95, 0.08); /* Subtle border instead */
   border-radius: 22px;
-  box-shadow: 0 4px 16px rgba(34, 58, 95, 0.1), 0 2px 6px rgba(34, 58, 95, 0.1);
+  box-shadow: none; /* ← Remove heavy shadow */
   display: flex;
   flex-direction: column;
   width: 320px;
@@ -61,12 +62,25 @@
   height: 320px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  backdrop-filter: blur(4px); /* Optional: subtle glass effect */
 }
 
+/* On hover: subtle lift + accent border */
 .trending-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 12px 36px rgba(34, 58, 95, 0.2), 0 4px 16px rgba(34, 58, 95, 0.15);
   border-color: #F9D87A;
+  box-shadow: 0 8px 24px rgba(34, 58, 95, 0.1); /* Light hover shadow */
+}
+
+/* Optional: Add a very subtle inner background for readability */
+.card-content {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.6); /* Very light white overlay */
+  border-radius: 0 0 22px 22px;
+  backdrop-filter: blur(6px);
 }
 
 .card-image-container {
@@ -114,13 +128,6 @@
 .badge-icon {
   width: 1rem;
   height: 1rem;
-}
-
-.card-content {
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
 }
 
 .card-title {

@@ -34,12 +34,12 @@ const BlogLanding = () => {
         <DynamicBreadcrumb />
       </div>
 
-      <div className="max-w-[1320px] mx-auto px-4 py-8">
-        <KnowBeforeYouBuySection />
-        <LatestBlog filteredBlogs={filteredBlogs} />
-      </div>
+     <div className="max-w-[1320px] mx-auto px-4 pt-6 pb-8">
+  <KnowBeforeYouBuySection />
+  <LatestBlog filteredBlogs={filteredBlogs} />
+    </div>
 
-      <div className="max-w-6xl mx-auto px-4 pb-8">
+      <div className="max-w-6xl mx-auto px-4 pb-2">
         <TrendingNow />
         <FamousSection />
       </div>

@@ -1,7 +1,6 @@
 .famous-section {
   margin-bottom: 2.5rem;
-   overflow: visible;
-   height: auto
+  overflow: visible;
 }
 
 .famous-heading {
@@ -14,26 +13,19 @@
   justify-content: center;
   text-align: center;
   width: 100%;
-  color: #1e3a8a; 
-  font-family: 'Poppins', sans-serif; 
+  color: #1e3a8a;
+  font-family: 'Poppins', sans-serif;
 }
-@media screen and (width: 768px) {
-  .famous-heading {
-    font-size: 1.25rem;
-  }
-}
-
-
 
 .famous-highlight {
-  color: #1e3a8a; 
+  color: #1e3a8a;
   filter: drop-shadow(0px 1px 1px rgba(0, 0, 0, 0.2));
 }
 
 .famous-icon {
   width: 1.75rem;
   height: 1.75rem;
-  color:  #1e3a8a; 
+  color: #1e3a8a;
   animation: bounce 1s infinite;
 }
 
@@ -43,8 +35,9 @@
   flex-direction: row;
   gap: 1.5rem;
   overflow-x: auto;
-  overflow-y: visible; /* Ensure vertical overflow is visible */
+  overflow-y: visible;
   scrollbar-width: none;
+  padding: 0.5rem 0; /* Small padding to prevent clipping */
 }
 
 .famous-cards::-webkit-scrollbar {
@@ -62,62 +55,49 @@
   flex-direction: column;
   width: 320px;
   min-width: 320px;
-  height: 320px;
-  transition: transform 0.3s, z-index 0.3s;
-   overflow: visible !important;
-  height: auto;
-  z-index: 1;
+  height: auto; /* Let content define height */
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .famous-card:hover {
-  transform: translateY(-1px);
-  z-index: 10;
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.15);
 }
 
-@media screen and (width: 768px) {
-  .famous-card {
-    width: 240px;
-    min-width: 240px;
-    height: 260px;
-  }
-}
-
+/* Image Container - Consistent Height */
 .famous-img-container {
   position: relative;
   width: 100%;
-  height: 160px;
+  height: 180px; /* Consistent height on all screens */
   overflow: hidden;
   border-top-left-radius: 1rem;
   border-top-right-radius: 1rem;
 }
 
-@media screen and (width: 768px) {
-  .famous-img-container {
-    height: 300px;
-  }
-}
-
-@media screen and (width: 768px){
 .famous-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.5s;
-}}
+  object-position: center;
+  transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
 
-.group:hover .famous-img {
+.famous-card:hover .famous-img {
   transform: scale(1.1);
 }
 
 .famous-img-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.4), transparent);
+  background: linear-gradient(to top, rgba(0,0,0,0.5), transparent 50%);
   border-top-left-radius: 1rem;
   border-top-right-radius: 1rem;
   pointer-events: none;
 }
 
+/* Card Body */
 .famous-card-body {
   padding: 1.25rem;
   display: flex;
@@ -129,7 +109,8 @@
   font-weight: bold;
   font-size: 1.125rem;
   margin-bottom: 0.5rem;
-  line-height: 1.25rem;
+  line-height: 1.3;
+  color: #1e293b;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -138,26 +119,31 @@
 .famous-date {
   font-size: 0.75rem;
   color: #9ca3af;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .famous-intro {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   color: #374151;
+  line-height: 1.5;
   margin-bottom: 1rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .famous-link {
   display: flex;
   align-items: center;
   margin-top: auto;
+  gap: 0.5rem;
 }
 
 .famous-view {
-  font-size: 0.75rem;
+  font-size: 0.875rem;
   font-weight: 600;
   color: #2563eb;
-  margin-right: 0.5rem;
   text-decoration: none;
 }
 
@@ -169,50 +155,89 @@
   width: 1rem;
   height: 1rem;
   color: #2563eb;
+  transition: transform 0.3s ease;
+}
+
+.famous-card:hover .famous-arrow {
+  transform: translateX(4px);
 }
 
 /* Bounce Animation */
 @keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-5px);
-  }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
-@media (max-width: 640px) {
-  .famous-heading {
-    font-size: 1.12rem;
-    margin-bottom: 1rem;
+
+/* Responsive Adjustments */
+@media (max-width: 1024px) {
+  .famous-card {
+    width: 280px;
+    min-width: 280px;
   }
 
-  .famous-icon {
-    width: 1.25rem;
-    height: 1.25rem;
+  .famous-img-container {
+    height: 160px;
+  }
+}
+
+@media (max-width: 768px) {
+  .famous-heading {
+    font-size: 1.5rem;
+  }
+
+  .famous-cards {
+    gap: 1rem;
+    padding: 0 0.5rem;
   }
 
   .famous-card {
     width: 240px;
     min-width: 240px;
-    height: 260px;
   }
 
   .famous-img-container {
-    height: 120px;
+    height: 140px;
   }
 
   .famous-card-body {
-    padding: 0.75rem;
+    padding: 1rem;
+  }
+
+  .famous-title {
+    font-size: 1.05rem;
+  }
+
+  .famous-intro {
+    font-size: 0.8rem;
+    -webkit-line-clamp: 2;
+  }
+
+  .famous-view,
+  .famous-date {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .famous-heading {
+    font-size: 1.25rem;
+  }
+
+  .famous-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .famous-card {
+    width: 220px;
+    min-width: 220px;
+  }
+
+  .famous-img-container {
+    height: 130px;
   }
 
   .famous-title {
     font-size: 1rem;
   }
-
-  .famous-intro,
-  .famous-date,
-  .famous-view {
-    font-size: 0.7rem;
-  }
 }
-

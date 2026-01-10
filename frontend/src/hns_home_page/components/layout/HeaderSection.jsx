@@ -10,7 +10,7 @@ const HeaderSection = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const navigate = useNavigate();
-  const [activeMenu, setActiveMenu] = useState('Projects');
+  // const [activeMenu, setActiveMenu] = useState('Projects');
   const [user, setUser] = useState(null);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   // Price slider state (single slider for max price)
@@ -143,21 +143,27 @@ const HeaderSection = () => {
   const handleSignup = () => {/* your signup logic here */};
 
   // Updated toggle function with scroll prevention
-  const toggleMenu = () => {
-    const newShowMenu = !showMenu;
-    setShowMenu(newShowMenu);
-    
-    // Prevent body scroll when menu is open
-    if (newShowMenu) {
-      document.body.style.overflow = 'hidden';
-      document.body.style.position = 'fixed';
-      document.body.style.width = '100%';
-    } else {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-    }
-  };
+ const toggleMenu = () => {
+  const newShowMenu = !showMenu;
+  setShowMenu(newShowMenu);
+
+  if (newShowMenu) {
+    // Save current scroll position and lock body
+    const scrollY = window.scrollY;
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.body.style.overflow = 'hidden';
+  } else {
+    // Restore scroll position
+    const scrollY = document.body.style.top;
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+    window.scrollTo(0, parseInt(scrollY || '0') * -1);
+  }
+};
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -247,14 +253,14 @@ const HeaderSection = () => {
   }, [showBhkDropdown]);
 
   // Cleanup effect for body styles
-  useEffect(() => {
-    return () => {
-      // Cleanup body styles when component unmounts
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-    };
-  }, []);
+useEffect(() => {
+  return () => {
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.width = '';
+    document.body.style.overflow = '';
+  };
+}, []);
 
   const bgImg = windowWidth <= 600 ? '/main-image.jpeg' : headerBg;
   const bgSize = windowWidth <= 600 ? 'contain' : 'cover';
@@ -439,6 +445,9 @@ const HeaderSection = () => {
               <Link to="/blogs" className="nav-link" style={{ 
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>Blog</Link>
+             <Link to="/cart" className="nav-link" style={{ fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px' }}>
+                Cart
+              </Link>
              <Link to="/about" className="nav-link" style={{ 
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>About Us</Link>
@@ -584,70 +593,82 @@ const HeaderSection = () => {
             )}
           </div>
           
-          {/* Action cards */}
-          <div className="action-cards-container" style={{ 
-            width: '100%', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            gap: 18, 
-            marginTop: 18, 
-            padding: '0 0 24px 0',
-            overflowY: 'auto',
-            flex: 1
-          }}>
-            {/* Builder */}
-            <Link 
-              to="/builder" 
-              onClick={() => { setActiveMenu('Builders'); toggleMenu(); }}
-              className={`action-card ${activeMenu === 'Builders' ? 'active' : ''}`}
-            >
-              <div>
-                <div className="action-card-title">Builders</div>
-                <div className="action-card-description">Find your dream home</div>
-              </div>
-              <span className="action-card-icon icon-projects">🏢</span>
-            </Link>
-            
-            {/* Projects */}
-            <Link 
-              to="/properties" 
-              onClick={() => { setActiveMenu('Projects'); toggleMenu(); }}
-              className={`action-card ${activeMenu === 'Projects' ? 'active' : ''}`}
-            >
-              <div>
-                <div className="action-card-title">Projects</div>
-                <div className="action-card-description">Explore top real estate projects </div>
-              </div>
-              <span className="action-card-icon icon-buy">🏠</span>
-            </Link>
-            
-            {/* Blog */}
-            <Link 
-              to="/blogs" 
-              onClick={() => { setActiveMenu('Blog'); toggleMenu(); }}
-              className={`action-card ${activeMenu === 'Blog' ? 'active' : ''}`}
-            >
-              <div>
-                <div className="action-card-title">Blog</div>
-                <div className="action-card-description">Read property news & tips</div>
-              </div>
-              <span className="action-card-icon icon-blog">📰</span>
-            </Link>
-            
-            {/* Contact Us */}
-            <a 
-              href="/about" 
-              onClick={() => { setActiveMenu('Contact Us'); toggleMenu(); }}
-              className={`action-card ${activeMenu === 'About Us' ? 'active' : ''}`}
-            >
-              <div>
-                <div className="action-card-title">About Us</div>
-                <div className="action-card-description">Get in touch with us</div>
-              </div>
-              <span className="action-card-icon icon-contact">✉</span>
-            </a>
-          </div>
-          
+      {/* Action cards */}
+<div className="action-cards-container" style={{ 
+  width: '100%', 
+  display: 'flex', 
+  flexDirection: 'column', 
+  gap: 16,           // ← Reduced gap for better fit
+  marginTop: 16, 
+  padding: '0 0 40px 0',
+  overflowY: 'auto',
+  flex: 1
+}}>
+  {/* Builder */}
+  <Link 
+    to="/builder" 
+    onClick={toggleMenu}
+    className="action-card"
+  >
+    <div>
+      <div className="action-card-title">Builders</div>
+      <div className="action-card-description">Find your dream home</div>
+    </div>
+    <span className="action-card-icon icon-projects">🏢</span>
+  </Link>
+
+  {/* Projects */}
+  <Link 
+    to="/properties" 
+    onClick={toggleMenu}
+    className="action-card"
+  >
+    <div>
+      <div className="action-card-title">Projects</div>
+      <div className="action-card-description">Explore top real estate projects</div>
+    </div>
+    <span className="action-card-icon icon-buy">🏠</span>
+  </Link>
+
+{/* CART ITEM */}
+  <Link 
+    to="/cart" 
+    onClick={toggleMenu}
+    className="action-card"
+  >
+    <div>
+      <div className="action-card-title">Cart</div>
+      <div className="action-card-description">View saved properties</div>
+    </div>
+    <span className="action-card-icon icon-cart">🛒</span>
+  </Link>
+
+  {/* Blog */}
+  <Link 
+    to="/blogs" 
+    onClick={toggleMenu}
+    className="action-card"
+  >
+    <div>
+      <div className="action-card-title">Blog</div>
+      <div className="action-card-description">Read property news & tips</div>
+    </div>
+    <span className="action-card-icon icon-blog">📰</span>
+  </Link>
+
+  {/* About Us */}
+  <Link 
+    to="/about" 
+    onClick={toggleMenu}
+    className="action-card"
+  >
+    <div>
+      <div className="action-card-title">About Us</div>
+      <div className="action-card-description">Get in touch with us</div>
+    </div>
+    <span className="action-card-icon icon-contact">✉</span>
+  </Link>
+</div>
           {/* Animation styles moved to HeaderSection.css */}
         </div>
       )}     

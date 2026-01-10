@@ -617,3 +617,14 @@
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
+
+/* When FooterNavBar mobile menu is open, hide MobileFooter */
+.mobile-menu-overlay ~ .mobile-footer,
+.mobile-menu-overlay + * .mobile-footer {
+  display: none !important;
+}
+
+/* More reliable: Direct sibling or general sibling selector if structure allows */
+.landing-page-container:has(.mobile-menu-overlay) .mobile-footer {
+  display: none !important;
+}

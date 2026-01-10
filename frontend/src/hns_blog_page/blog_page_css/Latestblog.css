@@ -226,6 +226,27 @@
   font-family: 'Quicksand', sans-serif;
 }
 
+/* Remove custom scrollbar on mobile and small screens */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    display: none; /* Completely hide scrollbar */
+    width: 0;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-thumb {
+    display: none;
+    background: transparent;
+  }
+
+  /* Also prevent horizontal overflow issues */
+  .latestblog-wrapper,
+  .latestblog-section,
+  .side-blogs {
+    overflow-x: hidden;
+  }
+}
+
 /* ====== Mobile Adjustments ====== */
 @media (max-width: 640px) {
   .latestblog-section {

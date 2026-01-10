@@ -1,8 +1,30 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Heart } from 'lucide-react';
+import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import { fetchBuilderProjects } from '../../../services/api';
 
-const ProjectCard = ({ status = 'Ready-to-move', title, image }) => (
-  <div className="rounded-xl border border-blue-300 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:border-blue-400 hover:scale-[1.005] transform origin-center">
+const ProjectCard = ({ status = 'Ready-to-move', title, image, project, onHeartClick, isInCart }) => (
+  <div className="rounded-xl border border-blue-300 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:border-blue-400 hover:scale-[1.005] transform origin-center relative">
+    {/* Heart Button */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        onHeartClick(project);
+      }}
+      className={`absolute top-2 right-2 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-300 ${
+        isInCart
+          ? 'bg-red-500 text-white shadow-lg'
+          : 'bg-white/90 text-gray-600 hover:bg-red-50 hover:text-red-500'
+      }`}
+      aria-label={isInCart ? 'Remove from cart' : 'Add to cart'}
+    >
+      <Heart
+        size={18}
+        fill={isInCart ? 'currentColor' : 'none'}
+        className="transition-all duration-300"
+      />
+    </button>
+
     <div className="relative rounded-t-xl">
       <div className="h-36 md:h-48 bg-gray-200 overflow-hidden rounded-t-xl">
         <img src={image} alt={title} className="w-full h-full object-cover" />
@@ -13,8 +35,8 @@ const ProjectCard = ({ status = 'Ready-to-move', title, image }) => (
     </div>
     <div className="p-2 md:p-3">
       <div className="font-serif text-gray-800 text-sm md:text-base">{title}</div>
-      <div className="mt-1 text-xs md:text-sm text-gray-600">Carpet Area: <span className="font-var(--hns-sans)">685–715 sq.ft.</span> | Spacious balconies</div>
-      <div className="text-xs md:text-sm text-gray-600">2 Years old | Maintenance: <span className="font-serif text-black-1000">₹2.5/sq.ft.</span></div>
+      <div className="mt-1 text-xs md:text-sm text-gray-600">Carpet Area: <span className="font-sans">685–715 sq.ft.</span> | Spacious balconies</div>
+      <div className="text-xs md:text-sm text-gray-600">2 Years old | Maintenance: <span className="font-serif text-black">₹2.5/sq.ft.</span></div>
     </div>
   </div>
 );
@@ -62,6 +84,8 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  
+  const { addToCart, removeFromCart, isInCart } = useCart();
 
   useEffect(() => {
     const load = async () => {
@@ -88,6 +112,28 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
     load();
   }, [builderId, statusFilter]);
 
+  const handleHeartClick = (project) => {
+    const propertyData = {
+      id: project.id,
+      name: project.title,
+      price: project.price || 'Contact for Price',
+      location: project.location || 'Location not specified',
+      image: pickProjectImage(project),
+      availability: project.status || 'Available',
+      bhk: project.configuration || '2-3 BHK',
+      area: project.carpet_area || 'N/A',
+      builder: project.builder_name || 'Builder',
+      amenities: project.amenities || [],
+      source: 'builder_profile'
+    };
+
+    if (isInCart(project.id)) {
+      removeFromCart(project.id);
+    } else {
+      addToCart(propertyData, 'builder_profile');
+    }
+  };
+
   const scrollLeft = () => {
     if (sliderRef.current) {
       sliderRef.current.scrollBy({ left: -260, behavior: 'smooth' });
@@ -102,7 +148,6 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
     }
   };
 
-  // Filter projects based on statusFilter
   const filteredProjects = projects.filter((p) => {
     if (!statusFilter) return true;
     const status = (p.status || '').toLowerCase();
@@ -111,7 +156,6 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
       : status.includes(String(statusFilter).toLowerCase());
   });
 
-  // CRITICAL: Return null if no projects - this hides the entire section
   if (!loading && !error && filteredProjects.length === 0) {
     return null;
   }
@@ -140,7 +184,6 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
         </div>
       </div>
 
-      {/* Horizontal slider for all screen sizes */}
       <div className="relative">
         <div
           ref={sliderRef}
@@ -157,7 +200,14 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
             const image = pickProjectImage(p);
             return (
               <div key={p.id} className="w-[240px] xs:w-[260px] sm:w-60 md:w-72 flex-shrink-0 my-1">
-                <ProjectCard title={p.title} status={p.status || 'Ready-to-move'} image={image} />
+                <ProjectCard 
+                  title={p.title} 
+                  status={p.status || 'Ready-to-move'} 
+                  image={image}
+                  project={p}
+                  onHeartClick={handleHeartClick}
+                  isInCart={isInCart(p.id)}
+                />
               </div>
             );
           })}

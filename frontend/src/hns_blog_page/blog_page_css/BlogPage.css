@@ -142,6 +142,8 @@
 @media (max-width: 480px) {
   .blog-section-heading {
     font-size: 1.4rem;
+    margin-bottom: 8px;
+    margin-top: 20px;
   }
 }
 

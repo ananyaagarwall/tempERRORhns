@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Building2, MapPin, Award, CheckCircle, Calendar, ExternalLink, Phone, Mail } from 'lucide-react';
+import { Search, Building2, MapPin, Award, CheckCircle, Calendar, ExternalLink, Phone, Mail, Heart } from 'lucide-react';
+import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import FooterNavBar from '../layout/FooterNavBar';
 import DynamicBreadcrumb from '../../../components/ui/DynamicBreadcrumb';
 
@@ -10,19 +11,21 @@ const BuildersListing = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('name');
+  
+  const { addBuilder, removeBuilder, isBuilderSaved } = useCart();
 
   useEffect(() => {
     fetchBuilders();
   }, []);
 
-    const fetchBuilders = async () => {
+  const fetchBuilders = async () => {
     try {
-      setLoading(true);                              // Show loading spinner
-      const token = localStorage.getItem('token');   // Get JWT token for auth
+      setLoading(true);
+      const token = localStorage.getItem('token');
       
       const response = await fetch('http://127.0.0.1:5000/api/builders', {
         headers: {
-          'Authorization': `Bearer ${token}`,        // Required by backend
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         }
       });
@@ -31,14 +34,14 @@ const BuildersListing = () => {
         throw new Error('Failed to fetch builders');
       }
 
-      const data = await response.json();            // Parse JSON → array of builder objects
-      setBuilders(data);                             // Save to state
+      const data = await response.json();
+      setBuilders(data);
       setError(null);
     } catch (err) {
       console.error('Error fetching builders:', err);
       setError(err.message);
     } finally {
-      setLoading(false);                             // Hide spinner
+      setLoading(false);
     }
   };
 
@@ -69,8 +72,34 @@ const BuildersListing = () => {
       }
     });
 
+  const handleHeartClick = (e, builder) => {
+    e.stopPropagation();
+    if (isBuilderSaved(builder.rera_id)) {
+      removeBuilder(builder.rera_id);
+    } else {
+      addBuilder(builder);
+    }
+  };
+
   const BuilderCard = ({ builder }) => (
-    <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden border border-gray-100">
+    <div className="bg-white rounded-xl shadow-md hover:shadow-xl transition-shadow duration-300 overflow-hidden border border-gray-100 relative">
+      {/* Heart Button */}
+      <button
+        onClick={(e) => handleHeartClick(e, builder)}
+        className={`absolute top-4 right-4 z-10 p-2.5 rounded-full backdrop-blur-md transition-all duration-300 ${
+          isBuilderSaved(builder.rera_id)
+            ? 'bg-red-500 text-white shadow-lg scale-110'
+            : 'bg-white/90 text-gray-600 hover:bg-red-50 hover:text-red-500'
+        }`}
+        aria-label={isBuilderSaved(builder.rera_id) ? 'Remove from saved' : 'Save builder'}
+      >
+        <Heart
+          size={20}
+          fill={isBuilderSaved(builder.rera_id) ? 'currentColor' : 'none'}
+          className="transition-all duration-300"
+        />
+      </button>
+
       {/* Header with Logo/Banner */}
       <div className="relative h-32 bg-gradient-to-r from-blue-600 to-indigo-600">
         {builder.cover_banner && (
@@ -81,7 +110,7 @@ const BuildersListing = () => {
           />
         )}
         {builder.verified && (
-          <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
+          <div className="absolute top-3 left-3 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
             <CheckCircle size={14} />
             Verified
           </div>
@@ -179,11 +208,12 @@ const BuildersListing = () => {
         )}
 
         <div className="flex gap-2">
-         <button 
-        onClick={() => window.location.href = `/builder/${builder.company_name.replace(/\s+/g, '-')}`}
-        >
-        View Details
-        </button>
+          <button 
+            onClick={() => window.location.href = `/builder/${builder.company_name.replace(/\s+/g, '-')}`}
+            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
+          >
+            View Details
+          </button>
           {builder.website_url && builder.website_url !== 'NA' && (
             <a
               href={builder.website_url}
@@ -232,11 +262,10 @@ const BuildersListing = () => {
 
   return (
     <>
-    
       <FooterNavBar />
       <DynamicBreadcrumb />
 
-      {/* Clean White Hero Header */}
+      {/* Hero Header */}
       <div className="bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="flex items-center gap-5 mb-6">
@@ -256,8 +285,8 @@ const BuildersListing = () => {
         </div>
       </div>
 
-      {/* Filters Section - No shadow or border at bottom */}
-      <div className="bg-gray-50 -mt-8 pt-8"> {/* Slight overlap for seamless feel */}
+      {/* Filters Section */}
+      <div className="bg-gray-50 -mt-8 pt-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8">
           <div className="bg-white rounded-2xl shadow-sm p-6">
             <div className="flex flex-col md:flex-row gap-4 mb-6">
@@ -303,7 +332,7 @@ const BuildersListing = () => {
         </div>
       </div>
 
-      {/* Builders Grid - Seamless continuation */}
+      {/* Builders Grid */}
       <div className="bg-gray-50 pb-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {filteredBuilders.length === 0 ? (

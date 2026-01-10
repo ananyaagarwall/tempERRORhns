@@ -1,12 +1,35 @@
+# === Core Web & Database ===
+Flask>=3.1.0
+Flask-SQLAlchemy>=3.1.1
+Flask-Cors>=5.0.0
+Flask-Migrate>=4.1.0
+python-dotenv>=1.0.1
+Werkzeug>=3.1.0                # much newer than 2.0.1 - recommended
+SQLAlchemy>=2.0.35             # 2.x series - required by new Flask-SQLAlchemy
 
-Flask==2.0.1
-Flask-SQLAlchemy==2.5.1
-Flask-Cors==3.0.10
-python-dotenv==0.19.0
-Werkzeug==2.0.1
-Flask-Migrate==4.0.4
-SQLAlchemy==1.4.23
-psycopg2-binary==2.9.9
-requests==2.31.0
-python-slugify==8.0.1 
-pandas==2.3.2
+# === Data & Utils ===
+pandas>=2.2.3
+requests>=2.32.3
+python-slugify>=8.0.4
+
+# === LangChain & RAG ecosystem (2025-2026 versions) ===
+langchain>=0.3.17
+langchain-core>=0.3.33
+langchain-community>=0.3.16
+langchain-huggingface>=0.1.2
+langchain-chroma>=0.1.4
+langchain-google-genai>=2.0.8
+langchain-classic>=0.0.22      # only if you still use old ConversationalRetrievalChain
+
+# === Embeddings & Models ===
+sentence-transformers>=3.3.1
+transformers>=4.47.1
+huggingface-hub>=0.27.0
+
+# === Vector Store ===
+chromadb>=0.5.23               # actual Chroma implementation
+
+# === Optional but very commonly needed in similar projects ===
+tiktoken>=0.8.0                # token counting (useful even with non-OpenAI models)
+pypdf>=5.1.0                   # if reading PDFs
+pymupdf>=1.25.1                # better PDF handling
