@@ -15,6 +15,7 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
     };
     
     const updateMainNavbarHeight = () => {
+      // Logic to find the main header height so we can stick just below it
       const mainNavbar = document.querySelector('.fixed.top-0');
       if (mainNavbar) {
         setMainNavbarHeight(mainNavbar.offsetHeight);
@@ -50,7 +51,7 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
       const shouldBeSticky = scrollTop > navbarInitialTop.current - mainNavbarHeight;
       setIsSticky(shouldBeSticky);
 
-      // Active section detection - fixed logic
+      // Active section detection
       const navHeight = navRef.current?.offsetHeight || 60;
       const triggerPoint = mainNavbarHeight + navHeight + 50;
       
@@ -79,11 +80,9 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
         if (section.ref?.current) {
           const rect = section.ref.current.getBoundingClientRect();
           
-          // If section top is above or at trigger point, it's potentially active
           if (rect.top <= triggerPoint) {
             currentSection = section.name;
           } else {
-            // Once we find a section that's below trigger point, stop
             break;
           }
         }
@@ -99,14 +98,14 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
   }, [mainNavbarHeight, overviewRef, floorPlansRef, amenitiesRef, mapRef]); 
 
   const calculateOffset = () => {
-    const footerNavBar = document.querySelector('.fixed.top-0'); // Assuming FooterNavBar is the fixed element at top
+    const footerNavBar = document.querySelector('.fixed.top-0'); 
     let totalOffset = 0;
     if (footerNavBar) {
       totalOffset += footerNavBar.offsetHeight;
     }
-    // For desktop (top-sticky), we need the combined height of fixed navs for correct scroll offset.
-    // For mobile (bottom-sticky), the offset calculation for scroll is handled in scrollToSection directly.
-    return isMobile ? 0 : totalOffset + (navRef.current?.offsetHeight || 0) + 16;
+    // Now unified for both Mobile and Desktop: 
+    // Height of Main Nav + Height of This Nav + Margin
+    return totalOffset + (navRef.current?.offsetHeight || 0) + 16;
   };
 
   const scrollToSection = (targetRef) => {
@@ -115,14 +114,8 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
     const offset = calculateOffset(); 
     const elementTop = targetRef.current.getBoundingClientRect().top;
     
-    let offsetPosition;
-    if (isMobile) {
-      // For bottom-sticky on mobile, ensure target section is visible above the fixed nav
-      offsetPosition = elementTop + window.pageYOffset - (window.innerHeight - (navRef.current?.offsetHeight || 0) - 16); // 16px extra margin
-    } else {
-      // For top-sticky on desktop
-      offsetPosition = elementTop + window.pageYOffset - offset;
-    }
+    // Unified logic: Always offset from top
+    const offsetPosition = elementTop + window.pageYOffset - offset;
     
     window.scrollTo({
       top: offsetPosition,
@@ -137,12 +130,8 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
     const offset = calculateOffset(); 
     const elementTop = element.getBoundingClientRect().top;
 
-    let offsetPosition;
-    if (isMobile) {
-      offsetPosition = elementTop + window.pageYOffset - (window.innerHeight - (navRef.current?.offsetHeight || 0) - 16);
-    } else {
-      offsetPosition = elementTop + window.pageYOffset - offset;
-    }
+    // Unified logic: Always offset from top
+    const offsetPosition = elementTop + window.pageYOffset - offset;
     
     window.scrollTo({
       top: offsetPosition,
@@ -152,21 +141,20 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
 
   return (
     <>
-      {/* Placeholder for sticky nav on desktop to prevent content jump */}
-      {isSticky && !isMobile && <div style={{ height: navRef.current?.offsetHeight || 60 }} />}
+      {/* Placeholder for sticky nav - Enabled for BOTH mobile and desktop now */}
+      {isSticky && <div style={{ height: navRef.current?.offsetHeight || 60 }} />}
       
       <div 
         ref={navRef} 
         className={`z-40 bg-white shadow-md border-b-2 border-gray-200 transition-all duration-300
           ${
             isSticky 
-              ? isMobile 
-                ? 'fixed bottom-0 left-0 right-0 border-t-2' 
-                : 'fixed left-0 right-0'
+              ? 'fixed left-0 right-0' // Removed the bottom-0 conditional logic
               : 'relative'
           }
         `}
-        style={isSticky && !isMobile ? { top: `${mainNavbarHeight}px` } : {}}
+        // Apply the top offset whenever it is sticky, regardless of device width
+        style={isSticky ? { top: `${mainNavbarHeight}px` } : {}}
       >
         <div className="px-4 sm:px-8 lg:px-16 py-3 sm:py-4 min-h-[60px] flex items-center">
           <div className="w-full flex flex-col lg:flex-row items-start lg:items-center justify-between lg:justify-center gap-2 lg:gap-0">
@@ -178,10 +166,10 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
               </div>
             </div>
             
-            {/* Mobile Search Info */}
+            {/* Mobile Search Info 
             <div className="lg:hidden flex items-center gap-2 text-gray-700 mb-1">
-              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">Property Details</span>
-            </div>
+              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">Results</span>
+            </div>*/}
             
             {/* Desktop Navigation - Centered */}
             <div className="hidden lg:flex items-center gap-3 xl:gap-6">
@@ -196,7 +184,7 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
                 Overview
               </button>
               <div className="w-px h-4 bg-gray-300"></div>
-              <button 
+              {/* <button 
                 onClick={() => scrollToSection(floorPlansRef)} 
                 className={`px-2 xl:px-3 py-2 font-semibold text-xs xl:text-sm rounded-lg transition-colors whitespace-nowrap ${
                   activeSection === 'floor-plans' 
@@ -205,7 +193,7 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
                 }`}
               >
                 Floor Plans
-              </button>
+              </button> */}
               <div className="w-px h-4 bg-gray-300"></div>
               <button 
                 onClick={() => scrollToSection(amenitiesRef)} 
