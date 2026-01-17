@@ -1,10 +1,56 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Heart, Star } from "lucide-react";
+import { useParams } from "react-router-dom";
+import { useCart } from "../../../hns_cart_page/js/CartContent.jsx";
 import propertyHero from "../../../assets/property-hero.jpg";
 import Button from "../ui/Button";
 import Badge from "../ui/Badge";
+import "../../../hns_home_page/home_page_css/PropertiesSection.css";
+
+// Heart Icon Component (matching PropertiesSection style)
+const HeartIcon = ({ filled }) => (
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+  </svg>
+);
 
 const PropertyHero = () => {
+  const { id } = useParams();
+  const { addToCart, removeFromCart, isInCart } = useCart();
+  const [propertyData, setPropertyData] = useState(null);
+
+  // Get property data from localStorage or use default
+  useEffect(() => {
+    try {
+      const lastClicked = localStorage.getItem('lastClickedProperty');
+      if (lastClicked) {
+        const parsed = JSON.parse(lastClicked);
+        setPropertyData(parsed);
+      } else {
+        // Fallback to default property data
+        setPropertyData({
+          id: id || 'default-property',
+          name: 'Neelkanth Palm Avenue',
+          address: 'Neelkanth Palm Avenue, Ghansoli, Navi Mumbai',
+          features: '2-4 BHK',
+          price: '₹45 Lakh - ₹1.2 Cr',
+          img: propertyHero
+        });
+      }
+    } catch (error) {
+      console.error('Error loading property data:', error);
+      // Fallback to default
+      setPropertyData({
+        id: id || 'default-property',
+        name: 'Neelkanth Palm Avenue',
+        address: 'Neelkanth Palm Avenue, Ghansoli, Navi Mumbai',
+        features: '2-4 BHK',
+        price: '₹45 Lakh - ₹1.2 Cr',
+        img: propertyHero
+      });
+    }
+  }, [id]);
+
   const scrollToMap = () => {
     const mapElement = document.getElementById('map-location');
     if (mapElement) {
@@ -12,21 +58,57 @@ const PropertyHero = () => {
     }
   };
 
+  const handleHeartClick = (e) => {
+    e.stopPropagation();
+    if (!propertyData) return;
+    
+    if (isInCart(propertyData.id)) {
+      removeFromCart(propertyData.id);
+    } else {
+      // Convert to property format for cart
+      const propertyForCart = {
+        id: propertyData.id,
+        name: propertyData.name,
+        address: propertyData.address,
+        location: propertyData.address,
+        price: propertyData.price,
+        img: propertyData.img || propertyHero,
+        image: propertyData.img || propertyHero,
+        features: propertyData.features || '2-4 BHK',
+        bhk: propertyData.features || '2-4 BHK',
+        area: propertyData.area || '685.3 sq.ft. to 715.5 sq.ft.',
+        amenities: propertyData.amenities || [],
+        status: 'Available'
+      };
+      addToCart(propertyForCart, 'featured');
+    }
+  };
+
+  const isPropertyInCart = propertyData ? isInCart(propertyData.id) : false;
+
   return (
     <section className="px-4 sm:px-6 md:px-8 lg:px-16 py-6 sm:py-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-start">
         {/* Property Image */}
         <div className="relative">
           <img 
-            src={propertyHero} 
-            alt="Neelkanth Palm Avenue" 
+            src={propertyData?.img || propertyHero} 
+            alt={propertyData?.name || "Neelkanth Palm Avenue"} 
             className="w-full h-[300px] md:h-[400px] lg:h-[500px] object-cover rounded-lg" 
           />
-          <div className="absolute top-4 left-4">
-            <div className="w-10 h-10 bg-black/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-              <Heart className="w-6 h-6 text-white" />
-            </div>
-          </div>
+          <button
+            onClick={handleHeartClick}
+            className={`property-heart-button ${isPropertyInCart ? 'in-cart' : ''}`}
+            style={{
+              position: 'absolute',
+              top: '14px',
+              left: '14px',
+              zIndex: 10
+            }}
+            aria-label={isPropertyInCart ? 'Remove from cart' : 'Add to cart'}
+          >
+            <HeartIcon filled={isPropertyInCart} />
+          </button>
           <div className="absolute top-4 right-4 bg-yellow-400 px-3 py-1 rounded-lg flex items-center gap-1">
             <Star className="w-4 h-4 text-gray-900 fill-current" />
             <span className="font-bold text-gray-900">95%</span>
@@ -46,15 +128,19 @@ const PropertyHero = () => {
           
           {/* Title and Address */}
           <div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 leading-tight">Neelkanth Palm Avenue</h1>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mb-2 leading-tight">
+              {propertyData?.name || 'Neelkanth Palm Avenue'}
+            </h1>
             <div className="space-y-2">
               <p 
                 className="text-sm sm:text-base md:text-lg text-gray-600 cursor-pointer hover:text-blue-600 transition-colors" 
                 onClick={scrollToMap}
               >
-                📍 Neelkanth Palm Avenue, Ghansoli, Navi Mumbai
+                📍 {propertyData?.address || 'Neelkanth Palm Avenue, Ghansoli, Navi Mumbai'}
               </p>
-              <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">₹45 Lakh - ₹1.2 Cr</p>
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-green-600">
+                {propertyData?.price || '₹45 Lakh - ₹1.2 Cr'}
+              </p>
             </div>
           </div>
           
@@ -69,7 +155,7 @@ const PropertyHero = () => {
           </div>
         
           {/* Property Detail Boxes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mt-4 sm:mt-6 md:mt-8">
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-4 mt-4 sm:mt-6 md:mt-8">
             {/* Carpet Area Box */}
             <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4 md:p-6 hover:shadow-lg transition-shadow">
               <div className="flex items-start gap-3 mb-4">

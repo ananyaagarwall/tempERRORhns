@@ -15,8 +15,8 @@
 
 @media (max-width: 768px) {
   .header-section {
-    height: 100vh !important;
-    min-height: 100dvh !important; /* Better for mobile with dynamic viewport */
+    height: 60vh !important;
+    min-height: 60vh !important; /* 60% of viewport height for mobile */
   }
 }
 
@@ -1258,6 +1258,7 @@
     padding: 0 10px;
     flex-direction: column;
     justify-content: center;
+    align-items: flex-end;
     text-align: left;
     margin-bottom: 0;
     height: 60vh;
@@ -1270,7 +1271,8 @@
     margin-top: 0;
     margin-bottom: 0;
     padding: 0 20px;
-    align-items: flex-start;
+    align-items: flex-end;
+    justify-content: center;
   }
   
   .hero-heading {
@@ -1339,8 +1341,8 @@
 /* Small Mobile (up to 360px) */
 @media (max-width: 360px) {
   .header-section {
-    height: 100vh !important;
-    min-height: 100vh !important;
+    height: 60vh !important;
+    min-height: 60vh !important;
   }
 
   .header-main {

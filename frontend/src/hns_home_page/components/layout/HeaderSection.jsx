@@ -369,8 +369,9 @@ const HeaderSection = () => {
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     backgroundRepeat: 'no-repeat',
-    height: '100vh',           // Full height on all devices
-    minHeight: '100dvh',       // Better for mobile (accounts for address bar)
+    // CHANGED: If mobile, use 60vh, otherwise 100vh
+    height: isMobile ? '60vh' : '100vh',           
+    minHeight: isMobile ? '60dvh' : '100dvh',       
   }}
 >
 
@@ -666,11 +667,12 @@ const HeaderSection = () => {
         <div
           className={`flex flex-col justify-center hero-text-container ${isMobile ? 'mobile' : ''}`}
           style={isMobile ? {
-            alignItems: 'flex-start',
+            alignItems: 'flex-end',
             textAlign: 'left',
             paddingLeft: '20px',
             paddingRight: '20px',
             width: '100%',
+            justifyContent: 'center',
           } : {}}
         >
           <h1

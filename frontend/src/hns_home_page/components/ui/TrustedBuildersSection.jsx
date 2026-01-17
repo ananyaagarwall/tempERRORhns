@@ -142,8 +142,8 @@ const TrustedBuildersSection = ({ location }) => {
                   top: '14px',
                   right: '14px',
                   zIndex: 3
-                }}
-              >
+              }}
+            >
                 <HeartIcon filled={isInCart(builder.id)} />
               </button>
 

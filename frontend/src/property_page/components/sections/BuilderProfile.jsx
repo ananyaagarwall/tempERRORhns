@@ -94,9 +94,9 @@ const BuilderProfile = ({ builderData }) => {
             {/* Visit Profile Button */}
             <button 
               onClick={handleBuilderClick}
-              className="group flex items-center gap-1 text-sm sm:text-base font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+              className="group flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm sm:text-base font-semibold rounded-lg shadow-md hover:bg-blue-700 hover:shadow-lg transition-all duration-200"
             >
-              View Profile
+              View Builder
               <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </button>
           </div>
