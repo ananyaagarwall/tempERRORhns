@@ -34,10 +34,11 @@ export const CartProvider = ({ children }) => {
         location: property.address || property.location,
         image: property.img || property.image,
         availability: property.status || 'Available',
-        bhk: property.features || property.bhk || '3 BHK',
+        bhk: property.bhk || (property.features && property.features !== 'Builder Project' ? property.features : '3 BHK'),
         area: property.carpetArea || property.area || '1200 sq ft',
         builder: property.builder || 'Builder Name',
         amenities: property.highlights || property.amenities || [],
+        features: property.features || undefined, // Store features field for builder detection
         source: source, // 'listing' or 'featured'
         addedAt: new Date().toISOString()
       }];

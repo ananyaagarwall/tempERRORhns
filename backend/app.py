@@ -157,7 +157,6 @@ def get_locations():
     unique_locations = sorted(set(unique_locations))
     return jsonify(unique_locations)
 
-
 @app.route('/api/properties/<int:id>', methods=['GET'])
 def get_property(id):
     property = Property.query.get_or_404(id)

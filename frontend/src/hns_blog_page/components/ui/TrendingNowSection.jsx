@@ -21,7 +21,7 @@ const TrendingNowSection = () => {
       featured_image_alt: 'Trade Rumors',
       title: "Boeser Trade Rumors: What's the Reality?",
       category: 'Breaking',
-      badge: 'Breaking',
+      badge: 'Trending',
       author: 'Editor',
       created_at: new Date().toISOString(),
       slug: 'boeser-trade-rumors',
@@ -32,7 +32,7 @@ const TrendingNowSection = () => {
       featured_image_alt: 'Real Estate Market',
       title: 'Maharashtra Real Estate Market Hits New High',
       category: 'Market',
-      badge: 'Exclusive',
+      badge: 'New',
       author: 'Reporter',
       created_at: new Date().toISOString(),
       slug: 'maharashtra-market-high',
@@ -40,45 +40,57 @@ const TrendingNowSection = () => {
   ];
 
   return (
-    <div className="trending-section">
+    <section className="trending-section">
       <div className="trending-header">
-      <svg className="trending-icon" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"> <path strokeLinecap="round" strokeLinejoin="round" d="M19 7v4H5V7a2 2 0 012-2h10a2 2 0 012 2z" /> <path strokeLinecap="round" strokeLinejoin="round" d="M5 11v6a2 2 0 002 2h10a2 2 0 002-2v-6" /> </svg>
-
-        <span className="trending-title">Trending Now</span>
-       
+        <div className="icon-wrapper">
+          <svg className="trending-icon" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+          </svg>
+        </div>
+        <h2 className="trending-title">Trending Now</h2>
       </div>
 
-      <div className="trending-cards">
+      <div className="trending-cards-container">
         {trendingItems.map((news) => (
           <Link key={news.id} to={`/blog/${news.slug}`} className="trending-card-link">
-            <div className="trending-card">
-              <div className="card-image-container">
+            <article className="trending-card">
+              <div className="card-image-wrapper">
+                {news.badge && (
+                  <span className={`badge badge-${news.badge.toLowerCase()}`}>
+                    {news.badge}
+                  </span>
+                )}
                 <img
                   src={news.featured_image}
                   alt={news.featured_image_alt || news.title}
                   className="card-image"
+                  loading="lazy"
                 />
-                <div className="image-overlay"></div>
               </div>
 
               <div className="card-content">
-                <h3 className="card-title">{news.title}</h3>
-                <div className="card-meta">
-                  <span>By {news.author}</span>
+                <div className="card-meta-top">
+                  <span className="meta-category">{news.category}</span>
+                  <span className="meta-dot">•</span>
+                  <span className="meta-date">{new Date(news.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
                 </div>
+                
+                <h3 className="card-title">{news.title}</h3>
+                
                 <div className="card-footer">
-                  <span className="read-more">Read More</span>
-                  <svg className="read-more-icon" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                  </svg>
-                  <span className="card-date">{new Date(news.created_at).toLocaleDateString()}</span>
+                  <span className="author-name">By {news.author}</span>
+                  <div className="read-more-btn">
+                    <svg fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </div>
                 </div>
               </div>
-            </div>
+            </article>
           </Link>
         ))}
       </div>
-    </div>
+    </section>
   );
 };
 

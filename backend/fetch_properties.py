@@ -1,7 +1,8 @@
 import sqlite3
 import argparse
 
-DB_PATH = '../backend/hns.db'  # Adjust path as needed
+DB_PATH = '../backend/instance/hns.db'  # Adjust path as needed
+
 
 def fetch_properties(location, price_range, bhk_types):
     conn = sqlite3.connect(DB_PATH)

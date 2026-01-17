@@ -5,7 +5,7 @@ const PropertyHeader = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   return (
-    <header className="relative pt-4 sm:pt-6">
+    <header>
       <div className="flex items-center justify-between mt-4 sm:mt-6 px-4 sm:px-8 lg:px-16">
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-1 sm:gap-2">

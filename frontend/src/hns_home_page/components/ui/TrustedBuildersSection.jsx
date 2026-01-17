@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import "../../home_page_css/TrustedBuildersSection.css";
+import '../../home_page_css/PropertiesSection.css';
+
+// Heart Icon Component
+const HeartIcon = ({ filled }) => (
+  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+  </svg>
+);
 
 
 const BORDER_RADIUS = 12;
@@ -9,6 +18,7 @@ const TrustedBuildersSection = ({ location }) => {
   const [activeIdx, setActiveIdx] = useState(2);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
+  const { addToCart, removeFromCart, isInCart } = useCart();
 
   useEffect(() => {
     const fetchBuilders = async () => {
@@ -16,6 +26,7 @@ const TrustedBuildersSection = ({ location }) => {
         const response = await fetch('http://localhost:5000/api/projects');
         const data = await response.json();
         const formattedData = data.map(project => ({
+          id: project._id || project.id || `builder-${project.title}-${project.location}`,
           img: project.project_image ? `http://localhost:5000${project.project_image}` : '/palm.jpg',
           logo: '',
           name: project.title,
@@ -29,6 +40,31 @@ const TrustedBuildersSection = ({ location }) => {
     };
     fetchBuilders();
   }, []);
+
+  const handleHeartClick = (e, builder) => {
+    e.stopPropagation();
+    if (isInCart(builder.id)) {
+      removeFromCart(builder.id);
+    } else {
+      // Convert builder to property format for cart
+      const builderAsProperty = {
+        id: builder.id,
+        name: builder.name,
+        address: builder.subtitle,
+        location: builder.subtitle,
+        price: builder.price,
+        img: builder.img,
+        image: builder.img,
+        features: 'Builder Project',
+        bhk: 'N/A',
+        area: 'N/A',
+        builder: builder.name,
+        amenities: [],
+        status: 'Available'
+      };
+      addToCart(builderAsProperty, 'featured'); // Mark as featured
+    }
+  };
 
   // Filter builders by location if provided
   const filteredBuilders = location && location.trim() ?
@@ -92,9 +128,25 @@ const TrustedBuildersSection = ({ location }) => {
                 height: '360px',      // Fixed height to prevent any vertical shifting
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
-                backgroundRepeat: 'no-repeat'
+                backgroundRepeat: 'no-repeat',
+                position: 'relative'
               }}
             >
+              {/* Heart Button - TOP RIGHT */}
+              <button
+                className={`property-heart-button ${isInCart(builder.id) ? 'in-cart' : ''}`}
+                onClick={(e) => handleHeartClick(e, builder)}
+                aria-label={isInCart(builder.id) ? 'Remove from cart' : 'Add to cart'}
+                style={{
+                  position: 'absolute',
+                  top: '14px',
+                  right: '14px',
+                  zIndex: 3
+                }}
+              >
+                <HeartIcon filled={isInCart(builder.id)} />
+              </button>
+
               {/* Card overlay with info */}
               <div className="card-overlay">
 
@@ -328,6 +380,21 @@ const TrustedBuildersSection = ({ location }) => {
                 }}
                 onClick={() => setActiveIdx(idx)}
               >
+                {/* Heart Button - TOP RIGHT */}
+                <button
+                  className={`property-heart-button ${isInCart(builder.id) ? 'in-cart' : ''}`}
+                  onClick={(e) => handleHeartClick(e, builder)}
+                  aria-label={isInCart(builder.id) ? 'Remove from cart' : 'Add to cart'}
+                  style={{
+                    position: 'absolute',
+                    top: '14px',
+                    right: '14px',
+                    zIndex: 30
+                  }}
+                >
+                  <HeartIcon filled={isInCart(builder.id)} />
+                </button>
+
                 <div
                   style={{
                     position: 'absolute',

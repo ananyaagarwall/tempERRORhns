@@ -6,6 +6,8 @@ import FooterNavBar from '../../hns_home_page/components/layout/FooterNavBar.jsx
 import FooterSection from '../../hns_home_page/components/layout/FooterSection.jsx';
 import MobileFooter from '../../components/ui/MobileFooter.jsx';
 import DynamicBreadcrumb from '../../components/ui/DynamicBreadcrumb.jsx';
+import CartBuilderCard from '../components/ui/CartBuilderCard.jsx';
+import '../../hns_home_page/home_page_css/TrustedBuildersSection.css';
 
 const CartPage = () => {
   const { cartItems, removeFromCart } = useCart();
@@ -22,14 +24,23 @@ const CartPage = () => {
   const mobileCalculatorRef = useRef(null);
   const navigate = useNavigate();
 
-  // Separate properties by source
-  const listingProperties = cartItems.filter(item => item.source === 'listing');
-  const featuredProperties = cartItems.filter(item => item.source === 'featured');
-  const allProperties = cartItems;
+  // Builder detection function
+  const isBuilder = (item) => {
+    return item.features === 'Builder Project' || 
+           item.bhk === 'N/A' || 
+           item.bhk === 'Builder Project';
+  };
 
-  const displayedProperties = activeTab === 'all' ? allProperties :
-                              activeTab === 'listing' ? listingProperties :
-                              featuredProperties;
+  // Separate builders and properties
+  const builders = cartItems.filter(isBuilder);
+  const properties = cartItems.filter(item => !isBuilder(item));
+  const buildersCount = builders.length;
+  const propertiesCount = properties.length;
+
+  // Display logic based on active tab
+  const displayedItems = activeTab === 'all' ? cartItems :
+                          activeTab === 'properties' ? properties :
+                          activeTab === 'builders' ? builders : [];
 
   const toggleCompare = (propertyId) => {
     setCompareList(prev => {
@@ -263,7 +274,12 @@ const CartPage = () => {
               <h1 className="text-xl font-bold text-gray-900">My Saved Properties</h1>
             </div>
             <div className="text-sm text-gray-600">
-              <span className="font-semibold text-gray-900">{cartItems.length}</span> properties saved
+              <span className="font-semibold text-gray-900">{propertiesCount}</span> properties saved
+              {buildersCount > 0 && (
+                <>
+                  , <span className="font-semibold text-gray-900">{buildersCount}</span> builders saved
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -275,13 +291,13 @@ const CartPage = () => {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 py-4">
             <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0">
               <button onClick={() => setActiveTab('all')} className={`px-4 sm:px-6 py-2.5 rounded-lg font-medium transition whitespace-nowrap ${activeTab === 'all' ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                All ({allProperties.length})
+                All ({cartItems.length})
               </button>
-              <button onClick={() => setActiveTab('listing')} className={`px-4 sm:px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'listing' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                <Home size={16} /> Search ({listingProperties.length})
+              <button onClick={() => setActiveTab('properties')} className={`px-4 sm:px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'properties' ? 'bg-purple-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                <Home size={16} /> Properties ({propertiesCount})
               </button>
-              <button onClick={() => setActiveTab('featured')} className={`px-4 sm:px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'featured' ? 'bg-amber-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
-                <Sparkles size={16} /> Featured ({featuredProperties.length})
+              <button onClick={() => setActiveTab('builders')} className={`px-4 sm:px-6 py-2.5 rounded-lg font-medium transition flex items-center gap-2 whitespace-nowrap ${activeTab === 'builders' ? 'bg-amber-600 text-white shadow-md' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+                <Sparkles size={16} /> Builders ({buildersCount})
               </button>
             </div>
 
@@ -306,43 +322,60 @@ const CartPage = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Properties List */}
+          {/* Items List (Properties and Builders) */}
           <div className="lg:col-span-2 space-y-4">
-            {displayedProperties.length === 0 ? (
+            {displayedItems.length === 0 ? (
               <div className="bg-white rounded-2xl shadow-lg p-12 sm:p-16 text-center">
                 <Heart size={64} className="mx-auto text-gray-300 mb-4" />
                 <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
-                  {activeTab === 'all' ? 'No saved properties yet' :
-                   activeTab === 'listing' ? 'No properties from search results' :
-                   'No featured properties saved'}
+                  {activeTab === 'all' ? 'No saved items yet' :
+                   activeTab === 'properties' ? 'No properties saved' :
+                   'No builders saved'}
                 </h3>
-                <p className="text-gray-600 mb-6">Start exploring and save properties you love!</p>
+                <p className="text-gray-600 mb-6">
+                  {activeTab === 'builders' 
+                    ? 'Start exploring and save builders you love!' 
+                    : 'Start exploring and save properties you love!'}
+                </p>
                 <button 
-                  onClick={() => navigate('/properties')} 
+                  onClick={() => navigate(activeTab === 'builders' ? '/' : '/properties')} 
                   className="bg-blue-600 text-white px-8 py-3 rounded-xl hover:bg-blue-700 transition font-medium"
                 >
-                  Browse Properties
+                  {activeTab === 'builders' ? 'Browse Builders' : 'Browse Properties'}
                 </button>
               </div>
             ) : (
-              displayedProperties.map(property => (
-                <div key={property.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition overflow-hidden">
+              displayedItems.map(item => {
+                // Check if item is a builder
+                if (isBuilder(item)) {
+                  return (
+                    <CartBuilderCard
+                      key={item.id}
+                      builder={item}
+                      onRemove={removeFromCart}
+                    />
+                  );
+                }
+                
+                // Otherwise render as property
+                return (
+                <div key={item.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
                     <div className="sm:w-80 h-64 sm:h-auto relative overflow-hidden group">
                       <img 
-                        src={property.image || '/main-image.jpeg'} 
-                        alt={property.name}
+                        src={item.image || '/main-image.jpeg'} 
+                        alt={item.name}
                         className="w-full h-full object-cover group-hover:scale-110 transition duration-500"
                       />
-                      <div className={`absolute top-4 left-4 ${getAvailabilityColor(property.availability)} text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg`}>
-                        {property.availability}
+                      <div className={`absolute top-4 left-4 ${getAvailabilityColor(item.availability)} text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-lg`}>
+                        {item.availability}
                       </div>
-                      {property.source === 'featured' && (
+                      {item.source === 'featured' && (
                         <div className="absolute top-4 right-4 bg-amber-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
                           <Sparkles size={12} /> Featured
                         </div>
                       )}
-                      {property.source === 'listing' && (
+                      {item.source === 'listing' && (
                         <div className="absolute bottom-4 right-4 bg-purple-500 text-white px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1">
                           <Home size={12} /> Search Result
                         </div>
@@ -352,14 +385,14 @@ const CartPage = () => {
                     <div className="flex-1 p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{property.name}</h3>
+                          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{item.name}</h3>
                           <div className="flex items-center text-gray-600 mb-3">
                             <MapPin size={16} className="mr-1" />
-                            <span className="text-sm">{property.location}</span>
+                            <span className="text-sm">{item.location}</span>
                           </div>
                         </div>
                         <button 
-                          onClick={() => removeFromCart(property.id)}
+                          onClick={() => removeFromCart(item.id)}
                           className="text-red-500 hover:bg-red-50 p-2.5 rounded-lg transition"
                           title="Remove from cart"
                         >
@@ -370,37 +403,37 @@ const CartPage = () => {
                       <div className="flex flex-wrap gap-4 mb-4">
                         <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-lg">
                           <Home size={18} className="text-blue-600" />
-                          <span className="font-semibold text-gray-900">{property.bhk}</span>
+                          <span className="font-semibold text-gray-900">{item.bhk}</span>
                         </div>
                         <div className="flex items-center gap-2 bg-green-50 px-4 py-2 rounded-lg">
                           <Maximize size={18} className="text-green-600" />
-                          <span className="font-semibold text-gray-900">{property.area}</span>
+                          <span className="font-semibold text-gray-900">{item.area}</span>
                         </div>
                       </div>
 
-                      {property.amenities && property.amenities.length > 0 && (
+                      {item.amenities && item.amenities.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-4">
-                          {property.amenities.slice(0, 4).map((amenity, i) => (
+                          {item.amenities.slice(0, 4).map((amenity, i) => (
                             <span key={i} className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
                               {amenity}
                             </span>
                           ))}
-                          {property.amenities.length > 4 && (
+                          {item.amenities.length > 4 && (
                             <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-medium">
-                              +{property.amenities.length - 4} more
+                              +{item.amenities.length - 4} more
                             </span>
                           )}
                         </div>
                       )}
 
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pt-4 border-t border-gray-200">
-                        <div className="text-2xl sm:text-3xl font-bold text-blue-600">{property.price}</div>
+                        <div className="text-2xl sm:text-3xl font-bold text-blue-600">{item.price}</div>
                         <div className="flex gap-2 w-full sm:w-auto">
                           <label className="flex items-center gap-2 cursor-pointer bg-purple-50 px-4 py-2 rounded-lg hover:bg-purple-100 transition flex-1 sm:flex-initial">
                             <input 
                               type="checkbox"
-                              checked={compareList.includes(property.id)}
-                              onChange={() => toggleCompare(property.id)}
+                              checked={compareList.includes(item.id)}
+                              onChange={() => toggleCompare(item.id)}
                               className="w-4 h-4 accent-purple-600"
                             />
                             <span className="text-sm font-medium text-purple-900">Compare</span>
@@ -413,7 +446,8 @@ const CartPage = () => {
                     </div>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
 
