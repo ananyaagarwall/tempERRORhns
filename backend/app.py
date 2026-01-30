@@ -71,6 +71,13 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Ordered array of areas for proximity-based search (Navi Mumbai nodes)
+ORDERED_AREAS = [
+    "Thane", "Airoli", "Rabale", "Ghansoli", "Kopar Khairane",
+    "Turbhe", "Juinagar", "Nerul", "Seawoods", "Belapur",
+    "Kharghar", "Mansarovar", "Khandeshwar", "Panvel"
+]
+
 #---------------------------------------------MODELS ---------------------------------------------
 
 #moved to models.py
@@ -156,6 +163,94 @@ def get_locations():
     unique_locations = [loc[0].strip() for loc in locations if loc[0] and loc[0].strip()] 
     unique_locations = sorted(set(unique_locations))
     return jsonify(unique_locations)
+
+@app.route('/api/nearest-nodes/<string:location>', methods=['GET'])
+def get_nearest_nodes(location):
+    """Get 4 nearest nodes based on the primary location from ORDERED_AREAS.
+    Returns the location's position and 4 nearest nodes (2 before + 2 after, adjusted at edges).
+    """
+    # Normalize the input location for matching
+    location_lower = location.lower().strip()
+    
+    # Find the index of the location in ORDERED_AREAS (case-insensitive partial match)
+    found_index = -1
+    for i, area in enumerate(ORDERED_AREAS):
+        if area.lower() == location_lower or location_lower in area.lower() or area.lower() in location_lower:
+            found_index = i
+            break
+    
+    # If location not found, return first 4 areas as fallback
+    if found_index == -1:
+        nearest = ORDERED_AREAS[:4]
+        return jsonify({
+            'primaryLocation': location,
+            'foundInArray': False,
+            'nearestNodes': nearest
+        })
+    
+    # Calculate 4 nearest nodes (2 before + 2 after, or adjusted at edges)
+    total_areas = len(ORDERED_AREAS)
+    
+    # Get indices for 4 nearest nodes excluding the current location
+    indices = []
+    
+    # Add 2 before (if available)
+    for offset in range(1, 3):
+        idx = found_index - offset
+        if idx >= 0:
+            indices.append(idx)
+    
+    # Add 2 after (if available)
+    for offset in range(1, 3):
+        idx = found_index + offset
+        if idx < total_areas:
+            indices.append(idx)
+    
+    # If we don't have 4 nodes yet, expand the range
+    offset = 3
+    while len(indices) < 4 and offset < total_areas:
+        # Try before
+        idx = found_index - offset
+        if idx >= 0 and idx not in indices:
+            indices.append(idx)
+        # Try after
+        idx = found_index + offset
+        if idx < total_areas and idx not in indices:
+            indices.append(idx)
+        offset += 1
+    
+    # Sort indices and take first 4
+    indices = sorted(indices)[:4]
+    nearest = [ORDERED_AREAS[i] for i in indices]
+    
+    return jsonify({
+        'primaryLocation': ORDERED_AREAS[found_index],
+        'foundInArray': True,
+        'primaryIndex': found_index,
+        'nearestNodes': nearest
+    })
+
+@app.route('/api/properties/multiple-locations', methods=['GET'])
+def get_properties_by_multiple_locations():
+    """Get properties from multiple locations.
+    Query param: locations (comma-separated list of location names)
+    """
+    locations_param = request.args.get('locations', '')
+    if not locations_param:
+        return jsonify([]), 200
+    
+    locations_list = [loc.strip() for loc in locations_param.split(',') if loc.strip()]
+    
+    # Query properties matching any of the locations
+    all_properties = []
+    for loc in locations_list:
+        properties = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
+        for prop in properties:
+            prop_dict = prop.to_dict()
+            if prop_dict not in all_properties:
+                all_properties.append(prop_dict)
+    
+    return jsonify(all_properties)
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
 def get_property(id):

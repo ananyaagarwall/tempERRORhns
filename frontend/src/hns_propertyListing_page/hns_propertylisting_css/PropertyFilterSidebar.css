@@ -74,27 +74,27 @@
 .filter-toggle-btn {
   display: none;
   position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  background: #facc15;
-  color: #111827;
+  top: 80px; /* Below navbar */
+  right: 1rem;
+  background: #1E3A8A;
+  color: #ffffff;
   border: none;
-  padding: 0.875rem 1.5rem;
-  border-radius: 9999px;
+  padding: 0.75rem 1.25rem;
+  border-radius: 10px;
   font-weight: 600;
   cursor: pointer;
-  z-index: 60;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
-  font-size: 0.9375rem;
+  z-index: 999;
+  box-shadow: 0 4px 12px rgba(30, 58, 138, 0.35);
+  font-size: 0.875rem;
   align-items: center;
   gap: 0.5rem;
   transition: all 0.2s ease;
 }
 
 .filter-toggle-btn:hover {
-  background: #fbbf24;
+  background: #2563EB;
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+  box-shadow: 0 6px 16px rgba(30, 58, 138, 0.4);
 }
 
 /* Tablet: show filter button, hide sidebar */
@@ -105,6 +105,8 @@
 
   .filter-toggle-btn {
     display: flex;
+    top: 80px;
+    right: 1.5rem;
   }
 }
 
@@ -116,10 +118,10 @@
 
   .filter-toggle-btn {
     display: flex;
-    bottom: 1rem;
+    top: 70px;
     right: 1rem;
-    padding: 0.75rem 1.25rem;
-    font-size: 0.875rem;
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
   }
 
   .sidebar-drawer {
@@ -130,12 +132,14 @@
 
 @media (max-width: 480px) {
   .filter-toggle-btn {
-    bottom: 0.75rem;
+    top: 65px;
     right: 0.75rem;
-    padding: 0.625rem 1rem;
-    font-size: 0.8125rem;
+    padding: 0.5rem 0.875rem;
+    font-size: 0.75rem;
+    border-radius: 8px;
   }
 }
+
 
 /* Mobile tags section - horizontal scrollable below search bar */
 .mobile-tags-section {

@@ -40,7 +40,8 @@
   height: 48px;
   border-radius: 50%;
   background-color: #0047ab;
-  color: white !important;                    /* Force white text/icons */
+  color: white !important;
+  /* Force white text/icons */
   border: none;
   display: flex;
   align-items: center;
@@ -63,7 +64,8 @@
   width: 24px;
   height: 24px;
   stroke-width: 2.5;
-  color: white !important;                    /* Critical: keeps icons white */
+  color: white !important;
+  /* Critical: keeps icons white */
   fill: none !important;
 }
 
@@ -218,6 +220,7 @@
     font-size: 1.0625rem;
   }
 }
+
 .property-search-card {
   width: 100%;
   max-width: 100%;

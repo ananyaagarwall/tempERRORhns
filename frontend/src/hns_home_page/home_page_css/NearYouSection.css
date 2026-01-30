@@ -1,0 +1,461 @@
+/* NearYouSection.css */
+
+.near-you-section {
+    padding: 60px 0 40px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    background: #faf9f6;
+}
+
+/* Section Header */
+.near-you-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.near-you-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: #223A5F;
+    margin: 0;
+    letter-spacing: -0.5px;
+    font-family: "'Abril Fatface', serif";
+}
+
+.near-you-underline {
+    display: block;
+    width: 80px;
+    height: 4px;
+    background: linear-gradient(90deg, #F1D97A 0%, #e6c76a 100%);
+    margin: 12px auto 0;
+    border-radius: 2px;
+    box-shadow: 0 2px 4px rgba(241, 217, 122, 0.3);
+}
+
+/* Tab Container */
+.near-you-tab-container {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    position: relative;
+    margin-bottom: 32px;
+    padding-left: 32px;
+    padding-right: 24px;
+    overflow: visible;
+}
+
+.near-you-tab-row {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    width: 100%;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.near-you-tab-row::-webkit-scrollbar {
+    height: 0;
+}
+
+.near-you-tabs-loading {
+    padding: 10px 18px;
+    color: #666;
+    font-size: 14px;
+}
+
+.near-you-tab-button {
+    background: none;
+    color: #23487c;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 16px;
+    padding: 10px 18px;
+    box-shadow: none;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.18s ease;
+    border-bottom: 3px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: fit-content;
+}
+
+.near-you-tab-button:hover {
+    color: #16386d;
+    background: rgba(241, 217, 122, 0.1);
+}
+
+.near-you-tab-button:active {
+    transform: translateY(1px);
+}
+
+.near-you-tab-button.active {
+    border-bottom: 3px solid #F1D97A;
+    color: #16386d;
+    background: rgba(241, 217, 122, 0.08);
+}
+
+/* Cards Container */
+.near-you-cards-container {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+    padding: 20px 0;
+    margin: -20px 0;
+}
+
+.near-you-cards-container::-webkit-scrollbar {
+    display: none;
+}
+
+.near-you-cards-container {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.near-you-cards-row {
+    display: flex;
+    gap: 28px;
+    align-items: center;
+    justify-content: flex-start;
+    padding-left: 32px;
+    padding-right: 32px;
+    scroll-behavior: smooth;
+    overflow-x: auto;
+    overflow-y: visible;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    min-height: 280px;
+}
+
+.near-you-cards-row::-webkit-scrollbar {
+    display: none;
+}
+
+/* Loading, Error, Empty States */
+.near-you-loading,
+.near-you-error,
+.near-you-empty {
+    padding: 2rem;
+    text-align: center;
+    font-size: 1rem;
+    color: #666;
+    width: 100%;
+}
+
+.near-you-error {
+    color: #dc3545;
+}
+
+/* Property Cards */
+.near-you-property-card {
+    width: 320px;
+    height: 240px;
+    border-radius: 20px;
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+    z-index: 1;
+    border: none;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.near-you-property-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.near-you-property-card:hover .near-you-card-inner {
+    transform: scale(1.03);
+}
+
+.near-you-card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    border-radius: 20px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+}
+
+.near-you-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.2) 50%, transparent 100%);
+    border-radius: 20px;
+}
+
+.near-you-card-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 20px;
+    z-index: 2;
+}
+
+.near-you-card-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    color: #fff;
+}
+
+.near-you-card-location {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    opacity: 0.9;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    color: #fff;
+}
+
+.near-you-card-price {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    color: #F1D97A;
+}
+
+.near-you-card-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+}
+
+.near-you-card-btn {
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(10px);
+    color: #223A5F;
+}
+
+.near-you-card-btn:hover {
+    background: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.near-you-card-btn.secondary {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    color: #fff;
+}
+
+.near-you-card-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* Responsive Styles */
+
+/* Large laptops (<=1440px) */
+@media (max-width: 1440px) {
+    .near-you-property-card {
+        width: 300px;
+        height: 230px;
+    }
+
+    .near-you-cards-row {
+        gap: 24px;
+    }
+
+    .near-you-card-title {
+        font-size: 1.2rem;
+    }
+}
+
+/* Medium laptops (<=1200px) */
+@media (max-width: 1200px) {
+    .near-you-property-card {
+        width: 280px;
+        height: 220px;
+        border-radius: 18px;
+    }
+
+    .near-you-card-inner,
+    .near-you-card-overlay {
+        border-radius: 18px;
+    }
+
+    .near-you-cards-row {
+        gap: 20px;
+    }
+}
+
+/* Tablets (<=1024px) */
+@media (max-width: 1024px) {
+    .near-you-section {
+        padding: 50px 0 30px;
+    }
+
+    .near-you-title {
+        font-size: 2.1rem;
+    }
+
+    .near-you-underline {
+        width: 70px;
+    }
+
+    .near-you-tab-container {
+        margin-bottom: 28px;
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .near-you-tab-button {
+        font-size: 15px;
+        padding: 9px 15px;
+    }
+
+    .near-you-property-card {
+        width: 260px;
+        height: 200px;
+    }
+
+    .near-you-cards-row {
+        gap: 16px;
+        padding-left: 20px;
+        padding-right: 20px;
+        min-height: 220px;
+    }
+
+    .near-you-card-content {
+        padding: 14px;
+    }
+
+    .near-you-card-title {
+        font-size: 1.1rem;
+    }
+
+    .near-you-card-btn {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+}
+
+/* Mobile (<=768px) */
+@media (max-width: 768px) {
+    .near-you-section {
+        padding: 40px 0 24px;
+    }
+
+    .near-you-header {
+        margin-bottom: 24px;
+    }
+
+    .near-you-title {
+        font-size: 1.8rem;
+    }
+
+    .near-you-underline {
+        width: 60px;
+        height: 3px;
+        margin: 8px auto 0;
+    }
+
+    .near-you-tab-container {
+        margin-bottom: 24px;
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+
+    .near-you-tab-button {
+        font-size: 13px;
+        padding: 8px 14px;
+    }
+
+    .near-you-property-card {
+        width: 70vw;
+        max-width: 280px;
+        height: 220px;
+        border-radius: 16px;
+    }
+
+    .near-you-card-inner,
+    .near-you-card-overlay {
+        border-radius: 16px;
+    }
+
+    .near-you-cards-row {
+        gap: 14px;
+        padding-left: 16px;
+        padding-right: 16px;
+        min-height: 240px;
+    }
+
+    .near-you-card-content {
+        padding: 14px;
+    }
+
+    .near-you-card-title {
+        font-size: 1rem;
+        margin-bottom: 4px;
+    }
+
+    .near-you-card-location {
+        font-size: 0.8rem;
+        margin-bottom: 3px;
+    }
+
+    .near-you-card-price {
+        font-size: 0.95rem;
+        margin-bottom: 10px;
+    }
+
+    .near-you-card-buttons {
+        gap: 8px;
+    }
+
+    .near-you-card-btn {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+        border-radius: 6px;
+    }
+}
+
+/* Small mobile (<=480px) */
+@media (max-width: 480px) {
+    .near-you-section {
+        padding: 32px 0 20px;
+    }
+
+    .near-you-title {
+        font-size: 1.5rem;
+    }
+
+    .near-you-property-card {
+        width: 75vw;
+        height: 200px;
+    }
+
+    .near-you-cards-row {
+        gap: 12px;
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .near-you-card-content {
+        padding: 12px;
+    }
+
+    .near-you-card-btn {
+        padding: 5px 8px;
+        font-size: 0.7rem;
+    }
+}
