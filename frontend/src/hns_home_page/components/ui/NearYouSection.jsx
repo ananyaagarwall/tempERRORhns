@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import "../../home_page_css/NearYouSection.css";
 
 // Fallback tabs if API fails or user location not detected
+// Note: Rabale, Juinagar, Kharghar, Khandeshwar are excluded from Near You section
 const FALLBACK_TABS = [
     { label: "Thane", key: "thane" },
     { label: "Airoli", key: "airoli" },
-    { label: "Rabale", key: "rabale" },
     { label: "Ghansoli", key: "ghansoli" },
+    { label: "Turbhe", key: "turbhe" },
 ];
 
 // Fallback images when property image is not available

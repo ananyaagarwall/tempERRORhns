@@ -78,6 +78,11 @@ ORDERED_AREAS = [
     "Kharghar", "Mansarovar", "Khandeshwar", "Panvel"
 ]
 
+# Nodes excluded from the Near You section (no property data available)
+EXCLUDED_NEAR_YOU_NODES = [
+    "Rabale", "Juinagar", "Kharghar", "Khandeshwar"
+]
+
 #---------------------------------------------MODELS ---------------------------------------------
 
 #moved to models.py
@@ -149,6 +154,13 @@ def login():
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
 def get_properties_by_location(loc):
+    # Check if the location is in the excluded nodes list (case-insensitive)
+    loc_normalized = loc.strip().lower()
+    for excluded in EXCLUDED_NEAR_YOU_NODES:
+        if excluded.lower() == loc_normalized:
+            # Return empty list for excluded nodes
+            return jsonify([])
+    
     properties = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
     return jsonify([property.to_dict() for property in properties])
 
@@ -164,10 +176,19 @@ def get_locations():
     unique_locations = sorted(set(unique_locations))
     return jsonify(unique_locations)
 
+def has_properties_for_location(loc_name):
+    """Check if a location has any properties in the database."""
+    # Also check if the location is in the excluded list
+    if loc_name in EXCLUDED_NEAR_YOU_NODES:
+        return False
+    count = Property.query.filter(Property.Location.ilike(f'%{loc_name}%')).count()
+    return count > 0
+
 @app.route('/api/nearest-nodes/<string:location>', methods=['GET'])
 def get_nearest_nodes(location):
     """Get 4 nearest nodes based on the primary location from ORDERED_AREAS.
-    Returns the location's position and 4 nearest nodes (2 before + 2 after, adjusted at edges).
+    Returns the location's position and 4 nearest nodes that have property data available.
+    Only includes nodes that actually have properties to display.
     """
     # Normalize the input location for matching
     location_lower = location.lower().strip()
@@ -179,49 +200,50 @@ def get_nearest_nodes(location):
             found_index = i
             break
     
-    # If location not found, return first 4 areas as fallback
+    # If location not found, find first 4 areas with properties as fallback
     if found_index == -1:
-        nearest = ORDERED_AREAS[:4]
+        nearest = []
+        for area in ORDERED_AREAS:
+            if has_properties_for_location(area):
+                nearest.append(area)
+                if len(nearest) >= 4:
+                    break
         return jsonify({
             'primaryLocation': location,
             'foundInArray': False,
             'nearestNodes': nearest
         })
     
-    # Calculate 4 nearest nodes (2 before + 2 after, or adjusted at edges)
+    # Calculate nearest nodes that have properties
     total_areas = len(ORDERED_AREAS)
+    nearest = []
     
-    # Get indices for 4 nearest nodes excluding the current location
-    indices = []
+    # Use a spiral search pattern: alternate between before and after the found index
+    # to find nodes with properties
+    max_offset = total_areas
     
-    # Add 2 before (if available)
-    for offset in range(1, 3):
-        idx = found_index - offset
-        if idx >= 0:
-            indices.append(idx)
-    
-    # Add 2 after (if available)
-    for offset in range(1, 3):
-        idx = found_index + offset
-        if idx < total_areas:
-            indices.append(idx)
-    
-    # If we don't have 4 nodes yet, expand the range
-    offset = 3
-    while len(indices) < 4 and offset < total_areas:
-        # Try before
-        idx = found_index - offset
-        if idx >= 0 and idx not in indices:
-            indices.append(idx)
+    for offset in range(1, max_offset):
+        if len(nearest) >= 4:
+            break
+        
         # Try after
-        idx = found_index + offset
-        if idx < total_areas and idx not in indices:
-            indices.append(idx)
-        offset += 1
+        idx_after = found_index + offset
+        if idx_after < total_areas:
+            area = ORDERED_AREAS[idx_after]
+            if has_properties_for_location(area):
+                nearest.append(area)
+        
+        if len(nearest) >= 4:
+            break
+        
+        # Try before
+        idx_before = found_index - offset
+        if idx_before >= 0:
+            area = ORDERED_AREAS[idx_before]
+            if has_properties_for_location(area):
+                nearest.insert(0, area)  # Insert at beginning to maintain order
     
-    # Sort indices and take first 4
-    indices = sorted(indices)[:4]
-    nearest = [ORDERED_AREAS[i] for i in indices]
+    nearest = nearest[:4]  # Ensure max 4 nodes
     
     return jsonify({
         'primaryLocation': ORDERED_AREAS[found_index],
