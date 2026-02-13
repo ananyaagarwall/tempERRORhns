@@ -1,8 +1,18 @@
 import React from "react";
 
 const ReadMoreAboutProperty = () => {
-  const [expandedCard, setExpandedCard] = React.useState(null);
+  // CHANGED: State is now an array to hold multiple open IDs
+  const [expandedCards, setExpandedCards] = React.useState([]);
   const [hoveredCard, setHoveredCard] = React.useState(null);
+
+  // Helper function to toggle a card's open/closed state
+  const toggleCard = (id) => {
+    setExpandedCards((prev) => 
+      prev.includes(id) 
+        ? prev.filter((cardId) => cardId !== id) // Close: Remove ID from array
+        : [...prev, id] // Open: Add ID to array
+    );
+  };
 
   const propertySections = [
     {
@@ -46,23 +56,23 @@ const ReadMoreAboutProperty = () => {
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900 tracking-tight">{section.title}</h3>
             </div>
 
-
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 items-start">
               {section.cards.map((card) => {
                 const uniqueCardId = `${section.id}-${card.id}`;
-                const isExpanded = expandedCard === uniqueCardId;
+                // CHANGED: Check if the ID exists in the array
+                const isExpanded = expandedCards.includes(uniqueCardId);
                 const isHovered = hoveredCard === uniqueCardId;
 
                 return (
                   <div
                     key={uniqueCardId}
-                    // Removed 'h-full' if it existed implicitly via stretch, items-start handles this now
                     className={`group relative bg-white rounded-2xl border transition-all duration-500 cursor-pointer overflow-hidden ${isHovered ? 'shadow-2xl border-blue-200 transform -translate-y-2 scale-[1.02]' : 'shadow-lg border-gray-100 hover:shadow-xl hover:border-gray-200'}`}
                     onMouseEnter={() => setHoveredCard(uniqueCardId)}
                     onMouseLeave={() => setHoveredCard(null)}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setExpandedCard(isExpanded ? null : uniqueCardId);
+                      // CHANGED: Use the toggle function instead of simple set state
+                      toggleCard(uniqueCardId);
                     }}
                   >
                     <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-indigo-500 transform scale-x-0 transition-transform duration-500 origin-left ${isHovered ? 'scale-x-100' : ''}`} />
@@ -71,7 +81,6 @@ const ReadMoreAboutProperty = () => {
                       <div className="space-y-2 sm:space-y-3 mb-4 sm:mb-6">
                         <div className="flex items-start justify-between">
                           <h4 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight group-hover:text-blue-900 transition-colors duration-300">{card.title}</h4>
-
 
                           <div className={`flex-shrink-0 w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center transition-all duration-300 ${isExpanded ? 'bg-blue-500 rotate-45' : isHovered ? 'bg-blue-100' : 'bg-gray-100'}`}>
                             <svg className={`w-2.5 h-2.5 sm:w-3 sm:h-3 transition-colors duration-300 ${isExpanded ? 'text-white' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -119,4 +128,5 @@ const ReadMoreAboutProperty = () => {
     </div>
   );
 };
+
 export default ReadMoreAboutProperty;

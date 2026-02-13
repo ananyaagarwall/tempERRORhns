@@ -133,6 +133,23 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Ordered array of areas for proximity-based search (Navi Mumbai nodes)
+ORDERED_AREAS = [
+    "Thane", "Airoli", "Rabale", "Ghansoli", "Kopar Khairane",
+    "Turbhe", "Juinagar", "Nerul", "Seawoods", "Belapur",
+    "Kharghar", "Mansarovar", "Khandeshwar", "Panvel"
+]
+
+# Nodes excluded from the Near You section (no property data available)
+EXCLUDED_NEAR_YOU_NODES = [
+    "Rabale", "Juinagar", "Kharghar", "Khandeshwar"
+]
+
+#---------------------------------------------MODELS ---------------------------------------------
+
+#moved to models.py
+
+#---------------------------------------------END OF MODELS ---------------------------------------------
 
 with app.app_context():
     try:
@@ -233,6 +250,13 @@ def logout():
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
 @jwt_required()
 def get_properties_by_location(loc):
+    # Check if the location is in the excluded nodes list (case-insensitive)
+    loc_normalized = loc.strip().lower()
+    for excluded in EXCLUDED_NEAR_YOU_NODES:
+        if excluded.lower() == loc_normalized:
+            # Return empty list for excluded nodes
+            return jsonify([])
+    
     properties = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
     return jsonify([property.to_dict() for property in properties])
 
@@ -250,6 +274,107 @@ def get_locations():
     unique_locations = sorted(set(unique_locations))
     return jsonify(unique_locations)
 
+#yaha se nearyou till.. 
+
+def has_properties_for_location(loc_name):
+    """Check if a location has any properties in the database."""
+    # Also check if the location is in the excluded list
+    if loc_name in EXCLUDED_NEAR_YOU_NODES:
+        return False
+    count = Property.query.filter(Property.Location.ilike(f'%{loc_name}%')).count()
+    return count > 0
+
+@app.route('/api/nearest-nodes/<string:location>', methods=['GET'])
+def get_nearest_nodes(location):
+    """Get 4 nearest nodes based on the primary location from ORDERED_AREAS.
+    Returns the location's position and 4 nearest nodes that have property data available.
+    Only includes nodes that actually have properties to display.
+    """
+    # Normalize the input location for matching
+    location_lower = location.lower().strip()
+    
+    # Find the index of the location in ORDERED_AREAS (case-insensitive partial match)
+    found_index = -1
+    for i, area in enumerate(ORDERED_AREAS):
+        if area.lower() == location_lower or location_lower in area.lower() or area.lower() in location_lower:
+            found_index = i
+            break
+    
+    # If location not found, find first 4 areas with properties as fallback
+    if found_index == -1:
+        nearest = []
+        for area in ORDERED_AREAS:
+            if has_properties_for_location(area):
+                nearest.append(area)
+                if len(nearest) >= 4:
+                    break
+        return jsonify({
+            'primaryLocation': location,
+            'foundInArray': False,
+            'nearestNodes': nearest
+        })
+    
+    # Calculate nearest nodes that have properties
+    total_areas = len(ORDERED_AREAS)
+    nearest = []
+    
+    # Use a spiral search pattern: alternate between before and after the found index
+    # to find nodes with properties
+    max_offset = total_areas
+    
+    for offset in range(1, max_offset):
+        if len(nearest) >= 4:
+            break
+        
+        # Try after
+        idx_after = found_index + offset
+        if idx_after < total_areas:
+            area = ORDERED_AREAS[idx_after]
+            if has_properties_for_location(area):
+                nearest.append(area)
+        
+        if len(nearest) >= 4:
+            break
+        
+        # Try before
+        idx_before = found_index - offset
+        if idx_before >= 0:
+            area = ORDERED_AREAS[idx_before]
+            if has_properties_for_location(area):
+                nearest.insert(0, area)  # Insert at beginning to maintain order
+    
+    nearest = nearest[:4]  # Ensure max 4 nodes
+    
+    return jsonify({
+        'primaryLocation': ORDERED_AREAS[found_index],
+        'foundInArray': True,
+        'primaryIndex': found_index,
+        'nearestNodes': nearest
+    })
+
+@app.route('/api/properties/multiple-locations', methods=['GET'])
+def get_properties_by_multiple_locations():
+    """Get properties from multiple locations.
+    Query param: locations (comma-separated list of location names)
+    """
+    locations_param = request.args.get('locations', '')
+    if not locations_param:
+        return jsonify([]), 200
+    
+    locations_list = [loc.strip() for loc in locations_param.split(',') if loc.strip()]
+    
+    # Query properties matching any of the locations
+    all_properties = []
+    for loc in locations_list:
+        properties = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
+        for prop in properties:
+            prop_dict = prop.to_dict()
+            if prop_dict not in all_properties:
+                all_properties.append(prop_dict)
+    
+    return jsonify(all_properties)
+
+# yaha tak nearyou. 
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
 @jwt_required()

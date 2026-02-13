@@ -184,7 +184,7 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
                 Overview
               </button>
               <div className="w-px h-4 bg-gray-300"></div>
-              {/* <button 
+               <button 
                 onClick={() => scrollToSection(floorPlansRef)} 
                 className={`px-2 xl:px-3 py-2 font-semibold text-xs xl:text-sm rounded-lg transition-colors whitespace-nowrap ${
                   activeSection === 'floor-plans' 
@@ -193,7 +193,7 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
                 }`}
               >
                 Floor Plans
-              </button> */}
+              </button> 
               <div className="w-px h-4 bg-gray-300"></div>
               <button 
                 onClick={() => scrollToSection(amenitiesRef)} 

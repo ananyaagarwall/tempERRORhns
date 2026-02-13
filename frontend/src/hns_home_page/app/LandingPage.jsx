@@ -5,6 +5,7 @@ import TrustedBuildersSection from '../components/ui/TrustedBuildersSection';
 import PropertiesSection from '../components/ui/PropertiesSection';
 import BudgetSection from '../components/ui/BudgetSection';
 import BuildersSection from '../components/ui/BuildersSection';
+import NearYouSection from '../components/ui/NearYouSection';
 import BlogSection from '../components/ui/BlogSection';
 import FooterSection from '../components/layout/FooterSection';
 import FooterNavBar from '../components/layout/FooterNavBar';
@@ -12,8 +13,10 @@ import MobileFooter from '../../components/ui/MobileFooter';
 import ChatBot from '../components/ui/ChatBot';               // <-- always rendered
 import '../home_page_css/LandingPage.css';
 
+
 const LandingPage = () => {
   const [geoStatus, setGeoStatus] = useState('');
+  const [userLocation, setUserLocation] = useState(null); // District from geolocation
   const [searchFilters, setSearchFilters] = useState({
     location: '',
     priceRange: 0,
@@ -37,6 +40,13 @@ const LandingPage = () => {
             .then((res) => res.json())
             .then((data) => {
               setGeoStatus('Coordinates sent! ' + (data.message || ''));
+              // Extract district/location from response
+              if (data.received && data.received.district) {
+                setUserLocation(data.received.district);
+              } else if (data.received && data.received.full_address) {
+                // Try to extract a known area from full address
+                setUserLocation(data.received.full_address);
+              }
             })
             .catch(() => setGeoStatus('Failed to send coordinates.'));
         },
@@ -53,6 +63,10 @@ const LandingPage = () => {
         priceRange: e.detail.priceRange ?? 0,
         bhkTypes: e.detail.bhkTypes || [],
       });
+      // Also update userLocation if user searches for a specific location
+      if (e.detail.location) {
+        setUserLocation(e.detail.location);
+      }
     };
     window.addEventListener('filterLandingPage', handleFilter);
     return () => window.removeEventListener('filterLandingPage', handleFilter);
@@ -106,7 +120,8 @@ const LandingPage = () => {
       )}
 
       <PropertiesSection searchFilters={searchFilters} />
-      <BuildersSection searchFilters={searchFilters} />
+      <NearYouSection searchFilters={searchFilters} userLocation={userLocation} />
+
       <BudgetSection />
       <TrustedBuildersSection location={searchFilters.location} />
       <BlogSection id="blog-section" />
