@@ -8,7 +8,16 @@ Flask-Migrate==4.0.4
 SQLAlchemy==1.4.23
 psycopg2-binary==2.9.9
 requests==2.31.0
-python-slugify==8.0.1 
+python-slugify==8.0.1
 pandas==2.3.2
 
+# Chatbot / RAG dependencies (chatbot/rag_service.py)
+langchain-huggingface==0.1.2
+langchain-chroma==0.2.2
+langchain-core==0.3.28
+langchain-google-genai==2.0.7
+langchain==0.3.13
 
+# AI/ML dependencies (aiml_folder/similarity.py)
+numpy==2.2.1
+sentence-transformers==3.3.1

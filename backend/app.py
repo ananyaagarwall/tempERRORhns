@@ -176,6 +176,8 @@ def get_locations():
     unique_locations = sorted(set(unique_locations))
     return jsonify(unique_locations)
 
+#yaha se nearyou till.. 
+
 def has_properties_for_location(loc_name):
     """Check if a location has any properties in the database."""
     # Also check if the location is in the excluded list
@@ -273,6 +275,8 @@ def get_properties_by_multiple_locations():
                 all_properties.append(prop_dict)
     
     return jsonify(all_properties)
+
+# yaha tak nearyou. 
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
 def get_property(id):
