@@ -3,7 +3,7 @@
    ======================================== */
 .listing-layout {
   display: flex;
-  padding: 24px;
+  padding: 12px 24px 24px;
   gap: 24px;
   min-height: 100vh;
   align-items: flex-start;
@@ -34,7 +34,7 @@
   overflow: visible;
 }
 
-.property-section-custom > div,
+.property-section-custom>div,
 .property-cards-row-wrapper {
   padding: 0 !important;
   margin: 0 !important;
@@ -438,7 +438,7 @@
   .property-section-custom .property-section-title-center {
     font-size: 1.9rem !important;
   }
-  
+
   .listing-layout {
     flex-direction: column;
     padding: 1.25rem;

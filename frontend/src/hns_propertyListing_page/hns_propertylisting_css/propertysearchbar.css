@@ -4,10 +4,10 @@
 .property-search-wrapper {
   width: 100%;
   max-width: 100%;
-  padding: 0.75rem 0;
+  padding: 0.25rem 0;
   background-color: transparent;
   box-sizing: border-box;
-  margin-bottom: 1rem;
+  margin-bottom: 0.25rem;
 }
 
 /* Card - responsive width */
@@ -16,9 +16,9 @@
   max-width: 100%;
   margin: 0;
   background-color: #ffffff;
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -27,21 +27,20 @@
 .property-search-bar {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  min-height: 64px;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  min-height: 44px;
   box-sizing: border-box;
 }
 
 /* Icon buttons (back & search) */
 .icon-button {
   flex-shrink: 0;
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   background-color: #0047ab;
   color: white !important;
-  /* Force white text/icons */
   border: none;
   display: flex;
   align-items: center;
@@ -61,11 +60,10 @@
 
 /* Force Lucide icons to be white in all modes */
 .icon {
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   stroke-width: 2.5;
   color: white !important;
-  /* Critical: keeps icons white */
   fill: none !important;
 }
 
@@ -81,7 +79,7 @@
   height: 100%;
   border: none;
   background: transparent;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 500;
   color: #111827;
   outline: none;
@@ -97,50 +95,81 @@
 /* Small mobile devices */
 @media (max-width: 640px) {
   .property-search-wrapper {
-    padding: 0.5rem 0;
+    padding: 0.25rem 0;
     width: 100%;
   }
 
   .property-search-card {
-    border-radius: 0.75rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 0.625rem;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
   }
 
   .property-search-bar {
-    padding: 0.5rem 0.75rem;
-    gap: 0.5rem;
-    min-height: 56px;
+    padding: 0.35rem 0.6rem;
+    gap: 0.4rem;
+    min-height: 40px;
   }
 
   .icon-button {
-    width: 40px;
-    height: 40px;
+    width: 32px;
+    height: 32px;
   }
 
   .icon {
-    width: 20px;
-    height: 20px;
+    width: 16px;
+    height: 16px;
     color: white !important;
   }
 
   .search-input {
-    font-size: 0.9375rem;
+    font-size: 0.85rem;
   }
 
   .search-input::placeholder {
-    font-size: 0.875rem;
+    font-size: 0.8rem;
   }
 }
 
 /* Extra small devices */
 @media (max-width: 480px) {
   .property-search-wrapper {
-    padding: 0.5rem 0;
+    padding: 0.2rem 0;
   }
 
   .property-search-bar {
-    padding: 0.5rem;
-    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    gap: 0.4rem;
+  }
+
+  .icon-button {
+    width: 30px;
+    height: 30px;
+  }
+
+  .icon {
+    width: 15px;
+    height: 15px;
+    color: white !important;
+  }
+
+  .search-input {
+    font-size: 0.8rem;
+  }
+
+  .search-input::placeholder {
+    font-size: 0.75rem;
+  }
+}
+
+/* Tablet & up */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .property-search-wrapper {
+    padding: 0.35rem 0;
+  }
+
+  .property-search-bar {
+    padding: 0.4rem 0.875rem;
+    gap: 0.6rem;
   }
 
   .icon-button {
@@ -155,45 +184,14 @@
   }
 
   .search-input {
-    font-size: 0.875rem;
-  }
-
-  .search-input::placeholder {
-    font-size: 0.8125rem;
-  }
-}
-
-/* Tablet & up */
-@media (min-width: 641px) and (max-width: 1024px) {
-  .property-search-wrapper {
-    padding: 0.75rem 0;
-  }
-
-  .property-search-bar {
-    padding: 0.875rem 1.25rem;
-    gap: 0.875rem;
-  }
-
-  .icon-button {
-    width: 50px;
-    height: 50px;
-  }
-
-  .icon {
-    width: 24px;
-    height: 24px;
-    color: white !important;
-  }
-
-  .search-input {
-    font-size: 1rem;
+    font-size: 0.9rem;
   }
 }
 
 /* Desktop */
 @media (min-width: 1025px) {
   .property-search-wrapper {
-    padding: 1rem 0;
+    padding: 0.25rem 0;
   }
 
   .property-search-card {
@@ -201,23 +199,23 @@
   }
 
   .property-search-bar {
-    padding: 1rem 1.5rem;
-    gap: 1rem;
+    padding: 0.5rem 1rem;
+    gap: 0.6rem;
   }
 
   .icon-button {
-    width: 52px;
-    height: 52px;
+    width: 38px;
+    height: 38px;
   }
 
   .icon {
-    width: 26px;
-    height: 26px;
+    width: 20px;
+    height: 20px;
     color: white !important;
   }
 
   .search-input {
-    font-size: 1.0625rem;
+    font-size: 0.95rem;
   }
 }
 
@@ -226,9 +224,9 @@
   max-width: 100%;
   margin: 0 auto;
   background-color: #ffffff;
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   border: 1px solid #e5e7eb;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 /* Desktop max width */
