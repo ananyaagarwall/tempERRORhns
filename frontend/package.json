@@ -92,5 +92,10 @@
   },
   "overrides": {
     "eslint": "^9.39.3"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "*",
+    "@esbuild/linux-x64": "*",
+    "lightningcss-linux-x64-gnu": "*"
   }
 }
