@@ -10,7 +10,6 @@
     "preview": "vite preview",
     "start": "vite"
   },
-  
   "dependencies": {
     "@fontsource/abril-fatface": "^4.5.9",
     "@fontsource/red-hat-display": "^4.5.9",
@@ -90,6 +89,8 @@
     "tailwindcss": "^4.1.13",
     "typescript": "^5.3.3",
     "vite": "^6.3.6"
+  },
+  "overrides": {
+    "eslint": "^9.39.3"
   }
 }
-
