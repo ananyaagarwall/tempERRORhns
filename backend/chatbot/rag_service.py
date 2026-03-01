@@ -267,8 +267,52 @@ def sync_extract_params(query):
         candidate = loc_match.group(2).strip()
         if candidate not in ignored and len(candidate) > 2:
             params['location'] = candidate
+
+    # Fallback: if query includes a known location without "in/at/near"
+    if not params.get('location'):
+        common_locations = [
+            'ghansoli', 'airoli', 'nerul', 'vashi', 'kharghar',
+            'kopar khairane', 'belapur', 'panvel', 'seawoods',
+            'thane', 'mumbai', 'navi mumbai', 'kalyan', 'dombivli'
+        ]
+        for loc in common_locations:
+            if re.search(rf'\b{re.escape(loc)}\b', q_lower):
+                params['location'] = loc
+                break
             
     return params
+
+
+def _normalize_for_match(value):
+    if not value:
+        return ""
+    return re.sub(r'[^a-z0-9\s]+', ' ', str(value).lower()).strip()
+
+
+def _matches_location(candidate_values, requested_location):
+    """
+    Strict-ish location match helper:
+    - Direct substring match
+    - Or all meaningful tokens from requested location are present
+    """
+    if not requested_location:
+        return True
+
+    req = _normalize_for_match(requested_location)
+    if not req:
+        return True
+
+    req_tokens = [t for t in req.split() if len(t) > 2]
+    for value in candidate_values:
+        text = _normalize_for_match(value)
+        if not text:
+            continue
+        if req in text:
+            return True
+        if req_tokens and all(tok in text for tok in req_tokens):
+            return True
+
+    return False
 
 
 class ConversationMemory:
@@ -1160,6 +1204,9 @@ Our team is available to assist you with any questions or schedule property visi
         if current_prefs['location'] and not user_location:
             user_location = current_prefs['location']
 
+    # Current query location should override older memory/preferences
+    query_location = params.get('location') or user_location
+
     if chat_history:
         history_text = "\n".join([f"User: {h[0]}\nAI: {h[1]}" for h in chat_history[-5:]])
         context_blocks.append(f"RECENT CONVERSATION:\n{history_text}")
@@ -1345,6 +1392,41 @@ Response (4-6 lines, no formatting):"""
         if rid:
             session_shown_ids.add(str(rid))
     
+    # Hard-filter final card results by requested location so cards match user query intent.
+    if query_location:
+        all_properties = [
+            p for p in all_properties
+            if _matches_location([p.Location, p.Address], query_location)
+        ]
+        all_builders = [
+            b for b in all_builders
+            if _matches_location([b.city, b.location, b.corporate_address], query_location)
+        ]
+
+        # Keep text response aligned with card payload when user asked location-specific results.
+        if intent == UserIntent.SEARCH_PROPERTIES:
+            if all_properties:
+                ai_answer = (
+                    f"I found {len(all_properties)} property option(s) in {query_location.title()}. "
+                    "Sharing the most relevant matching cards below."
+                )
+            else:
+                ai_answer = (
+                    f"I couldn't find matching properties in {query_location.title()} for this query. "
+                    "Try nearby areas or relax your budget/BHK filters."
+                )
+        elif intent == UserIntent.SEARCH_BUILDERS:
+            if all_builders:
+                ai_answer = (
+                    f"I found {len(all_builders)} builder option(s) in {query_location.title()}. "
+                    "Sharing the best matching builder cards below."
+                )
+            else:
+                ai_answer = (
+                    f"I couldn't find matching builders in {query_location.title()} for this query. "
+                    "Try nearby locations or a broader builder search."
+                )
+
     print(f"✅ Retrieved {len(all_properties)} properties, {len(all_builders)} builders")
     print(f"📊 Will show 10 initially, {max(0, len(all_properties) - 10)} available for 'load more'")
     

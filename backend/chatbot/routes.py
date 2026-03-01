@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
-from models import Builder, ChatSession, ChatMessage, UserInteraction, Property
+from models import Builder, ChatSession, ChatMessage, UserInteraction, Property, User
 from extensions import db 
+from sqlalchemy.exc import DataError, IntegrityError, OperationalError
+from sqlalchemy import text
 from .rag_service import (
     get_chatbot_response, 
     sync_properties_to_vectordb, 
@@ -19,6 +21,75 @@ chatbot_bp = Blueprint('chatbot', __name__)
 # Session-level tracking (in-memory)
 # For production, consider Redis or database storage
 session_tracking = {}
+
+
+def _resync_sequence(table_name, pk_column="id"):
+    """
+    Repair PostgreSQL sequence drift for SERIAL/BIGSERIAL PKs.
+    """
+    db.session.execute(
+        text(
+            f"""
+            SELECT setval(
+                pg_get_serial_sequence('{table_name}', '{pk_column}'),
+                COALESCE((SELECT MAX({pk_column}) FROM {table_name}), 1),
+                true
+            )
+            """
+        )
+    )
+    db.session.commit()
+
+
+def _resync_chat_session_sequence():
+    """
+    Fix PostgreSQL sequence drift for chat_session.id so next inserts don't collide.
+    Safe no-op for empty table; only intended for PostgreSQL backends.
+    """
+    _resync_sequence("chat_session", "id")
+
+
+def _save_chat_messages(session_id, user_content=None, assistant_content=None):
+    """
+    Persist chat messages with one automatic retry on chat_message sequence drift.
+    """
+    payloads = []
+    if user_content:
+        payloads.append({"role": "user", "content": user_content})
+    if assistant_content:
+        payloads.append({"role": "assistant", "content": assistant_content})
+    if not payloads:
+        return
+
+    def _insert_messages():
+        for item in payloads:
+            db.session.add(
+                ChatMessage(
+                    session_id=session_id,
+                    role=item["role"],
+                    content=item["content"]
+                )
+            )
+        db.session.commit()
+
+    try:
+        _insert_messages()
+    except IntegrityError as e:
+        db.session.rollback()
+        err_text = str(e).lower()
+        if "chat_message_pkey" in err_text and "duplicate key value" in err_text:
+            try:
+                _resync_sequence("chat_message", "id")
+                _insert_messages()
+                return
+            except Exception as retry_error:
+                db.session.rollback()
+                print(f"Failed saving chat messages after sequence resync: {retry_error}")
+                return
+        print(f"Failed saving chat messages: {e}")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Failed saving chat messages: {e}")
 
 
 @chatbot_bp.route('/sync', methods=['POST'])
@@ -56,7 +127,9 @@ def ask_bot():
             'memory': ConversationMemory(session_id),
             'all_properties': [],
             'all_builders': [],
-            'current_page': 0
+            'current_page': 0,
+            'properties_offset': 0,
+            'builders_offset': 0
         }
     
     session_data = session_tracking.get(session_id, {
@@ -65,7 +138,9 @@ def ask_bot():
         'memory': ConversationMemory(session_id) if session_id else None,
         'all_properties': [],
         'all_builders': [],
-        'current_page': 0
+        'current_page': 0,
+        'properties_offset': 0,
+        'builders_offset': 0
     })
     
     session_data['conversation_count'] += 1
@@ -154,11 +229,7 @@ def ask_bot():
 
                     # Save chat messages
                     if session_id:
-                        user_msg_entry = ChatMessage(session_id=session_id, role='user', content=user_message)
-                        ai_msg_entry = ChatMessage(session_id=session_id, role='assistant', content=detailed)
-                        db.session.add(user_msg_entry)
-                        db.session.add(ai_msg_entry)
-                        db.session.commit()
+                        _save_chat_messages(session_id, user_message, detailed)
 
                     return jsonify({
                         "response": detailed,
@@ -177,11 +248,7 @@ def ask_bot():
                     session_data['last_shown_builders'] = [str(bid)]
 
                     if session_id:
-                        user_msg_entry = ChatMessage(session_id=session_id, role='user', content=user_message)
-                        ai_msg_entry = ChatMessage(session_id=session_id, role='assistant', content=detailed)
-                        db.session.add(user_msg_entry)
-                        db.session.add(ai_msg_entry)
-                        db.session.commit()
+                        _save_chat_messages(session_id, user_message, detailed)
 
                     return jsonify({
                         "response": detailed,
@@ -237,6 +304,10 @@ def ask_bot():
         elif last_intent == 'search_builders':
             properties_to_show = []
 
+        # Track cursor offsets for robust pagination per latest result set
+        session_data['properties_offset'] = len(properties_to_show)
+        session_data['builders_offset'] = len(builders_to_show)
+
         # Add displayed items to shown_ids so 'show more' won't return duplicates
         for p in properties_to_show:
             session_data['shown_ids'].add(str(p.get('id')))
@@ -255,20 +326,7 @@ def ask_bot():
         
         # Save to DB
         if session_id:
-            user_msg_entry = ChatMessage(
-                session_id=session_id, 
-                role='user', 
-                content=user_message
-            )
-            ai_msg_entry = ChatMessage(
-                session_id=session_id, 
-                role='assistant', 
-                content=ai_response
-            )
-            
-            db.session.add(user_msg_entry)
-            db.session.add(ai_msg_entry)
-            db.session.commit()
+            _save_chat_messages(session_id, user_message, ai_response)
 
         # PROCESS BUFFERED RESPONSES (Serialize objects)
         final_buffered = []
@@ -328,16 +386,7 @@ def ask_bot():
             )
             
             if session_id:
-                ai_msg_entry = ChatMessage(
-                    session_id=session_id, 
-                    role='assistant', 
-                    content=error_message
-                )
-                db.session.add(ai_msg_entry)
-                try:
-                    db.session.commit()
-                except:
-                    db.session.rollback()
+                _save_chat_messages(session_id, assistant_content=error_message)
             
             return jsonify({
                 "response": error_message,
@@ -387,23 +436,27 @@ def load_more():
         all_builders = session_data.get('all_builders', [])
         shown_ids = session_data.get('shown_ids', set())
 
-        # Compute unseen items relative to shown_ids
-        unseen_props = [p for p in all_properties if str(p.get('id')) not in shown_ids]
-        unseen_builders = [b for b in all_builders if str(b.get('id')) not in shown_ids]
+        # Page using explicit offsets from the current result set.
+        # This avoids false "no more" when shown_ids includes items from older turns.
+        properties_offset = int(session_data.get('properties_offset', 0) or 0)
+        builders_offset = int(session_data.get('builders_offset', 0) or 0)
 
-        print(f"📊 Total properties: {len(all_properties)}, unseen: {len(unseen_props)}; Total builders: {len(all_builders)}, unseen builders: {len(unseen_builders)}")
+        print(
+            f"📊 Total properties: {len(all_properties)} (offset: {properties_offset}); "
+            f"Total builders: {len(all_builders)} (offset: {builders_offset})"
+        )
 
         # Decide which type to load based on last intent
         last_intent = session_data.get('last_intent')
         if last_intent == 'search_properties':
-            properties_to_show = unseen_props[:10]
+            properties_to_show = all_properties[properties_offset:properties_offset + 10]
             builders_to_show = []
         elif last_intent == 'search_builders':
             properties_to_show = []
-            builders_to_show = unseen_builders[:10]
+            builders_to_show = all_builders[builders_offset:builders_offset + 10]
         else:
-            properties_to_show = unseen_props[:10]
-            builders_to_show = unseen_builders[:10]
+            properties_to_show = all_properties[properties_offset:properties_offset + 10]
+            builders_to_show = all_builders[builders_offset:builders_offset + 10]
 
         # If nothing unseen, return empty and indicate no more
         if not properties_to_show and not builders_to_show:
@@ -422,6 +475,10 @@ def load_more():
         for b in builders_to_show:
             shown_ids.add(str(b.get('id')))
 
+        # Advance offsets by what we returned
+        session_data['properties_offset'] = properties_offset + len(properties_to_show)
+        session_data['builders_offset'] = builders_offset + len(builders_to_show)
+
         session_data['shown_ids'] = shown_ids
         session_data['current_page'] = current_page + 1
 
@@ -431,11 +488,14 @@ def load_more():
 
         # Check if more results available for this intent
         if last_intent == 'search_properties':
-            has_more = len([p for p in all_properties if str(p.get('id')) not in shown_ids]) > 0
+            has_more = session_data['properties_offset'] < len(all_properties)
         elif last_intent == 'search_builders':
-            has_more = len([b for b in all_builders if str(b.get('id')) not in shown_ids]) > 0
+            has_more = session_data['builders_offset'] < len(all_builders)
         else:
-            has_more = len([p for p in all_properties if str(p.get('id')) not in shown_ids]) > 0 or len([b for b in all_builders if str(b.get('id')) not in shown_ids]) > 0
+            has_more = (
+                session_data['properties_offset'] < len(all_properties) or
+                session_data['builders_offset'] < len(all_builders)
+            )
         
         print(f"✅ Returning {len(properties_to_show)} properties, {len(builders_to_show)} builders")
         print(f"📌 Has more: {has_more}")
@@ -446,6 +506,12 @@ def load_more():
             "builders": builders_to_show,
             "has_more": has_more,
             "current_page": session_data['current_page'],
+            "debug_pagination": {
+                "properties_offset": session_data.get('properties_offset', 0),
+                "builders_offset": session_data.get('builders_offset', 0),
+                "total_properties": len(all_properties),
+                "total_builders": len(all_builders)
+            },
             "total_results": {
                 "properties": len(all_properties),
                 "builders": len(all_builders)
@@ -462,8 +528,20 @@ def load_more():
 def create_session():
     """Create a new chat session"""
     try:
-        data = request.json
-        user_id = data.get('user_id')
+        data = request.get_json(silent=True) or {}
+        raw_user_id = data.get('user_id')
+
+        # Allow anonymous sessions when user_id is not provided.
+        user_id = None
+        if raw_user_id not in (None, ""):
+            try:
+                user_id = int(raw_user_id)
+            except (TypeError, ValueError):
+                return jsonify({"error": "Invalid user_id. It must be an integer."}), 400
+
+            # Validate foreign key target early to avoid DB-level 500s.
+            if not User.query.get(user_id):
+                return jsonify({"error": f"user_id {user_id} does not exist."}), 404
         
         new_session = ChatSession(
             user_id=user_id, 
@@ -482,13 +560,59 @@ def create_session():
             'memory': ConversationMemory(new_session.id),
             'all_properties': [],
             'all_builders': [],
-            'current_page': 0
+            'current_page': 0,
+            'properties_offset': 0,
+            'builders_offset': 0
         }
         
         return jsonify({
             "session_id": new_session.id,
             "message": "Session created successfully"
         })
+    except (IntegrityError, DataError) as e:
+        db.session.rollback()
+        err_text = str(e).lower()
+        print(f"Error creating session (data/integrity): {e}")
+
+        # Auto-heal common PostgreSQL issue:
+        # duplicate key on chat_session_pkey due to sequence behind MAX(id).
+        if "chat_session_pkey" in err_text and "duplicate key value" in err_text:
+            try:
+                _resync_chat_session_sequence()
+                # Retry once after sequence repair.
+                retry_session = ChatSession(
+                    user_id=user_id,
+                    title="New Chat",
+                    state='initial',
+                    status='active'
+                )
+                db.session.add(retry_session)
+                db.session.commit()
+
+                session_tracking[retry_session.id] = {
+                    'shown_ids': set(),
+                    'conversation_count': 0,
+                    'memory': ConversationMemory(retry_session.id),
+                    'all_properties': [],
+                    'all_builders': [],
+                    'current_page': 0,
+                    'properties_offset': 0,
+                    'builders_offset': 0
+                }
+
+                return jsonify({
+                    "session_id": retry_session.id,
+                    "message": "Session created successfully"
+                })
+            except Exception as retry_error:
+                db.session.rollback()
+                print(f"Session retry after sequence resync failed: {retry_error}")
+
+        return jsonify({"error": "Invalid session payload."}), 400
+    except OperationalError as e:
+        db.session.rollback()
+        print(f"Error creating session (db operational): {e}")
+        return jsonify({"error": "Database schema issue. Ensure chat tables are migrated/created."}), 500
     except Exception as e:
         db.session.rollback()
         print(f"Error creating session: {e}")
@@ -533,6 +657,8 @@ def reset_session(session_id):
             session_tracking[session_id]['all_properties'] = []
             session_tracking[session_id]['all_builders'] = []
             session_tracking[session_id]['current_page'] = 0
+            session_tracking[session_id]['properties_offset'] = 0
+            session_tracking[session_id]['builders_offset'] = 0
             return jsonify({"message": "Session tracking reset successfully"})
         return jsonify({"message": "Session not found"}), 404
     except Exception as e:

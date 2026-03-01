@@ -1,6 +1,6 @@
 import os
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
-os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppresses all TF C++ logs
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import requests
 from models import (
@@ -79,12 +79,6 @@ logging.basicConfig(
 security_logger = logging.getLogger('security')
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={
-    r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/query": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/build_index": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/health": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}
-})
 CORS(app, supports_credentials=True, resources={
     r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
     r"/query": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
@@ -289,42 +283,6 @@ def logout():
     unset_jwt_cookies(response)
     return response, 200
 
-    #  tokens ------------------------------------------------------------------------------------------
-    access_token = create_access_token(identity={
-        'username': user.username, 
-        'role': user.role, 
-        'user_id': user.id,
-        'email': user.email
-    })
-    refresh_token = create_refresh_token(identity={
-        'username': user.username, 
-        'role': user.role, 
-        'user_id': user.id,
-        'email': user.email
-    })
-
-    # cookies ------------------------------------------------------------------------------------------
-    response = jsonify({'message': 'Login successful', 'user': user.to_dict()})
-    set_access_cookies(response, access_token)
-    set_refresh_cookies(response, refresh_token)
-    
-    return response, 200
-
-@app.route('/api/auth/refresh', methods=['POST'])
-@jwt_required(refresh=True)
-def refresh():
-    identity = get_jwt_identity()
-    access_token = create_access_token(identity=identity)
-    response = jsonify(access_token=access_token)
-    set_access_cookies(response, access_token)
-    return response, 200
-
-@app.route('/api/auth/logout', methods=['POST'])
-def logout():
-    response = jsonify({'message': 'Logout successful'})
-    unset_jwt_cookies(response)
-    return response, 200
-
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
 # @jwt_required()
@@ -346,6 +304,34 @@ def get_locations():
     unique_locations = [loc[0].strip() for loc in locations if loc[0] and loc[0].strip()] 
     unique_locations = sorted(set(unique_locations))
     return jsonify(unique_locations)
+
+# Excluded nodes for the "near you" feature (kept as an empty set for now so all areas are eligible).
+EXCLUDED_NEAR_YOU_NODES = set()
+
+# Ordered list of key nodes/areas used for the "nearest nodes" API.
+# This is used as a logical sequence (roughly along the Navi Mumbai / Thane belt)
+# to compute nearby locations. Update this list if you add more areas.
+ORDERED_AREAS = [
+    "Airoli",
+    "Rabale",
+    "Ghansoli",
+    "Kopar Khairane",
+    "Vashi",
+    "Sanpada",
+    "Juinagar",
+    "Nerul",
+    "Seawoods",
+    "Belapur",
+    "Kharghar",
+    "Mansarovar",
+    "Khandeshwar",
+    "Panvel",
+    "Thane",
+    "Kalyan Subdistrict",
+    "Kalyan-Dombivli",
+    "Mumbai",
+    "Navi Mumbai",
+]
 
 #yaha se nearyou till.. 
 
@@ -456,7 +442,6 @@ def get_property(id):
     return jsonify(property.to_dict())
 
 @app.route('/api/properties', methods=['POST'])
-@admin_only
 @admin_only
 def create_property():
     data = request.json
@@ -1623,43 +1608,6 @@ def get_security_audit():
         security_logger.error(f"Error reading security audit: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-# Security audit endpoint for admins
-@app.route('/api/admin/security-audit', methods=['GET'])
-@admin_only
-def get_security_audit():
-    """Get recent security events for admin review"""
-    try:
-        # Read the last 100 lines from security.log
-        log_file = 'security.log'
-        if not os.path.exists(log_file):
-            return jsonify({'events': [], 'message': 'No security log found'})
-        
-        with open(log_file, 'r') as f:
-            lines = f.readlines()
-            # Get last 100 lines
-            recent_lines = lines[-100:] if len(lines) > 100 else lines
-        
-        events = []
-        for line in recent_lines:
-            if line.strip():
-                # Parse log line (basic parsing)
-                parts = line.split(' - ')
-                if len(parts) >= 4:
-                    events.append({
-                        'timestamp': parts[0],
-                        'logger': parts[1],
-                        'level': parts[2],
-                        'message': ' - '.join(parts[3:]).strip()
-                    })
-        
-        return jsonify({
-            'events': events,
-            'total_events': len(events)
-        })
-    except Exception as e:
-        security_logger.error(f"Error reading security audit: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/api/admin/latest-geolocation', methods=['GET'])
 @admin_only
 @admin_only
@@ -2153,56 +2101,6 @@ def google_signin():
     set_refresh_cookies(response, refresh_token)
     return response, 200
 
-
-
-@app.route('/health', methods=['GET'])
-def health():
-    return jsonify({"status": "ok"}), 200
-
-GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")  # Set your actual Google Client ID here
-
-@app.route('/api/auth/google-signin', methods=['POST'])
-def google_signin():
-    data = request.json
-    id_token = data.get('id_token')
-    if not id_token:
-        return jsonify({'error': 'Missing id_token'}), 400
-
-    # Verify id_token with Google
-    resp = requests.get(
-        f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
-    )
-    if resp.status_code != 200:
-        return jsonify({'error': 'Invalid Google token'}), 401
-    info = resp.json()
-
-    # Client ID check - SECURITY (always verify this)
-    if info.get('aud') != GOOGLE_CLIENT_ID:
-        return jsonify({'error': 'Invalid Google client ID'}), 401
-
-    # User info from Google response
-    email = info.get('email')
-    username = info.get('name', email)
-
-    user = User.query.filter_by(email=email).first()
-    if not user:
-        user = User(
-            username=username,
-            email=email,
-            password='',  # No password needed for Google users
-            role='customer',
-            is_active=True,
-        )
-        db.session.add(user)
-        db.session.commit()
-    
-    access_token = create_access_token(identity={'username': user.username, 'role': user.role, 'user_id': user.id, 'email': user.email})
-    refresh_token = create_refresh_token(identity={'username': user.username, 'role': user.role, 'user_id': user.id, 'email': user.email})
-
-    response = jsonify({'message': 'Login successful', 'user': user.to_dict()})
-    set_access_cookies(response, access_token)
-    set_refresh_cookies(response, refresh_token)
-    return response, 200
 
 
 #... existing imports...
