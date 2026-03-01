@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from 'react';
 import { FaEdit, FaTrash, FaEye, FaPlus } from 'react-icons/fa';
 

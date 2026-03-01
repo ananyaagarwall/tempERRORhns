@@ -1,4 +1,7 @@
 import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"  # suppresses all TF C++ logs
+
 import requests
 from models import (
     User,
@@ -17,6 +20,8 @@ from models import (
 )
 
 from flask import Flask, request, jsonify, send_from_directory, redirect, make_response
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
+
 #flash
 from flask_cors import CORS
 import os
@@ -33,40 +38,99 @@ import sys
 from slugify import slugify
 from extensions import db 
 from models import ChatSession, ChatMessage, UserPreference
+import logging
+from datetime import timedelta
+from flask_jwt_extended import JWTManager
+from flask_jwt_extended import jwt_required
+from functools import wraps
+import threading
 
+
+
+# Set UTF-8 encoding for stdout
 # Set UTF-8 encoding for stdout
 sys.stdout.reconfigure(encoding='utf-8')
 
 load_dotenv()
 
+# Configure logging for security events
+# NOTE: File logging disabled during development to prevent huge log files
+# Uncomment FileHandler line for production security auditing
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        # logging.FileHandler('security.log'),  # Disabled - was creating 30k+ line files
+        logging.StreamHandler()  # Console logging only
+    ]
+)
+security_logger = logging.getLogger('security')
+
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}})
+CORS(app, supports_credentials=True, resources={
+    r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
+    r"/query": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
+    r"/build_index": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
+    r"/health": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}
+})
 
 # Configure Flask to use UTF-8
 app.config['JSON_AS_ASCII'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
-import os
+# Configure JWT
+app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change this!
+app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
+app.config["JWT_COOKIE_SECURE"] = False  # Set True in production
+app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=15)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
+
+jwt = JWTManager(app)
+
+# Simplified RBAC - Only 2 roles: customer and admin
+def admin_only(fn):
+    """Admin-only access decorator"""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            verify_jwt_in_request()
+            identity = get_jwt_identity()
+            if identity.get('role') != 'admin':
+                return jsonify({'error': 'Admin access required'}), 403
+            return fn(*args, **kwargs)
+        except Exception as e:
+            return jsonify({'error': 'Authentication required'}), 401
+    return wrapper
 
 # Get absolute path to the backend folder (where app.py lives)
 basedir = os.path.abspath(os.path.dirname(__file__))
-
 # Create 'instance' folder if it doesn't exist
 instance_dir = os.path.join(basedir, 'instance')
 os.makedirs(instance_dir, exist_ok=True)  # This line fixes most issues
 
-# Use FULL absolute path for the SQLite file
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(instance_dir, 'hns.db')}"
+
+# Use PostgreSQL (DATABASE_URL from .env)
+_db_url = os.getenv('DATABASE_URL', f"sqlite:///{os.path.join(instance_dir, 'hns.db')}")
+# SQLAlchemy requires 'postgresql://' not 'postgres://' (Heroku-style URLs)
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize SQLAlchemy first
+# Import the db instance from extensions
+from extensions import db
 
-# --- NEW INITIALIZATION ---
-# Instead of db = SQLAlchemy(app), we connect the existing db to the app
-db.init_app(app)
+# Initialize the db with the app
+db.init_app(app)  # <-- Use the imported db instance
 
 # Then initialize Flask-Migrate
 migrate = Migrate(app, db)
+
+# Chatbot globals
+_index_lock = threading.Lock()
+_emb_index = None
 
 # Add these configurations
 UPLOAD_FOLDER = 'uploads'
@@ -81,11 +145,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-#---------------------------------------------MODELS ---------------------------------------------
-
-#moved to models.py
-
-#---------------------------------------------END OF MODELS ---------------------------------------------
 
 with app.app_context():
     try:
@@ -125,7 +184,7 @@ def signup():
         email=data['email'],
         password=data['password'],  # Plain text password
         phone=data.get('phone'),
-        role=data.get('role', 'buyer')
+        role=data.get('role', 'customer')
     )
     
     db.session.add(new_user)
@@ -139,28 +198,64 @@ def signup():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.json
-    
-    user = User.query.filter_by(email=data['email']).first()
-    if not user or user.password != data['password']:  # Direct password comparison
+    email = data.get('email', None)
+    password = data.get('password', None)
+
+    user = User.query.filter_by(email=email).first()
+    if not user or user.password != password:
         return jsonify({'message': 'Invalid email or password'}), 401
+
+    #  tokens ------------------------------------------------------------------------------------------
+    access_token = create_access_token(identity={
+        'username': user.username, 
+        'role': user.role, 
+        'user_id': user.id,
+        'email': user.email
+    })
+    refresh_token = create_refresh_token(identity={
+        'username': user.username, 
+        'role': user.role, 
+        'user_id': user.id,
+        'email': user.email
+    })
+
+    # cookies ------------------------------------------------------------------------------------------
+    response = jsonify({'message': 'Login successful', 'user': user.to_dict()})
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
     
-    return jsonify({
-        'message': 'Login successful',
-        'user': user.to_dict()
-    }), 200
+    return response, 200
+
+@app.route('/api/auth/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    identity = get_jwt_identity()
+    access_token = create_access_token(identity=identity)
+    response = jsonify(access_token=access_token)
+    set_access_cookies(response, access_token)
+    return response, 200
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    response = jsonify({'message': 'Logout successful'})
+    unset_jwt_cookies(response)
+    return response, 200
 
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
+# @jwt_required()
 def get_properties_by_location(loc):
-    properties = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
+    properties = Property.query.filter(Property.Location.like(f'%{loc}%')).all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/properties', methods=['GET'])
+# @jwt_required()
 def get_properties():
     properties = Property.query.all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/locations', methods=['GET']) 
+@jwt_required()
 def get_locations(): 
     locations = db.session.query(Property.Location).distinct().all() 
     unique_locations = [loc[0].strip() for loc in locations if loc[0] and loc[0].strip()] 
@@ -169,11 +264,13 @@ def get_locations():
 
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
+# @jwt_required()
 def get_property(id):
     property = Property.query.get_or_404(id)
     return jsonify(property.to_dict())
 
 @app.route('/api/properties', methods=['POST'])
+@admin_only
 def create_property():
     data = request.json
     new_property = Property(
@@ -212,16 +309,9 @@ def create_property():
     return jsonify(new_property.to_dict()), 201
 
 @app.route('/api/builders', methods=['GET'])
+# @jwt_required()
 def get_builders():
     try:
-        # Get the token from the Authorization header
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return jsonify({'error': 'No authorization token provided'}), 401
-
-        token = auth_header.split(' ')[1]
-        # You might want to verify the token here if you're using JWT
-
         print("Fetching builders...")  # Debug log
         builders = Builder.query.all()
         print(f"Found {len(builders)} builders")  # Debug log
@@ -232,48 +322,95 @@ def get_builders():
         print(f"Error in get_builders: {str(e)}")  # Debug log
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/builders/all', methods=['GET']) # Temporary route for debugging
-def get_all_builders_debug():
-    try:
-        builders = Builder.query.all()
-        return jsonify([b.to_dict() for b in builders])
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 # New endpoint to fetch builder by company_name
 @app.route('/api/builders/name/<company_name>', methods=['GET'])
 def get_builder_by_name(company_name):
+    """
+    Get builder by company name (case-insensitive, handles URL-encoded names)
+    """
     try:
-        # Support underscores and hyphens as spaces for flexible matching
-        normalized_name = company_name.replace('_', ' ').replace('-', ' ')
+        # Decode URL-encoded name and normalize (replace hyphens/underscores with spaces)
+        normalized_name = company_name.replace('-', ' ').replace('_', ' ').strip()
         
-        print(f"Searching for builder: '{normalized_name}' (from URL: '{company_name}')")
+        print(f"Searching for builder: '{normalized_name}'")  # Debug log
         
-        # Try exact match first on company_name
-        builder = Builder.query.filter_by(company_name=normalized_name).first()
+        # Try exact match first (case-insensitive)
+        builder = Builder.query.filter(
+            Builder.company_name.ilike(normalized_name)
+        ).first()
         
-        # If not found, try case-insensitive match on company_name
+        # If not found, try partial match
         if not builder:
-            builder = Builder.query.filter(Builder.company_name.ilike(normalized_name)).first()
+            builder = Builder.query.filter(
+                Builder.company_name.ilike(f'%{normalized_name}%')
+            ).first()
         
-        # If still not found, try searching by brand_name
+        # If still not found, try matching individual words
         if not builder:
-            builder = Builder.query.filter(Builder.brand_name.ilike(normalized_name)).first()
+            words = normalized_name.split()
+            for word in words:
+                if len(word) > 3:  # Only search meaningful words
+                    builder = Builder.query.filter(
+                        Builder.company_name.ilike(f'%{word}%')
+                    ).first()
+                    if builder:
+                        break
         
         if not builder:
+            print(f"Builder not found for name: '{normalized_name}'")  # Debug log
             # List all available builders for debugging
             all_builders = Builder.query.all()
-            builder_names = [b.company_name for b in all_builders]
-            print(f"Builder not found. Available builders: {builder_names}")
-            return jsonify({'error': 'Builder not found', 'available_builders': builder_names}), 404
+            available_names = [b.company_name for b in all_builders]
+            print(f"Available builders: {available_names}")
+            
+            return jsonify({
+                'error': 'Builder not found',
+                'searched_name': normalized_name,
+                'available_builders': available_names[:5]  # Return first 5 for reference
+            }), 404
         
-        print(f"Found builder: {builder.company_name}")
+        print(f"Builder found: {builder.company_name}")  # Debug log
         return jsonify(builder.to_dict())
+        
     except Exception as e:
-        print(f"Error in get_builder_by_name: {str(e)}")
+        print(f"Error in get_builder_by_name: {str(e)}")  # Debug log
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# Alternative: Add a route that lists all builders for debugging
+@app.route('/api/builders/search', methods=['GET'])
+def search_builders():
+    """
+    Search builders by name with query parameter
+    Usage: /api/builders/search?name=hiranandani
+    """
+    try:
+        search_term = request.args.get('name', '').strip()
+        
+        if not search_term:
+            return jsonify({'error': 'Please provide a search term'}), 400
+        
+        # Search by company name or brand name
+        builders = Builder.query.filter(
+            (Builder.company_name.ilike(f'%{search_term}%')) |
+            (Builder.brand_name.ilike(f'%{search_term}%'))
+        ).all()
+        
+        if not builders:
+            return jsonify({
+                'error': 'No builders found',
+                'searched_term': search_term
+            }), 404
+        
+        return jsonify([builder.to_dict() for builder in builders])
+        
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>', methods=['GET'])
+# @jwt_required()
 def get_builder(rera_id):
     try:
         builder = Builder.query.get_or_404(rera_id)
@@ -282,6 +419,7 @@ def get_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders', methods=['POST'])
+@admin_only
 def create_builder():
     try:
         # Get user_id and rera_id from form data
@@ -406,6 +544,7 @@ def delete_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>/projects', methods=['GET'])
+# @jwt_required()
 def get_builder_projects(rera_id):
     try:
         status = request.args.get('status')
@@ -456,6 +595,7 @@ def _create_property_for_project(project, user_id, data):
 
 #-----------------STEP 1 ROUTING FETCHING DETAILS FROM FRONTEND AND PUSHING TO DATABASE------------------------
 @app.route('/api/builders/<rera_id>/projects/step1', methods=['POST'])
+@admin_only
 def create_project_step1(rera_id):
     data = request.json
     title = data['title']
@@ -495,6 +635,7 @@ def create_project_step1(rera_id):
     return jsonify(new_project.to_dict()), 201
 
 @app.route('/api/builders/<rera_id>/projects/step2', methods=['POST'])
+@admin_only
 def create_project_step2(rera_id):
     data = request.json
     project_id = data.get('project_id')
@@ -514,6 +655,7 @@ def create_project_step2(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step4', methods=['POST'])
+@admin_only
 def create_project_step4(rera_id):
     # Handle both form data and JSON data
     if request.content_type and 'multipart/form-data' in request.content_type:
@@ -549,6 +691,7 @@ def create_project_step4(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step5', methods=['POST'])
+@admin_only
 def create_project_step5(rera_id):
     data = request.json
     project_id = data.get('project_id')
@@ -703,6 +846,7 @@ def update_project_step(rera_id, project_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
+@admin_only
 def delete_project(project_id):
     project = BuilderProject.query.get_or_404(project_id)
     db.session.delete(project)
@@ -714,6 +858,7 @@ def delete_project(project_id):
 #----------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------
 @app.route('/api/admin/stats', methods=['GET'])
+@admin_only
 def get_admin_stats():
     try:
         print("Starting to fetch admin stats...")  # Debug log
@@ -791,6 +936,7 @@ def get_admin_stats():
 
 #--------------------------------------------- USER MANAGEMENT ROUTES ---------------------------------------------
 @app.route('/api/users', methods=['GET'])
+@admin_only
 def get_users():
     try:
         # Get the token from the Authorization header
@@ -815,6 +961,7 @@ def get_users():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/<int:id>', methods=['GET'])
+@jwt_required()
 def get_user(id):
     try:
         user = User.query.get_or_404(id)
@@ -829,6 +976,7 @@ def get_user(id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 @app.route('/api/projects/<int:project_id>', methods=['GET'])
+# @jwt_required()
 def get_builder_project_by_id(project_id):
     project = BuilderProject.query.get(project_id)
     if not project:
@@ -836,6 +984,7 @@ def get_builder_project_by_id(project_id):
     return jsonify(project.to_dict())
 
 @app.route('/api/users/<int:id>', methods=['PUT'])
+@admin_only
 def update_user(id):
     try:
         user = User.query.get_or_404(id)
@@ -869,6 +1018,7 @@ def update_user(id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/<int:id>', methods=['DELETE'])
+@admin_only
 def delete_user(id):
     try:
         user = User.query.get_or_404(id)
@@ -908,6 +1058,7 @@ def save_image(file):
 
 # API to create a blog (multipart/form-data)
 @app.route('/api/blogs', methods=['POST'])
+@admin_only
 def create_blog():
     try:
         data = request.form
@@ -971,6 +1122,7 @@ def create_blog():
 
 # API to list all blogs (for admin dashboard)
 @app.route('/api/blogs', methods=['GET'])
+@jwt_required()
 def list_blogs():
     blogs = Blog.query.order_by(Blog.created_at.desc()).all()
     print(f"Found {len(blogs)} blogs")
@@ -980,12 +1132,14 @@ def list_blogs():
 
 # Get a single blog by ID
 @app.route('/api/blogs/<int:blog_id>', methods=['GET'])
+@jwt_required()
 def get_blog(blog_id):
     blog = Blog.query.get_or_404(blog_id)
     return jsonify(blog.to_dict())
 
 # Get a single blog by slug
 @app.route('/api/blogs/slug/<slug>', methods=['GET'])
+@jwt_required()
 def get_blog_by_slug(slug):
     print(f"Fetching blog with slug: {slug}")
     blog = Blog.query.filter_by(slug=slug).first()
@@ -1107,6 +1261,7 @@ def uploaded_file(filename):
 
 # Update /api/projects/slug/<slug> to handle BuilderProject slugs
 @app.route('/api/projects/slug/<slug>', methods=['GET'])
+# @jwt_required()
 def get_project_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='project').first()
     if not slug_entry:
@@ -1122,6 +1277,7 @@ def get_project_by_slug(slug):
 
 # 3. Redirect alias slugs to primary in /api/properties/slug/<slug>
 @app.route('/api/properties/slug/<slug>', methods=['GET'])
+@jwt_required()
 def get_property_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='property').first()
     if not slug_entry:
@@ -1137,11 +1293,13 @@ def get_property_by_slug(slug):
     return jsonify(property.to_dict())
 
 @app.route('/api/projects', methods=['GET'])
+# @jwt_required()
 def get_all_projects():
     projects = BuilderProject.query.all()
     return jsonify([p.to_dict() for p in projects])
 
 @app.route('/api/builders/<rera_id>/projects/upload-image', methods=['POST'])
+@admin_only
 def upload_project_image(rera_id):
     print(f"Upload project image called with rera_id: {rera_id}")
     print(f"Request form data: {request.form}")
@@ -1223,7 +1381,45 @@ def receive_geolocation():
 
 # ---------------------------------------------------------------------GEO LOCATION admin dashboard-----------------------------------------------------------------------
 
+# Security audit endpoint for admins
+@app.route('/api/admin/security-audit', methods=['GET'])
+@admin_only
+def get_security_audit():
+    """Get recent security events for admin review"""
+    try:
+        # Read the last 100 lines from security.log
+        log_file = 'security.log'
+        if not os.path.exists(log_file):
+            return jsonify({'events': [], 'message': 'No security log found'})
+        
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+            # Get last 100 lines
+            recent_lines = lines[-100:] if len(lines) > 100 else lines
+        
+        events = []
+        for line in recent_lines:
+            if line.strip():
+                # Parse log line (basic parsing)
+                parts = line.split(' - ')
+                if len(parts) >= 4:
+                    events.append({
+                        'timestamp': parts[0],
+                        'logger': parts[1],
+                        'level': parts[2],
+                        'message': ' - '.join(parts[3:]).strip()
+                    })
+        
+        return jsonify({
+            'events': events,
+            'total_events': len(events)
+        })
+    except Exception as e:
+        security_logger.error(f"Error reading security audit: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/admin/latest-geolocation', methods=['GET'])
+@admin_only
 def get_latest_geolocation():
     global latest_geolocation
     # If latest_geolocation is not set, return a default empty response
@@ -1236,6 +1432,7 @@ def get_latest_geolocation():
 # ------------------------------------------------------- AI Blog Summarization -------------------------------------------------- ---
 
 @app.route('/api/blogs/<slug>/summary', methods=['GET'])
+@jwt_required()
 def summarize_blog(slug):
     api_key = os.getenv('PERPLEXITY_API_KEY')
     blog = Blog.query.filter_by(slug=slug).first()
@@ -1496,6 +1693,7 @@ def _canonical_property_status(value: str) -> str:
         return ''
 
 @app.route('/api/properties/filters', methods=['GET'])
+@jwt_required()
 def get_filters():
     """Return unique filter options sourced from BuilderProject and Property tables.
     Includes amenities (normalized), property_status, project status, and derived society types.
@@ -1547,6 +1745,7 @@ def get_filters():
 
 # Simplified property search endpoint: direct filtering only
 @app.route('/api/properties/search', methods=['GET'])
+# @jwt_required()
 def search_properties():
     location = request.args.get('location', '', type=str)
     price = request.args.get('price', 0, type=float)  # price in Cr
@@ -1657,6 +1856,57 @@ def search_properties():
 
     # Return JSON
     return jsonify([p.to_dict() for p in results])
+
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok"}), 200
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")  # Set your actual Google Client ID here
+
+@app.route('/api/auth/google-signin', methods=['POST'])
+def google_signin():
+    data = request.json
+    id_token = data.get('id_token')
+    if not id_token:
+        return jsonify({'error': 'Missing id_token'}), 400
+
+    # Verify id_token with Google
+    resp = requests.get(
+        f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+    )
+    if resp.status_code != 200:
+        return jsonify({'error': 'Invalid Google token'}), 401
+    info = resp.json()
+
+    # Client ID check - SECURITY (always verify this)
+    if info.get('aud') != GOOGLE_CLIENT_ID:
+        return jsonify({'error': 'Invalid Google client ID'}), 401
+
+    # User info from Google response
+    email = info.get('email')
+    username = info.get('name', email)
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        user = User(
+            username=username,
+            email=email,
+            password='',  # No password needed for Google users
+            role='customer',
+            is_active=True,
+        )
+        db.session.add(user)
+        db.session.commit()
+    
+    access_token = create_access_token(identity={'username': user.username, 'role': user.role, 'user_id': user.id, 'email': user.email})
+    refresh_token = create_refresh_token(identity={'username': user.username, 'role': user.role, 'user_id': user.id, 'email': user.email})
+
+    response = jsonify({'message': 'Login successful', 'user': user.to_dict()})
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
+    return response, 200
 
 
 #... existing imports...

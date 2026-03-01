@@ -4,7 +4,7 @@ import "../../blog_page_css/Latestblog.css";
 
 const LatestBlog = ({ filteredBlogs }) => {
   if (!filteredBlogs || filteredBlogs.length === 0) {
-    return <p>No blogs available</p>;
+    return null;
   }
 
   return (
