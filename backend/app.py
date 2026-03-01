@@ -22,6 +22,8 @@ from models import (
 from flask import Flask, request, jsonify, send_from_directory, redirect, make_response
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
 
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
+
 #flash
 from flask_cors import CORS
 import os
@@ -38,6 +40,16 @@ import sys
 from slugify import slugify
 from extensions import db 
 from models import ChatSession, ChatMessage, UserPreference
+import logging
+from datetime import timedelta
+from flask_jwt_extended import JWTManager
+from flask_jwt_extended import jwt_required
+from functools import wraps
+import threading
+
+
+
+# Set UTF-8 encoding for stdout
 import logging
 from datetime import timedelta
 from flask_jwt_extended import JWTManager
@@ -73,11 +85,42 @@ CORS(app, supports_credentials=True, resources={
     r"/build_index": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
     r"/health": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}
 })
+CORS(app, supports_credentials=True, resources={
+    r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
+    r"/query": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
+    r"/build_index": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
+    r"/health": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}
+})
 
 # Configure Flask to use UTF-8
 app.config['JSON_AS_ASCII'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
+# Configure JWT
+app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change this!
+app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
+app.config["JWT_COOKIE_SECURE"] = False  # Set True in production
+app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=15)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
+
+jwt = JWTManager(app)
+
+# Simplified RBAC - Only 2 roles: customer and admin
+def admin_only(fn):
+    """Admin-only access decorator"""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            verify_jwt_in_request()
+            identity = get_jwt_identity()
+            if identity.get('role') != 'admin':
+                return jsonify({'error': 'Admin access required'}), 403
+            return fn(*args, **kwargs)
+        except Exception as e:
+            return jsonify({'error': 'Authentication required'}), 401
+    return wrapper
 # Configure JWT
 app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change this!
 app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
@@ -127,6 +170,10 @@ db.init_app(app)  # <-- Use the imported db instance
 
 # Then initialize Flask-Migrate
 migrate = Migrate(app, db)
+
+# Chatbot globals
+_index_lock = threading.Lock()
+_emb_index = None
 
 # Chatbot globals
 _index_lock = threading.Lock()
@@ -202,8 +249,45 @@ def login():
     password = data.get('password', None)
 
     user = User.query.filter_by(email=email).first()
+ 
     if not user or user.password != password:
         return jsonify({'message': 'Invalid email or password'}), 401
+
+    #  tokens ------------------------------------------------------------------------------------------
+    access_token = create_access_token(identity={
+        'username': user.username, 
+        'role': user.role, 
+        'user_id': user.id,
+        'email': user.email
+    })
+    refresh_token = create_refresh_token(identity={
+        'username': user.username, 
+        'role': user.role, 
+        'user_id': user.id,
+        'email': user.email
+    })
+
+    # cookies ------------------------------------------------------------------------------------------
+    response = jsonify({'message': 'Login successful', 'user': user.to_dict()})
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
+    
+    return response, 200
+
+@app.route('/api/auth/refresh', methods=['POST'])
+@jwt_required(refresh=True)
+def refresh():
+    identity = get_jwt_identity()
+    access_token = create_access_token(identity=identity)
+    response = jsonify(access_token=access_token)
+    set_access_cookies(response, access_token)
+    return response, 200
+
+@app.route('/api/auth/logout', methods=['POST'])
+def logout():
+    response = jsonify({'message': 'Logout successful'})
+    unset_jwt_cookies(response)
+    return response, 200
 
     #  tokens ------------------------------------------------------------------------------------------
     access_token = create_access_token(identity={
@@ -256,12 +340,114 @@ def get_properties():
 
 @app.route('/api/locations', methods=['GET']) 
 @jwt_required()
+@jwt_required()
 def get_locations(): 
     locations = db.session.query(Property.Location).distinct().all() 
     unique_locations = [loc[0].strip() for loc in locations if loc[0] and loc[0].strip()] 
     unique_locations = sorted(set(unique_locations))
     return jsonify(unique_locations)
 
+#yaha se nearyou till.. 
+
+def has_properties_for_location(loc_name):
+    """Check if a location has any properties in the database."""
+    # Also check if the location is in the excluded list
+    if loc_name in EXCLUDED_NEAR_YOU_NODES:
+        return False
+    count = Property.query.filter(Property.Location.ilike(f'%{loc_name}%')).count()
+    return count > 0
+
+@app.route('/api/nearest-nodes/<string:location>', methods=['GET'])
+def get_nearest_nodes(location):
+    """Get 4 nearest nodes based on the primary location from ORDERED_AREAS.
+    Returns the location's position and 4 nearest nodes that have property data available.
+    Only includes nodes that actually have properties to display.
+    """
+    # Normalize the input location for matching
+    location_lower = location.lower().strip()
+    
+    # Find the index of the location in ORDERED_AREAS (case-insensitive partial match)
+    found_index = -1
+    for i, area in enumerate(ORDERED_AREAS):
+        if area.lower() == location_lower or location_lower in area.lower() or area.lower() in location_lower:
+            found_index = i
+            break
+    
+    # If location not found, find first 4 areas with properties as fallback
+    if found_index == -1:
+        nearest = []
+        for area in ORDERED_AREAS:
+            if has_properties_for_location(area):
+                nearest.append(area)
+                if len(nearest) >= 4:
+                    break
+        return jsonify({
+            'primaryLocation': location,
+            'foundInArray': False,
+            'nearestNodes': nearest
+        })
+    
+    # Calculate nearest nodes that have properties
+    total_areas = len(ORDERED_AREAS)
+    nearest = []
+    
+    # Use a spiral search pattern: alternate between before and after the found index
+    # to find nodes with properties
+    max_offset = total_areas
+    
+    for offset in range(1, max_offset):
+        if len(nearest) >= 4:
+            break
+        
+        # Try after
+        idx_after = found_index + offset
+        if idx_after < total_areas:
+            area = ORDERED_AREAS[idx_after]
+            if has_properties_for_location(area):
+                nearest.append(area)
+        
+        if len(nearest) >= 4:
+            break
+        
+        # Try before
+        idx_before = found_index - offset
+        if idx_before >= 0:
+            area = ORDERED_AREAS[idx_before]
+            if has_properties_for_location(area):
+                nearest.insert(0, area)  # Insert at beginning to maintain order
+    
+    nearest = nearest[:4]  # Ensure max 4 nodes
+    
+    return jsonify({
+        'primaryLocation': ORDERED_AREAS[found_index],
+        'foundInArray': True,
+        'primaryIndex': found_index,
+        'nearestNodes': nearest
+    })
+
+@app.route('/api/properties/multiple-locations', methods=['GET'])
+def get_properties_by_multiple_locations():
+    """Get properties from multiple locations.
+    Query param: locations (comma-separated list of location names)
+    """
+    locations_param = request.args.get('locations', '')
+    if not locations_param:
+        return jsonify([]), 200
+    
+    locations_list = [loc.strip() for loc in locations_param.split(',') if loc.strip()]
+    
+    # Query properties matching any of the locations
+    all_properties = []
+    for loc in locations_list:
+        properties = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
+        for prop in properties:
+            prop_dict = prop.to_dict()
+            if prop_dict not in all_properties:
+                all_properties.append(prop_dict)
+    
+    return jsonify(all_properties)
+
+# yaha tak nearyou. 
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
 # @jwt_required()
@@ -270,6 +456,7 @@ def get_property(id):
     return jsonify(property.to_dict())
 
 @app.route('/api/properties', methods=['POST'])
+@admin_only
 @admin_only
 def create_property():
     data = request.json
@@ -324,6 +511,7 @@ def get_builders():
 
 # New endpoint to fetch builder by company_name
 @app.route('/api/builders/name/<company_name>', methods=['GET'])
+@jwt_required()
 def get_builder_by_name(company_name):
     """
     Get builder by company name (case-insensitive, handles URL-encoded names)
@@ -419,6 +607,7 @@ def get_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders', methods=['POST'])
+@admin_only
 @admin_only
 def create_builder():
     try:
@@ -596,6 +785,7 @@ def _create_property_for_project(project, user_id, data):
 #-----------------STEP 1 ROUTING FETCHING DETAILS FROM FRONTEND AND PUSHING TO DATABASE------------------------
 @app.route('/api/builders/<rera_id>/projects/step1', methods=['POST'])
 @admin_only
+@admin_only
 def create_project_step1(rera_id):
     data = request.json
     title = data['title']
@@ -636,6 +826,7 @@ def create_project_step1(rera_id):
 
 @app.route('/api/builders/<rera_id>/projects/step2', methods=['POST'])
 @admin_only
+@admin_only
 def create_project_step2(rera_id):
     data = request.json
     project_id = data.get('project_id')
@@ -655,6 +846,7 @@ def create_project_step2(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step4', methods=['POST'])
+@admin_only
 @admin_only
 def create_project_step4(rera_id):
     # Handle both form data and JSON data
@@ -691,6 +883,7 @@ def create_project_step4(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step5', methods=['POST'])
+@admin_only
 @admin_only
 def create_project_step5(rera_id):
     data = request.json
@@ -847,6 +1040,7 @@ def update_project_step(rera_id, project_id):
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
 @admin_only
+@admin_only
 def delete_project(project_id):
     project = BuilderProject.query.get_or_404(project_id)
     db.session.delete(project)
@@ -858,6 +1052,7 @@ def delete_project(project_id):
 #----------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------
 @app.route('/api/admin/stats', methods=['GET'])
+@admin_only
 @admin_only
 def get_admin_stats():
     try:
@@ -937,6 +1132,7 @@ def get_admin_stats():
 #--------------------------------------------- USER MANAGEMENT ROUTES ---------------------------------------------
 @app.route('/api/users', methods=['GET'])
 @admin_only
+@admin_only
 def get_users():
     try:
         # Get the token from the Authorization header
@@ -962,6 +1158,7 @@ def get_users():
 
 @app.route('/api/users/<int:id>', methods=['GET'])
 @jwt_required()
+@jwt_required()
 def get_user(id):
     try:
         user = User.query.get_or_404(id)
@@ -984,6 +1181,7 @@ def get_builder_project_by_id(project_id):
     return jsonify(project.to_dict())
 
 @app.route('/api/users/<int:id>', methods=['PUT'])
+@admin_only
 @admin_only
 def update_user(id):
     try:
@@ -1018,6 +1216,7 @@ def update_user(id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/<int:id>', methods=['DELETE'])
+@admin_only
 @admin_only
 def delete_user(id):
     try:
@@ -1058,6 +1257,7 @@ def save_image(file):
 
 # API to create a blog (multipart/form-data)
 @app.route('/api/blogs', methods=['POST'])
+@admin_only
 @admin_only
 def create_blog():
     try:
@@ -1123,6 +1323,7 @@ def create_blog():
 # API to list all blogs (for admin dashboard)
 @app.route('/api/blogs', methods=['GET'])
 @jwt_required()
+@jwt_required()
 def list_blogs():
     blogs = Blog.query.order_by(Blog.created_at.desc()).all()
     print(f"Found {len(blogs)} blogs")
@@ -1133,12 +1334,14 @@ def list_blogs():
 # Get a single blog by ID
 @app.route('/api/blogs/<int:blog_id>', methods=['GET'])
 @jwt_required()
+@jwt_required()
 def get_blog(blog_id):
     blog = Blog.query.get_or_404(blog_id)
     return jsonify(blog.to_dict())
 
 # Get a single blog by slug
 @app.route('/api/blogs/slug/<slug>', methods=['GET'])
+@jwt_required()
 @jwt_required()
 def get_blog_by_slug(slug):
     print(f"Fetching blog with slug: {slug}")
@@ -1278,6 +1481,7 @@ def get_project_by_slug(slug):
 # 3. Redirect alias slugs to primary in /api/properties/slug/<slug>
 @app.route('/api/properties/slug/<slug>', methods=['GET'])
 @jwt_required()
+@jwt_required()
 def get_property_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='property').first()
     if not slug_entry:
@@ -1299,6 +1503,7 @@ def get_all_projects():
     return jsonify([p.to_dict() for p in projects])
 
 @app.route('/api/builders/<rera_id>/projects/upload-image', methods=['POST'])
+@admin_only
 @admin_only
 def upload_project_image(rera_id):
     print(f"Upload project image called with rera_id: {rera_id}")
@@ -1418,7 +1623,45 @@ def get_security_audit():
         security_logger.error(f"Error reading security audit: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+# Security audit endpoint for admins
+@app.route('/api/admin/security-audit', methods=['GET'])
+@admin_only
+def get_security_audit():
+    """Get recent security events for admin review"""
+    try:
+        # Read the last 100 lines from security.log
+        log_file = 'security.log'
+        if not os.path.exists(log_file):
+            return jsonify({'events': [], 'message': 'No security log found'})
+        
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+            # Get last 100 lines
+            recent_lines = lines[-100:] if len(lines) > 100 else lines
+        
+        events = []
+        for line in recent_lines:
+            if line.strip():
+                # Parse log line (basic parsing)
+                parts = line.split(' - ')
+                if len(parts) >= 4:
+                    events.append({
+                        'timestamp': parts[0],
+                        'logger': parts[1],
+                        'level': parts[2],
+                        'message': ' - '.join(parts[3:]).strip()
+                    })
+        
+        return jsonify({
+            'events': events,
+            'total_events': len(events)
+        })
+    except Exception as e:
+        security_logger.error(f"Error reading security audit: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/admin/latest-geolocation', methods=['GET'])
+@admin_only
 @admin_only
 def get_latest_geolocation():
     global latest_geolocation
@@ -1432,6 +1675,7 @@ def get_latest_geolocation():
 # ------------------------------------------------------- AI Blog Summarization -------------------------------------------------- ---
 
 @app.route('/api/blogs/<slug>/summary', methods=['GET'])
+@jwt_required()
 @jwt_required()
 def summarize_blog(slug):
     api_key = os.getenv('PERPLEXITY_API_KEY')
@@ -1694,6 +1938,7 @@ def _canonical_property_status(value: str) -> str:
 
 @app.route('/api/properties/filters', methods=['GET'])
 @jwt_required()
+@jwt_required()
 def get_filters():
     """Return unique filter options sourced from BuilderProject and Property tables.
     Includes amenities (normalized), property_status, project status, and derived society types.
@@ -1856,6 +2101,57 @@ def search_properties():
 
     # Return JSON
     return jsonify([p.to_dict() for p in results])
+
+
+
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok"}), 200
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")  # Set your actual Google Client ID here
+
+@app.route('/api/auth/google-signin', methods=['POST'])
+def google_signin():
+    data = request.json
+    id_token = data.get('id_token')
+    if not id_token:
+        return jsonify({'error': 'Missing id_token'}), 400
+
+    # Verify id_token with Google
+    resp = requests.get(
+        f"https://oauth2.googleapis.com/tokeninfo?id_token={id_token}"
+    )
+    if resp.status_code != 200:
+        return jsonify({'error': 'Invalid Google token'}), 401
+    info = resp.json()
+
+    # Client ID check - SECURITY (always verify this)
+    if info.get('aud') != GOOGLE_CLIENT_ID:
+        return jsonify({'error': 'Invalid Google client ID'}), 401
+
+    # User info from Google response
+    email = info.get('email')
+    username = info.get('name', email)
+
+    user = User.query.filter_by(email=email).first()
+    if not user:
+        user = User(
+            username=username,
+            email=email,
+            password='',  # No password needed for Google users
+            role='customer',
+            is_active=True,
+        )
+        db.session.add(user)
+        db.session.commit()
+    
+    access_token = create_access_token(identity={'username': user.username, 'role': user.role, 'user_id': user.id, 'email': user.email})
+    refresh_token = create_refresh_token(identity={'username': user.username, 'role': user.role, 'user_id': user.id, 'email': user.email})
+
+    response = jsonify({'message': 'Login successful', 'user': user.to_dict()})
+    set_access_cookies(response, access_token)
+    set_refresh_cookies(response, refresh_token)
+    return response, 200
 
 
 

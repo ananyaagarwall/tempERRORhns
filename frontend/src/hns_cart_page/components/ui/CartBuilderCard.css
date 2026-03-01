@@ -1,0 +1,72 @@
+/* CartBuilderCard.css */
+
+.cart-builder-card {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.cart-builder-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(34,58,95,0.25), 0 4px 12px rgba(34,58,95,0.15);
+}
+
+.cart-builder-remove-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 30;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  color: #dc2626;
+}
+
+.cart-builder-remove-button:hover {
+  transform: scale(1.1);
+  background: rgba(255, 255, 255, 1);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  color: #b91c1c;
+}
+
+.cart-builder-remove-button:active {
+  transform: scale(0.95);
+}
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .cart-builder-remove-button {
+    width: 36px;
+    height: 36px;
+    top: 10px;
+    right: 10px;
+  }
+  
+  .cart-builder-remove-button svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .cart-builder-remove-button {
+    width: 32px;
+    height: 32px;
+    top: 8px;
+    right: 8px;
+  }
+  
+  .cart-builder-remove-button svg {
+    width: 16px;
+    height: 16px;
+  }
+}

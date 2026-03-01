@@ -8,8 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "backend": "cd backend && python app.py",
-    "start": "concurrently \"npm run dev\" \"npm run backend\""
+    "start": "vite"
   },
   "dependencies": {
     "@fontsource/abril-fatface": "^4.5.9",
@@ -77,12 +76,12 @@
     "@types/node": "^20.10.5",
     "@types/react": "^18.2.45",
     "@types/react-dom": "^18.2.18",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "@typescript-eslint/parser": "^6.15.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.2",
-    "eslint": "^8.56.0",
+    "eslint": "^9.39.3",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.5",
     "globals": "^13.24.0",
@@ -90,5 +89,13 @@
     "tailwindcss": "^4.1.13",
     "typescript": "^5.3.3",
     "vite": "^6.3.6"
+  },
+  "overrides": {
+    "eslint": "^9.39.3"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-linux-x64-gnu": "*",
+    "@esbuild/linux-x64": "*",
+    "lightningcss-linux-x64-gnu": "*"
   }
 }
