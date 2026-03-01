@@ -30,7 +30,8 @@ const LandingPage = () => {
       setGeoStatus('Requesting location permission...');
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setGeoStatus('Location permission granted. Sending coordinates...');
+          // Hide banner once user has responded to permission prompt.
+          setGeoStatus('');
           const { latitude, longitude } = position.coords;
           fetch('http://localhost:5000/api/geolocation', {
             method: 'POST',
@@ -39,7 +40,6 @@ const LandingPage = () => {
           })
             .then((res) => res.json())
             .then((data) => {
-              setGeoStatus('Coordinates sent! ' + (data.message || ''));
               // Extract district/location from response
               if (data.received && data.received.district) {
                 setUserLocation(data.received.district);
@@ -48,12 +48,15 @@ const LandingPage = () => {
                 setUserLocation(data.received.full_address);
               }
             })
-            .catch(() => setGeoStatus('Failed to send coordinates.'));
+            .catch(() => {});
         },
-        () => setGeoStatus('Location permission denied or unavailable.')
+        () => {
+          // Hide banner if permission denied/unavailable.
+          setGeoStatus('');
+        }
       );
     } else {
-      setGeoStatus('Geolocation is not supported by your browser.');
+      setGeoStatus('');
     }
 
     // Filter event from header/search bar
@@ -89,7 +92,7 @@ const LandingPage = () => {
 
   return (
     <div className="landing-page-container">
-      {/* Geolocation status */}
+      {/* Show only while permission prompt is pending */}
       {geoStatus && (
         <div
           style={{
