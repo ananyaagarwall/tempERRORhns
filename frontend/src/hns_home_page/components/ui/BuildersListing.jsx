@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React, { useState, useEffect } from 'react';
 import { Search, Building2, MapPin, Award, CheckCircle, Calendar, ExternalLink, Phone, Mail, Heart } from 'lucide-react';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
@@ -23,7 +24,7 @@ const BuildersListing = () => {
       setLoading(true);
       const token = localStorage.getItem('token');
       
-      const response = await fetch('http://127.0.0.1:5000/api/builders', {
+      const response = await fetch(`${API_BASE_URL}/api/builders`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React from 'react';
 
 const MobileIntro = ({ blog }) => {
@@ -6,7 +7,7 @@ const MobileIntro = ({ blog }) => {
       <div className="text-sm text-gray-700 text-left">
         {blog.featured_image && (
           <img
-            src={`http://localhost:5000/uploads/${blog.featured_image}`}
+            src={`${API_BASE_URL}/uploads/${blog.featured_image}`}
             alt={blog.featured_image_alt || blog.title}
             className="w-full object-cover rounded-lg mb-2"
             onError={(e) => {

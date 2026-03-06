@@ -1,4 +1,6 @@
-const API_URL = 'http://localhost:5000/api';
+import API_BASE_URL from '../config';
+
+const API_URL = `${API_BASE_URL}/api`;
 
 export const fetchBuilderProjectById = async (id) => {
     try {
@@ -51,13 +53,13 @@ export const fetchBuilders = async (location = '') => {
     try {
         const params = new URLSearchParams();
         if (location) params.append('location', location);
-        
+
         const response = await fetch(`${API_URL}/builders${location ? `?${params.toString()}` : ''}`, {
             headers: {
                 'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
             }
         });
-        
+
         if (!response.ok) throw new Error('Failed to fetch builders');
         return await response.json();
     } catch (error) {

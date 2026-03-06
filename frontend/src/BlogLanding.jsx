@@ -1,3 +1,4 @@
+import API_BASE_URL from './config';
 import React, { useEffect, useState, useRef } from 'react';
 import { fetchBlogs } from '../services/api';
 import { Link } from 'react-router-dom';
@@ -315,7 +316,7 @@ const BlogLanding = () => {
                   <div className="relative">
                     <div className="relative w-full h-52 overflow-hidden rounded-t-2xl">
                       <img
-                        src={blog.featured_image ? `http://localhost:5000/uploads/${blog.featured_image}` : 'https://via.placeholder.com/600x400?text=No+Image'}
+                        src={blog.featured_image ? `${API_BASE_URL}/uploads/${blog.featured_image}` : 'https://via.placeholder.com/600x400?text=No+Image'}
                         alt={blog.featured_image_alt || blog.title}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-125 shadow-lg"
                       />

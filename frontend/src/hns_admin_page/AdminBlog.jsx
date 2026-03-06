@@ -1,3 +1,4 @@
+import API_BASE_URL from '../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -39,7 +40,7 @@ const AdminBlog = () => {
     featuredImage: null
   });
 
-  const FLASK_API_URL = 'http://localhost:5000/api';
+  const FLASK_API_URL = `${API_BASE_URL}/api`;
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -140,10 +141,10 @@ const AdminBlog = () => {
         featuredImageAlt: editingBlog.featured_image_alt || ''
       });
       setImagePreview({
-        image1: editingBlog.image1 ? `http://localhost:5000/uploads/${editingBlog.image1}` : null,
-        image2: editingBlog.image2 ? `http://localhost:5000/uploads/${editingBlog.image2}` : null,
-        image3: editingBlog.image3 ? `http://localhost:5000/uploads/${editingBlog.image3}` : null,
-        featuredImage: editingBlog.featured_image ? `http://localhost:5000/uploads/${editingBlog.featured_image}` : null
+        image1: editingBlog.image1 ? `${API_BASE_URL}/uploads/${editingBlog.image1}` : null,
+        image2: editingBlog.image2 ? `${API_BASE_URL}/uploads/${editingBlog.image2}` : null,
+        image3: editingBlog.image3 ? `${API_BASE_URL}/uploads/${editingBlog.image3}` : null,
+        featuredImage: editingBlog.featured_image ? `${API_BASE_URL}/uploads/${editingBlog.featured_image}` : null
       });
     }
   }, [editingBlog]);

@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React from "react";
 import { Link } from "react-router-dom";
 import "../../blog_page_css/Latestblog.css";
@@ -19,7 +20,7 @@ const LatestBlog = ({ filteredBlogs }) => {
                   <img
                     src={
                       filteredBlogs[0].featured_image
-                        ? `http://localhost:5000/uploads/${filteredBlogs[0].featured_image}`
+                        ? `${API_BASE_URL}/uploads/${filteredBlogs[0].featured_image}`
                         : "/news.jpg"
                     }
                     alt={filteredBlogs[0].featured_image_alt || filteredBlogs[0].title}
@@ -54,7 +55,7 @@ const LatestBlog = ({ filteredBlogs }) => {
                 <img
                   src={
                     blog.featured_image
-                      ? `http://localhost:5000/uploads/${blog.featured_image}`
+                      ? `${API_BASE_URL}/uploads/${blog.featured_image}`
                       : "/news.jpg"
                   }
                   alt={blog.featured_image_alt || blog.title}

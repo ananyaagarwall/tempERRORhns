@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../config';
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
@@ -36,13 +37,13 @@ const BlogDetail = () => {
 
   useEffect(() => {
     setLoading(true);
-    axios.get(`http://localhost:5000/api/blogs`).then(res => {
+    axios.get(`${API_BASE_URL}/api/blogs`).then(res => {
       const found = res.data.find(b => b.slug === slug);
       if (found) {
         setBlog(found);
         setNotFound(false);
         // Fetch AI summary (optional - don't fail if API is down)
-        axios.get(`http://localhost:5000/api/blogs/${slug}/summary`).then(summaryRes => {
+        axios.get(`${API_BASE_URL}/api/blogs/${slug}/summary`).then(summaryRes => {
           setAiSummary(summaryRes.data.summary || '');
         }).catch((err) => {
           console.log('AI summary not available:', err.message);

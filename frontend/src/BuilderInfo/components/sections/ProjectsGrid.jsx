@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React, { useState, useRef, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
@@ -11,11 +12,10 @@ const ProjectCard = ({ status = 'Ready-to-move', title, image, project, onHeartC
         e.stopPropagation();
         onHeartClick(project);
       }}
-      className={`absolute top-2 right-2 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-300 ${
-        isInCart
+      className={`absolute top-2 right-2 z-10 p-2 rounded-full backdrop-blur-md transition-all duration-300 ${isInCart
           ? 'bg-red-500 text-white shadow-lg'
           : 'bg-white/90 text-gray-600 hover:bg-red-50 hover:text-red-500'
-      }`}
+        }`}
       aria-label={isInCart ? 'Remove from cart' : 'Add to cart'}
     >
       <Heart
@@ -44,7 +44,7 @@ const ProjectCard = ({ status = 'Ready-to-move', title, image, project, onHeartC
 const withBackendOrigin = (path) => {
   if (!path) return '';
   if (path.startsWith('http')) return path;
-  return `http://localhost:5000${path.startsWith('/') ? path : `/${path}`}`;
+  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
 };
 
 const normalizeUrl = (url) => {
@@ -84,7 +84,7 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const { addToCart, removeFromCart, isInCart } = useCart();
 
   useEffect(() => {
@@ -200,9 +200,9 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
             const image = pickProjectImage(p);
             return (
               <div key={p.id} className="w-[240px] xs:w-[260px] sm:w-60 md:w-72 flex-shrink-0 my-1">
-                <ProjectCard 
-                  title={p.title} 
-                  status={p.status || 'Ready-to-move'} 
+                <ProjectCard
+                  title={p.title}
+                  status={p.status || 'Ready-to-move'}
                   image={image}
                   project={p}
                   onHeartClick={handleHeartClick}

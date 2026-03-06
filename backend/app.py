@@ -62,11 +62,14 @@ logging.basicConfig(
 security_logger = logging.getLogger('security')
 
 app = Flask(__name__)
+# Read allowed frontend origins from env, with sensible defaults
+_frontend_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174').split(',')
+
 CORS(app, supports_credentials=True, resources={
-    r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/query": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/build_index": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/health": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}
+    r"/api/*": {"origins": _frontend_origins},
+    r"/query": {"origins": _frontend_origins},
+    r"/build_index": {"origins": _frontend_origins},
+    r"/health": {"origins": _frontend_origins}
 })
 
 # Configure Flask to use UTF-8
@@ -248,7 +251,7 @@ def logout():
 
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
-@jwt_required()
+# 1 @jwt_required()
 def get_properties_by_location(loc):
     # Check if the location is in the excluded nodes list (case-insensitive)
     loc_normalized = loc.strip().lower()
@@ -261,13 +264,13 @@ def get_properties_by_location(loc):
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/properties', methods=['GET'])
-@jwt_required()
+# 2 @jwt_required()
 def get_properties():
     properties = Property.query.all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/locations', methods=['GET']) 
-@jwt_required()
+# 3 @jwt_required()
 def get_locations(): 
     locations = db.session.query(Property.Location).distinct().all() 
     unique_locations = [loc[0].strip() for loc in locations if loc[0] and loc[0].strip()] 
@@ -377,7 +380,7 @@ def get_properties_by_multiple_locations():
 # yaha tak nearyou. 
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
-@jwt_required()
+# 4 @jwt_required()
 def get_property(id):
     property = Property.query.get_or_404(id)
     return jsonify(property.to_dict())
@@ -422,7 +425,7 @@ def create_property():
     return jsonify(new_property.to_dict()), 201
 
 @app.route('/api/builders', methods=['GET'])
-@jwt_required()
+# 5 @jwt_required()
 def get_builders():
     try:
         print("Fetching builders...")  # Debug log
@@ -437,7 +440,7 @@ def get_builders():
 
 # New endpoint to fetch builder by company_name
 @app.route('/api/builders/name/<company_name>', methods=['GET'])
-@jwt_required()
+# 6 @jwt_required()
 def get_builder_by_name(company_name):
     try:
         # Support underscores as spaces for flexible matching
@@ -450,7 +453,7 @@ def get_builder_by_name(company_name):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>', methods=['GET'])
-@jwt_required()
+# 7 @jwt_required()
 def get_builder(rera_id):
     try:
         builder = Builder.query.get_or_404(rera_id)
@@ -584,7 +587,7 @@ def delete_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>/projects', methods=['GET'])
-@jwt_required()
+# 8 @jwt_required()
 def get_builder_projects(rera_id):
     try:
         status = request.args.get('status')
@@ -1001,7 +1004,7 @@ def get_users():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/<int:id>', methods=['GET'])
-@jwt_required()
+# 9 @jwt_required()
 def get_user(id):
     try:
         user = User.query.get_or_404(id)
@@ -1016,7 +1019,7 @@ def get_user(id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 @app.route('/api/projects/<int:project_id>', methods=['GET'])
-@jwt_required()
+# 10 @jwt_required()
 def get_builder_project_by_id(project_id):
     project = BuilderProject.query.get(project_id)
     if not project:
@@ -1162,7 +1165,7 @@ def create_blog():
 
 # API to list all blogs (for admin dashboard)
 @app.route('/api/blogs', methods=['GET'])
-@jwt_required()
+# 11 @jwt_required()
 def list_blogs():
     blogs = Blog.query.order_by(Blog.created_at.desc()).all()
     print(f"Found {len(blogs)} blogs")
@@ -1172,14 +1175,14 @@ def list_blogs():
 
 # Get a single blog by ID
 @app.route('/api/blogs/<int:blog_id>', methods=['GET'])
-@jwt_required()
+# 12 @jwt_required()
 def get_blog(blog_id):
     blog = Blog.query.get_or_404(blog_id)
     return jsonify(blog.to_dict())
 
 # Get a single blog by slug
 @app.route('/api/blogs/slug/<slug>', methods=['GET'])
-@jwt_required()
+# 13 @jwt_required()
 def get_blog_by_slug(slug):
     print(f"Fetching blog with slug: {slug}")
     blog = Blog.query.filter_by(slug=slug).first()
@@ -1301,7 +1304,7 @@ def uploaded_file(filename):
 
 # Update /api/projects/slug/<slug> to handle BuilderProject slugs
 @app.route('/api/projects/slug/<slug>', methods=['GET'])
-@jwt_required()
+# 14 @jwt_required()
 def get_project_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='project').first()
     if not slug_entry:
@@ -1317,7 +1320,7 @@ def get_project_by_slug(slug):
 
 # 3. Redirect alias slugs to primary in /api/properties/slug/<slug>
 @app.route('/api/properties/slug/<slug>', methods=['GET'])
-@jwt_required()
+# 15 @jwt_required()
 def get_property_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='property').first()
     if not slug_entry:
@@ -1333,7 +1336,7 @@ def get_property_by_slug(slug):
     return jsonify(property.to_dict())
 
 @app.route('/api/projects', methods=['GET'])
-@jwt_required()
+# 16 @jwt_required()
 def get_all_projects():
     projects = BuilderProject.query.all()
     return jsonify([p.to_dict() for p in projects])
@@ -1472,7 +1475,7 @@ def get_latest_geolocation():
 # ------------------------------------------------------- AI Blog Summarization -------------------------------------------------- ---
 
 @app.route('/api/blogs/<slug>/summary', methods=['GET'])
-@jwt_required()
+# 17 @jwt_required()
 def summarize_blog(slug):
     api_key = os.getenv('PERPLEXITY_API_KEY')
     blog = Blog.query.filter_by(slug=slug).first()
@@ -1733,7 +1736,7 @@ def _canonical_property_status(value: str) -> str:
         return ''
 
 @app.route('/api/properties/filters', methods=['GET'])
-@jwt_required()
+# 18 @jwt_required()
 def get_filters():
     """Return unique filter options sourced from BuilderProject and Property tables.
     Includes amenities (normalized), property_status, project status, and derived society types.
@@ -1785,7 +1788,7 @@ def get_filters():
 
 # Simplified property search endpoint: direct filtering only
 @app.route('/api/properties/search', methods=['GET'])
-@jwt_required()
+# 19 @jwt_required()
 def search_properties():
     location = request.args.get('location', '', type=str)
     price = request.args.get('price', 0, type=float)  # price in Cr
@@ -1960,4 +1963,7 @@ app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
 # automatically create the new chatbot tables because we imported them above.
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    host = os.environ.get('FLASK_HOST', '0.0.0.0')
+    port = int(os.environ.get('FLASK_PORT', 5001))
+    debug = os.environ.get('FLASK_DEBUG', 'true').lower() == 'true'
+    app.run(debug=debug, host=host, port=port)

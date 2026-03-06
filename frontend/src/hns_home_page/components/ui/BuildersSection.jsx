@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../home_page_css/BuildersSection.css";
@@ -42,7 +43,7 @@ const BuildersSection = ({ searchFilters }) => {
       setLoading(true);
       try {
         const res = await fetch(
-          `http://127.0.0.1:5000/api/properties/location/${activeTab}`
+          `${API_BASE_URL}/api/properties/location/${activeTab}`
         );
         const data = await res.json();
         // Add Existing_Configurations to mapped data

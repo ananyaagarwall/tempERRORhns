@@ -1,3 +1,4 @@
+import API_BASE_URL from '../config';
 import React, { useEffect, useState } from 'react';
 
 const GeoLocation = () => {
@@ -12,7 +13,7 @@ const GeoLocation = () => {
   const fetchGeo = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5000/api/admin/latest-geolocation');
+      const res = await fetch(`${API_BASE_URL}/api/admin/latest-geolocation`);
       if (res.ok) {
         const data = await res.json();
         setGeo(data);

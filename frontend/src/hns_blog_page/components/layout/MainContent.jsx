@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React from 'react';
 import '../../blog_page_css/MainContent.css';
 
@@ -8,7 +9,7 @@ const MainContent = ({ blog }) => {
       <div className="intro-section">
         {blog.featured_image && (
           <img
-            src={`http://localhost:5000/uploads/${blog.featured_image}`}
+            src={`${API_BASE_URL}/uploads/${blog.featured_image}`}
             alt={blog.featured_image_alt || blog.title}
             className="intro-image"
             onError={(e) => {
@@ -23,7 +24,7 @@ const MainContent = ({ blog }) => {
       {blog.content1 && <p className="section-content">{blog.content1}</p>}
       {blog.image1 && (
         <img
-          src={`http://localhost:5000/uploads/${blog.image1}`}
+          src={`${API_BASE_URL}/uploads/${blog.image1}`}
           alt={blog.alt_text1 || ''}
           className="content-image"
           onError={(e) => {
@@ -36,7 +37,7 @@ const MainContent = ({ blog }) => {
       {blog.content2 && <p className="section-content">{blog.content2}</p>}
       {blog.image2 && (
         <img
-          src={`http://localhost:5000/uploads/${blog.image2}`}
+          src={`${API_BASE_URL}/uploads/${blog.image2}`}
           alt={blog.alt_text2 || ''}
           className="content-image"
           onError={(e) => {
@@ -49,7 +50,7 @@ const MainContent = ({ blog }) => {
       {blog.content3 && <p className="section-content">{blog.content3}</p>}
       {blog.image3 && (
         <img
-          src={`http://localhost:5000/uploads/${blog.image3}`}
+          src={`${API_BASE_URL}/uploads/${blog.image3}`}
           alt={blog.alt_text3 || ''}
           className="content-image"
           onError={(e) => {
