@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import hashlib
 from datetime import datetime
 from enum import Enum
 from collections import Counter
@@ -21,7 +22,46 @@ load_dotenv()
 print("📂 Vector store: PostgreSQL (pgvector)")
 
 # --- 2. EMBEDDINGS SETUP ---
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+HF_MODEL_NAME = os.getenv("HF_EMBED_MODEL", "all-MiniLM-L6-v2")
+HF_LOCAL_ONLY = os.getenv("HF_LOCAL_FILES_ONLY", "true").lower() in ("1", "true", "yes", "on")
+FALLBACK_EMBED_DIM = int(os.getenv("FALLBACK_EMBED_DIM", "384"))
+
+
+class LocalFallbackEmbeddings:
+    """
+    Lightweight deterministic embedding fallback for offline/startup resilience.
+    """
+    def __init__(self, dim=384):
+        self.dim = dim
+
+    def _embed(self, text):
+        seed = hashlib.sha256((text or "").encode("utf-8")).digest()
+        values = []
+
+        while len(values) < self.dim:
+            seed = hashlib.sha256(seed).digest()
+            for i in range(0, len(seed), 4):
+                chunk = seed[i:i + 4]
+                if len(chunk) < 4:
+                    continue
+                raw = int.from_bytes(chunk, "big", signed=False) / 4294967295.0
+                values.append((raw * 2.0) - 1.0)
+                if len(values) >= self.dim:
+                    break
+
+        norm = sum(v * v for v in values) ** 0.5
+        if norm > 0:
+            values = [v / norm for v in values]
+        return values
+
+    def embed_documents(self, texts):
+        return [self._embed(text) for text in texts]
+
+    def embed_query(self, text):
+        return self._embed(text)
+
+
+embeddings = None
 
 # --- 3. PGVECTOR STORE SETUP ---
 # Requires the 'vector' extension in your Postgres DB:
@@ -29,12 +69,46 @@ embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 PG_CONNECTION_STRING = os.getenv("DATABASE_URL", "postgresql://localhost/hns_db")
 COLLECTION_NAME = "real_estate_unified"
 
-vectorstore = PGVector(
-    embeddings=embeddings,
-    collection_name=COLLECTION_NAME,
-    connection=PG_CONNECTION_STRING,
-    use_jsonb=True,
-)
+_vectorstore = None
+_vectorstore_lock = threading.Lock()
+
+
+def _create_embeddings():
+    """Create HF embeddings, with offline/local-first + deterministic fallback."""
+    model_kwargs = {}
+    if HF_LOCAL_ONLY:
+        model_kwargs["local_files_only"] = True
+
+    try:
+        return HuggingFaceEmbeddings(model_name=HF_MODEL_NAME, model_kwargs=model_kwargs)
+    except Exception as e:
+        print(f"Embedding model load failed ({e}). Using local deterministic fallback embeddings.")
+        return LocalFallbackEmbeddings(dim=FALLBACK_EMBED_DIM)
+
+
+def get_vectorstore():
+    """Lazy PGVector initialization to prevent import-time startup failures."""
+    global _vectorstore, embeddings
+    if _vectorstore is None:
+        with _vectorstore_lock:
+            if _vectorstore is None:
+                embeddings = _create_embeddings()
+                _vectorstore = PGVector(
+                    embeddings=embeddings,
+                    collection_name=COLLECTION_NAME,
+                    connection=PG_CONNECTION_STRING,
+                    use_jsonb=True,
+                )
+    return _vectorstore
+
+
+class _LazyVectorStore:
+    """Proxy that initializes PGVector only on first use."""
+    def __getattr__(self, item):
+        return getattr(get_vectorstore(), item)
+
+
+vectorstore = _LazyVectorStore()
 
 
 # ============================================

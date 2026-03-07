@@ -65,7 +65,7 @@ const SearchByFilter = () => {
       <div className="h-3 xs:h-4 sm:h-6"></div>
 
       {/* Custom CSS for text-xxs */}
-      <style jsx>{`
+      <style>{`
         .text-xxs {
           font-size: 0.65rem;
           line-height: 0.9rem;

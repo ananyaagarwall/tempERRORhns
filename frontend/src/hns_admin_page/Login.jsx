@@ -159,7 +159,7 @@ const Login = () => {
                 </div>
             </div>
             {/* New background styles for pastel waves */}
-            <style jsx global>{`
+            <style>{`
                 .min-h-screen.overflow-hidden::before,
                 .min-h-screen.overflow-hidden::after {
                     content: '';

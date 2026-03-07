@@ -381,19 +381,6 @@ useEffect(() => {
   }}
 >
 
-      {/* Overlay */}
-      <div 
-        className="absolute bg-gradient-to-r from-[#16386d] to-[rgba(0,0,0,0.1)] z-0"
-        style={isMobile ? {
-          top: 0,
-          left: 0,
-          right: 0,
-          height: '60vh',
-        } : {
-          inset: 0,
-        }}
-      />
-
       {/* Main Navbar */}
      {!(isMobile && showMenu) && (
     <nav

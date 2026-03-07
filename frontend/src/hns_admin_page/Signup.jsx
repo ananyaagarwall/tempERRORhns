@@ -178,7 +178,7 @@ const Signup = () => {
                 </div>
             </div>
 
-            <style jsx global>{`
+            <style>{`
                 .min-h-screen.overflow-hidden::before,
                 .min-h-screen.overflow-hidden::after {
                     content: '';

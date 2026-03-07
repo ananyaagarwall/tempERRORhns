@@ -79,12 +79,51 @@ logging.basicConfig(
 security_logger = logging.getLogger('security')
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True, resources={
-    r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/query": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/build_index": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/health": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}
-})
+
+LOCAL_DEV_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
+
+# Allow localhost/127.0.0.1 on any port for development.
+LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+CORS(
+    app,
+    supports_credentials=True,
+    resources={
+        r"/api/*": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/query": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/build_index": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/health": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+    },
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
+
+@app.after_request
+def add_local_dev_cors_headers(response):
+    """
+    Safety net for local development: ensure CORS headers are present even on
+    framework-generated error/redirect responses.
+    """
+    origin = request.headers.get("Origin")
+    if origin and (
+        origin in LOCAL_DEV_ORIGINS
+        or origin.startswith("http://localhost:")
+        or origin.startswith("http://127.0.0.1:")
+    ):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    return response
 
 # Configure Flask to use UTF-8
 app.config['JSON_AS_ASCII'] = False
