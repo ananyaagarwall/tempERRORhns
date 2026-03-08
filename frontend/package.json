@@ -11,6 +11,7 @@
     "start": "vite"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.3",
     "@fontsource/abril-fatface": "^4.5.9",
     "@fontsource/red-hat-display": "^4.5.9",
     "@fontsource/red-hat-mono": "^4.5.9",
@@ -94,8 +95,8 @@
     "eslint": "^9.39.3"
   },
   "optionalDependencies": {
-    "@rollup/rollup-linux-x64-gnu": "*",
     "@esbuild/linux-x64": "*",
+    "@rollup/rollup-linux-x64-gnu": "*",
     "lightningcss-linux-x64-gnu": "*"
   }
 }

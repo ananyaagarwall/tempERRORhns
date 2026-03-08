@@ -1,5 +1,6 @@
 import React, { createContext, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { SignedIn, SignedOut, RedirectToSignIn, useUser } from '@clerk/clerk-react';
 import { CartProvider } from './hns_cart_page/js/CartContent'; // Import CartProvider
 import Navbar from './hns_admin_page/Navbar';
 import Login from './hns_admin_page/Login';
@@ -32,18 +33,29 @@ import BuildersListing from './hns_home_page/components/ui/BuildersListing';
 export const ChatbotContext = createContext();
 
 const ProtectedRoute = ({ children }) => {
-  const user = JSON.parse(localStorage.getItem('user'));
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-  return children;
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
+  );
 };
 
 const AdminRoute = ({ children }) => {
-  const user = JSON.parse(localStorage.getItem('user'));
-  if (!user || user.role !== 'admin') {
+  const { user, isLoaded } = useUser();
+  
+  if (!isLoaded) return <div>Loading...</div>;
+  
+  // Assuming the admin has a specific email address like 'admin@gmail.com'
+  // Or checking against `user.publicMetadata.role === 'admin'` if configured in Clerk.
+  const isAdmin = user?.primaryEmailAddress?.emailAddress === 'admin@gmail.com';
+  
+  if (!user || !isAdmin) {
     return <Navigate to="/" />;
   }
+  
   return children;
 };
 
@@ -54,8 +66,8 @@ function App() {
     <CartProvider>
       <ChatbotContext.Provider value={{ isChatbotOpen, setIsChatbotOpen }}>
         <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route path="/login/*" element={<Login />} />
+          <Route path="/signup/*" element={<Signup />} />
           <Route
             path="/builder-dashboard"
             element={

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { FaSearch, FaBars, FaTimes, FaHome, FaBuilding, FaRegFileAlt, FaEnvelope, FaUser, FaUserCircle, FaRegUserCircle } from 'react-icons/fa';
 import headerBg from '../../../assets/Header.img1.gradient1.png'; 
 import { Link, useNavigate } from 'react-router-dom';
+import { SignedIn, SignedOut, UserButton, useUser, SignInButton } from '@clerk/clerk-react';
 import '../../home_page_css/HeaderSection.css'; 
 
 const HeaderSection = () => {
@@ -11,7 +12,7 @@ const HeaderSection = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const navigate = useNavigate();
   // const [activeMenu, setActiveMenu] = useState('Projects');
-  const [user, setUser] = useState(null);
+  const { user } = useUser();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   // Price slider state (single slider for max price)
   const [priceRange, setPriceRange] = useState(0); // 0 means "All Range"
@@ -439,9 +440,16 @@ useEffect(() => {
              <Link to="/about" className="nav-link" style={{ 
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>About Us</Link>
-              <Link to="/login" className="nav-link" style={{ 
-                fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
-              }}><FaRegUserCircle size={22} /></Link>
+              <SignedOut>
+                <Link to="/login" className="nav-link" style={{ 
+                  fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
+                }}><FaRegUserCircle size={22} /></Link>
+              </SignedOut>
+              <SignedIn>
+                <div style={{ marginLeft: '4px', display: 'flex' }}>
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              </SignedIn>
               </div>
           )}
 
@@ -541,17 +549,24 @@ useEffect(() => {
               &times;
             </button>
             <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, marginTop: 2 }}>
-              <FaUserCircle size={36} color="#fff" className="user-avatar" style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%' }} />
+              <SignedIn>
+                <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              </SignedIn>
+              <SignedOut>
+                <FaUserCircle size={36} color="#fff" className="user-avatar" style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%' }} />
+              </SignedOut>
               <div>
                 <div className="user-name" style={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', marginBottom: 1 }}>
-                  {user ? `Hi, ${user.name}` : 'Welcome Guest'}
+                  {user ? `Hi, ${user.firstName || user.username || 'User'}` : 'Welcome Guest'}
                 </div>
                 <div className="user-status" style={{ color: '#eaf1ff', fontWeight: 500, fontSize: '0.92rem' }}>
                   {user ? <span>Profile &bull; <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>Manage Profile</span></span> : 'Guest Profile'}
                 </div>
               </div>
             </div>
-            {!user && (
+            <SignedOut>
               <Link 
                 to="/login" 
                 onClick={toggleMenu}
@@ -578,7 +593,7 @@ useEffect(() => {
               >
                 Login / Signup
               </Link>
-            )}
+            </SignedOut>
           </div>
           
       {/* Action cards */}

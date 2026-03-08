@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { FaBars, FaTimes, FaUserCircle, FaRegUserCircle, FaShoppingCart } from 'react-icons/fa'; // ← Added FaShoppingCart
 import { MdTravelExplore, MdHome, MdBusiness, MdArticle } from 'react-icons/md';
 import { Link } from 'react-router-dom';
+import { SignedIn, SignedOut, UserButton, useUser, SignInButton } from '@clerk/clerk-react';
 import "../../home_page_css/FooterNavBar.css";
 
 const FooterNavBar = ({ sticky = false }) => {
   const [showMenu, setShowMenu] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const [user] = useState(null);
+  const { user } = useUser();
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
@@ -62,13 +63,20 @@ const FooterNavBar = ({ sticky = false }) => {
             </Link>
             <Link to="/blogs" className="footer-nav-link">Blogs</Link>
             <Link to="/about" className="footer-nav-link">About Us</Link>
-            <Link 
-              to="/login" 
-              className="footer-nav-link" 
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <FaRegUserCircle size={22} />
-            </Link>
+            <SignedOut>
+              <Link 
+                to="/login" 
+                className="footer-nav-link" 
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <FaRegUserCircle size={22} />
+              </Link>
+            </SignedOut>
+            <SignedIn>
+              <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
+                <UserButton afterSignOutUrl="/" />
+              </div>
+            </SignedIn>
           </nav>
         )}
 
@@ -100,10 +108,17 @@ const FooterNavBar = ({ sticky = false }) => {
               &times;
             </button>
             <div className="user-info-container">
-              <FaUserCircle size={36} color="#fff" className="user-icon" />
+              <SignedIn>
+                <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
+                   <UserButton afterSignOutUrl="/" />
+                </div>
+              </SignedIn>
+              <SignedOut>
+                <FaUserCircle size={36} color="#fff" className="user-icon" />
+              </SignedOut>
               <div>
                 <div className="user-name">
-                  {user ? `Hi, ${user.name}` : 'Welcome Guest'}
+                  {user ? `Hi, ${user.firstName || user.username || 'User'}` : 'Welcome Guest'}
                 </div>
                 <div className="user-status">
                   {user ? (
@@ -114,15 +129,16 @@ const FooterNavBar = ({ sticky = false }) => {
                 </div>
               </div>
             </div>
-            {!user && (
+            <SignedOut>
               <Link 
                 to="/login" 
                 className="login-button" 
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={() => setShowMenu(false)}
               >
-                <FaRegUserCircle size={24} />
+                <FaRegUserCircle size={24} style={{ marginRight: '8px' }} /> Login / Signup
               </Link>
-            )}
+            </SignedOut>
           </div>
 
           {/* Action cards - Now includes Cart */}

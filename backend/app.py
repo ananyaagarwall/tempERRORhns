@@ -129,56 +129,46 @@ def add_local_dev_cors_headers(response):
 app.config['JSON_AS_ASCII'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
-# Configure JWT
-app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change this!
-app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_COOKIE_SECURE"] = False  # Set True in production
-app.config["JWT_COOKIE_SAMESITE"] = "Lax"
-app.config["JWT_COOKIE_CSRF_PROTECT"] = False
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=15)
-app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
+# Configure Clerk Auth
+CLERK_SECRET_KEY = os.getenv('CLERK_SECRET_KEY')
 
-jwt = JWTManager(app)
-
-# Simplified RBAC - Only 2 roles: customer and admin
-def admin_only(fn):
-    """Admin-only access decorator"""
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
+def clerk_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            return jsonify({"message": "Token is missing"}), 401
+        
+        token = auth_header.split(" ")[1] if " " in auth_header else auth_header
+        
         try:
-            verify_jwt_in_request()
-            identity = get_jwt_identity()
-            if identity.get('role') != 'admin':
-                return jsonify({'error': 'Admin access required'}), 403
-            return fn(*args, **kwargs)
+            response = requests.get(
+                'https://api.clerk.dev/v1/sessions/verify',
+                headers={'Authorization': f'Bearer {CLERK_SECRET_KEY}'},
+                params={'token': token}
+            )
+            
+            if response.status_code != 200:
+                return jsonify({"message": "Invalid token"}), 401
+                
+            request.clerk_user = response.json()
+            
         except Exception as e:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({"message": str(e)}), 500
+            
+        return f(*args, **kwargs)
+    return decorated
+
+# Map the old jwt_required and admin_only to clerk_required so your other routes don't break
+def jwt_required(*args, **kwargs):
+    if len(args) == 1 and callable(args[0]):
+        return clerk_required(args[0])
+    def wrapper(fn):
+        return clerk_required(fn)
     return wrapper
-# Configure JWT
-app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change this!
-app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_COOKIE_SECURE"] = False  # Set True in production
-app.config["JWT_COOKIE_SAMESITE"] = "Lax"
-app.config["JWT_COOKIE_CSRF_PROTECT"] = False
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=15)
-app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
 
-jwt = JWTManager(app)
-
-# Simplified RBAC - Only 2 roles: customer and admin
 def admin_only(fn):
-    """Admin-only access decorator"""
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        try:
-            verify_jwt_in_request()
-            identity = get_jwt_identity()
-            if identity.get('role') != 'admin':
-                return jsonify({'error': 'Admin access required'}), 403
-            return fn(*args, **kwargs)
-        except Exception as e:
-            return jsonify({'error': 'Authentication required'}), 401
-    return wrapper
+    return clerk_required(fn)
 
 # Get absolute path to the backend folder (where app.py lives)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -249,78 +239,9 @@ with app.app_context():
         print(f"Error during database initialization: {str(e)}")
         db.session.rollback()
 
-#--------------------------------------------- AUTH ROUTES ---------------------------------------------
-@app.route('/api/auth/signup', methods=['POST'])
-def signup():
-    data = request.json
-    
-    # Check if user already exists
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'message': 'Email already registered'}), 400
-    
-    # Create new user
-    new_user = User(
-        username=data['username'],
-        email=data['email'],
-        password=data['password'],  # Plain text password
-        phone=data.get('phone'),
-        role=data.get('role', 'customer')
-    )
-    
-    db.session.add(new_user)
-    db.session.commit()
-    
-    return jsonify({
-        'message': 'User created successfully',
-        'user': new_user.to_dict()
-    }), 201
-
-@app.route('/api/auth/login', methods=['POST'])
-def login():
-    data = request.json
-    email = data.get('email', None)
-    password = data.get('password', None)
-
-    user = User.query.filter_by(email=email).first()
- 
-    if not user or user.password != password:
-        return jsonify({'message': 'Invalid email or password'}), 401
-
-    #  tokens ------------------------------------------------------------------------------------------
-    access_token = create_access_token(identity={
-        'username': user.username, 
-        'role': user.role, 
-        'user_id': user.id,
-        'email': user.email
-    })
-    refresh_token = create_refresh_token(identity={
-        'username': user.username, 
-        'role': user.role, 
-        'user_id': user.id,
-        'email': user.email
-    })
-
-    # cookies ------------------------------------------------------------------------------------------
-    response = jsonify({'message': 'Login successful', 'user': user.to_dict()})
-    set_access_cookies(response, access_token)
-    set_refresh_cookies(response, refresh_token)
-    
-    return response, 200
-
-@app.route('/api/auth/refresh', methods=['POST'])
-@jwt_required(refresh=True)
-def refresh():
-    identity = get_jwt_identity()
-    access_token = create_access_token(identity=identity)
-    response = jsonify(access_token=access_token)
-    set_access_cookies(response, access_token)
-    return response, 200
-
-@app.route('/api/auth/logout', methods=['POST'])
-def logout():
-    response = jsonify({'message': 'Logout successful'})
-    unset_jwt_cookies(response)
-    return response, 200
+#--------------------------------------------- AUTHENTICATION HANDLED BY CLERK ---------------------------------------------
+# Removed /api/auth/signup, /api/auth/login, /api/auth/refresh, /api/auth/logout routes
+# as these are now fully managed by Clerk's frontend UI components and backend token verification.
 
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
