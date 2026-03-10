@@ -90,20 +90,8 @@ const LandingPage = () => {
 
   return (
     <div className="landing-page-container">
-      {/* Geolocation status */}
-      {geoStatus && (
-        <div
-          style={{
-            background: '#e0f7fa',
-            color: '#00796b',
-            padding: '8px',
-            textAlign: 'center',
-            fontSize: '0.95rem',
-          }}
-        >
-          {geoStatus}
-        </div>
-      )}
+
+
 
       <HeaderSection />
 

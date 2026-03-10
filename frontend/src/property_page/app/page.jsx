@@ -81,6 +81,7 @@ const PropertyListingPage = () => {
 
       {/* Main Content */}
       <main className="pt-16 sm:pt-20 lg:pt-24 pb-16 lg:pb-0">
+        <DynamicBreadcrumb />
         <PropertyHeader />
         {!loading && <BuilderProfile builderData={builderData} />}
         <PropertyHero />
@@ -91,7 +92,7 @@ const PropertyListingPage = () => {
       </main>
 
       {/* Floating Call Button (Mobile Only) */}
-      
+
 
       {/* Mobile Footer */}
       <MobileFooter />

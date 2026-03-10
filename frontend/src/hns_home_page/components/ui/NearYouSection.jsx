@@ -185,14 +185,15 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
         // BHK Type filter
         let bhkMatch = true;
         if (searchFilters.bhkTypes && searchFilters.bhkTypes.length > 0) {
-            if (property.Existing_Configurations && Array.isArray(property.Existing_Configurations)) {
+            if (property.Existing_Configurations && Array.isArray(property.Existing_Configurations) && property.Existing_Configurations.length > 0) {
                 bhkMatch = searchFilters.bhkTypes.some(type =>
                     property.Existing_Configurations.some(cfg =>
                         cfg.type && cfg.type.toLowerCase().includes(type.replace('bhk', ' bhk'))
                     )
                 );
             } else {
-                bhkMatch = false;
+                // No configuration data — don't filter out this property
+                bhkMatch = true;
             }
         }
 

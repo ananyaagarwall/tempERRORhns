@@ -67,16 +67,24 @@ function BuilderInfoIndex() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#EFF5FF' }}>
-        <div className="text-lg text-gray-600">Loading builder information...</div>
+      <div className="min-h-screen" style={{ background: '#EFF5FF' }}>
+        <FooterNavBar sticky={true} />
+        <DynamicBreadcrumb />
+        <div className="flex items-center justify-center" style={{ minHeight: '60vh' }}>
+          <div className="text-lg text-gray-600">Loading builder information...</div>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#EFF5FF' }}>
-        <div className="text-lg text-red-600">{error}</div>
+      <div className="min-h-screen" style={{ background: '#EFF5FF' }}>
+        <FooterNavBar sticky={true} />
+        <DynamicBreadcrumb />
+        <div className="flex items-center justify-center" style={{ minHeight: '60vh' }}>
+          <div className="text-lg text-red-600">{error}</div>
+        </div>
       </div>
     );
   }

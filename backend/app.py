@@ -317,36 +317,24 @@ def get_nearest_nodes(location):
             'nearestNodes': nearest
         })
     
-    # Calculate nearest nodes that have properties
+    # Calculate nearest nodes that have properties.
+    # Collect ALL valid candidates with their offset distance, then pick
+    # the 4 closest ordered by position in ORDERED_AREAS.
     total_areas = len(ORDERED_AREAS)
-    nearest = []
-    
-    # Use a spiral search pattern: alternate between before and after the found index
-    # to find nodes with properties
-    max_offset = total_areas
-    
-    for offset in range(1, max_offset):
-        if len(nearest) >= 4:
-            break
-        
-        # Try after
-        idx_after = found_index + offset
-        if idx_after < total_areas:
-            area = ORDERED_AREAS[idx_after]
-            if has_properties_for_location(area):
-                nearest.append(area)
-        
-        if len(nearest) >= 4:
-            break
-        
-        # Try before
-        idx_before = found_index - offset
-        if idx_before >= 0:
-            area = ORDERED_AREAS[idx_before]
-            if has_properties_for_location(area):
-                nearest.insert(0, area)  # Insert at beginning to maintain order
-    
-    nearest = nearest[:4]  # Ensure max 4 nodes
+    candidates = []  # list of (absolute_offset, index_in_ORDERED_AREAS)
+
+    for i, area in enumerate(ORDERED_AREAS):
+        if i == found_index:
+            continue  # skip the user's own location
+        if has_properties_for_location(area):
+            candidates.append((abs(i - found_index), i))
+
+    # Sort by offset distance (closest first), then by actual index for stable ordering
+    candidates.sort(key=lambda x: (x[0], x[1]))
+
+    # Take the 4 closest; re-sort by original index to preserve geographic order
+    closest_four = sorted(candidates[:4], key=lambda x: x[1])
+    nearest = [ORDERED_AREAS[idx] for _, idx in closest_four]
     
     return jsonify({
         'primaryLocation': ORDERED_AREAS[found_index],
@@ -443,9 +431,10 @@ def get_builders():
 # 6 @jwt_required()
 def get_builder_by_name(company_name):
     try:
-        # Support underscores as spaces for flexible matching
-        normalized_name = company_name.replace('_', ' ')
-        builder = Builder.query.filter_by(company_name=normalized_name).first()
+        # Normalize: replace hyphens and underscores with spaces for flexible matching
+        normalized_name = company_name.replace('-', ' ').replace('_', ' ')
+        # Use case-insensitive matching since the frontend lowercases the name
+        builder = Builder.query.filter(Builder.company_name.ilike(normalized_name)).first()
         if not builder:
             return jsonify({'error': 'Builder not found'}), 404
         return jsonify(builder.to_dict())
