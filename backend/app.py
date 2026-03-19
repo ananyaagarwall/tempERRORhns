@@ -1778,6 +1778,7 @@ def get_filters():
 # Simplified property search endpoint: direct filtering only
 @app.route('/api/properties/search', methods=['GET'])
 # 19 @jwt_required()
+# for budget sec 
 def search_properties():
     location = request.args.get('location', '', type=str)
     price = request.args.get('price', 0, type=float)  # price in Cr
@@ -1801,12 +1802,17 @@ def search_properties():
     if price and price > 0:
         def price_matches(prop, max_price_cr):
             val = getattr(prop, "Price_Starting_From", "") or ""
-            val_clean = val.replace('₹','').replace(',','').replace('+','').strip().lower()
+            # Handle ranges like "70 L - 2.5 Cr" - take the starting price
+            first_part = val.split('–')[0].split('-')[0].strip()
+            val_clean = first_part.replace('₹','').replace(',','').replace('+','').strip().lower()
+            
             try:
-                if 'cr' in val_clean:
-                    price_val = float(val_clean.replace('cr','').strip())
-                elif 'lakh' in val_clean:
-                    price_val = float(val_clean.replace('lakh','').strip()) / 100  # Lakh → Cr
+                # Handle "Cr" or "Crore"
+                if 'cr' in val_clean or 'crore' in val_clean:
+                    price_val = float(val_clean.replace('crore','').replace('cr','').strip())
+                # Handle "L" or "Lakh"
+                elif 'l' in val_clean or 'lakh' in val_clean:
+                    price_val = float(val_clean.replace('lakh','').replace('l','').strip()) / 100  # Lakh → Cr
                 else:
                     price_val = float(val_clean)
                 return price_val <= max_price_cr

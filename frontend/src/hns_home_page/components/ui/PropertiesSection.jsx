@@ -24,12 +24,17 @@ const sampleProperty = {
 
 function parsePriceInCr(priceStr) {
   if (!priceStr) return 0;
-  let val = priceStr.toString().replace(/₹|,|\+|\s/g, '').toLowerCase();
+  // Take only the starting price if it's a range like "₹72 L – ₹2.5 Cr"
+  const startPart = priceStr.toString().split('–')[0].split('-')[0];
+  let val = startPart.replace(/₹|,|\+|\s/g, '').toLowerCase();
   try {
-    if (val.includes('cr')) {
-      return parseFloat(val.replace('cr', ''));
+    if (val.includes('cr') || val.includes('crore')) {
+      return parseFloat(val.replace('crore', '').replace('cr', ''));
     } else if (val.includes('lakh')) {
       return parseFloat(val.replace('lakh', '')) / 100;
+    } else if (val.endsWith('l')) {
+      // Handle shorthand "L" for Lakhs (e.g., "72l" → 72 lakhs → 0.72 Cr)
+      return parseFloat(val.slice(0, -1)) / 100;
     } else {
       return parseFloat(val);
     }
@@ -288,9 +293,9 @@ const PropertiesSection = ({ searchFilters }) => {
           width: 100%;
           display: flex;
           align-items: center;
-         padding: 20px 0;        /* Reduced from 40px */
-          margin: 20px 0 0 0;    /* Add positive top margin instead of negative */
-          overflow: hidden;
+         padding: 30px 0;        /* Reduced from 40px */
+          margin: 40px 0 0 0;    /* Add positive top margin instead of negative */
+          overflow: visible;
           background: white;
           border-radius: 8px;
         }
@@ -305,9 +310,9 @@ const PropertiesSection = ({ searchFilters }) => {
           overflow-x: auto;
           scrollbar-width: none;
           -ms-overflow-style: none;
-          padding: 20px 16px;     /* Reduced from 40px */
+          padding: 30px 16px;     /* Reduced from 40px */
           margin: 0;              /* Remove negative margin */
-          overflow-y: hidden;
+          overflow-y: visible;
           -webkit-overflow-scrolling: touch;
           scroll-behavior: smooth;
           scroll-snap-type: x mandatory;
@@ -464,7 +469,7 @@ const PropertiesSection = ({ searchFilters }) => {
           .property-cards-row {
             gap: 18px;
             padding: 36px 16px;
-            margin: -36px 0;
+            margin: 36px 0;
           }
           .property-card-custom {
             width: 280px;
@@ -527,7 +532,6 @@ const PropertiesSection = ({ searchFilters }) => {
             gap: 16px;
             padding: 32px 16px;
             margin: 32px 10px;
-            overflow-y: hidden;
           }
 
           .property-cards-row-wrapper {
@@ -630,7 +634,6 @@ const PropertiesSection = ({ searchFilters }) => {
             gap: 12px;
             padding: 12px 10px;
             margin: 12px 10px;
-            overflow-y: hidden;
           }
 
           .property-cards-row-wrapper {
@@ -717,7 +720,6 @@ const PropertiesSection = ({ searchFilters }) => {
             gap: 10px;
             padding: 10px 10px;
             margin: -10px 0;
-            overflow-y: hidden;
           }
 
           .property-cards-row-wrapper {
