@@ -204,6 +204,7 @@ class Builder(db.Model):
             except Exception:
                 return str(dt)
         return {
+            'id': self.rera_id,
             'rera_id': self.rera_id,
             'user_id': self.user_id,
             'company_name': self.company_name,

@@ -1,4 +1,7 @@
 import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 import requests
 from models import (
     User,
@@ -17,6 +20,8 @@ from models import (
 )
 
 from flask import Flask, request, jsonify, send_from_directory, redirect, make_response
+from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
+
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
 
 #flash
@@ -45,18 +50,30 @@ import threading
 
 
 # Set UTF-8 encoding for stdout
+import logging
+from datetime import timedelta
+from flask_jwt_extended import JWTManager
+from flask_jwt_extended import jwt_required
+from functools import wraps
+import threading
+
+
+
+# Set UTF-8 encoding for stdout
 # Set UTF-8 encoding for stdout
 sys.stdout.reconfigure(encoding='utf-8')
 
 load_dotenv()
 
 # Configure logging for security events
+# NOTE: File logging disabled during development to prevent huge log files
+# Uncomment FileHandler line for production security auditing
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('security.log'),
-        logging.StreamHandler()
+        # logging.FileHandler('security.log'),  # Disabled - was creating 30k+ line files
+        logging.StreamHandler()  # Console logging only
     ]
 )
 security_logger = logging.getLogger('security')
@@ -101,6 +118,31 @@ def admin_only(fn):
         except Exception as e:
             return jsonify({'error': 'Authentication required'}), 401
     return wrapper
+# Configure JWT
+app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change this!
+app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
+app.config["JWT_COOKIE_SECURE"] = False  # Set True in production
+app.config["JWT_COOKIE_SAMESITE"] = "Lax"
+app.config["JWT_COOKIE_CSRF_PROTECT"] = False
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=15)
+app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
+
+jwt = JWTManager(app)
+
+# Simplified RBAC - Only 2 roles: customer and admin
+def admin_only(fn):
+    """Admin-only access decorator"""
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        try:
+            verify_jwt_in_request()
+            identity = get_jwt_identity()
+            if identity.get('role') != 'admin':
+                return jsonify({'error': 'Admin access required'}), 403
+            return fn(*args, **kwargs)
+        except Exception as e:
+            return jsonify({'error': 'Authentication required'}), 401
+    return wrapper
 
 # Get absolute path to the backend folder (where app.py lives)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -109,15 +151,26 @@ instance_dir = os.path.join(basedir, 'instance')
 os.makedirs(instance_dir, exist_ok=True)  # This line fixes most issues
 
 
-# Use FULL absolute path for the SQLite file
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(instance_dir, 'hns.db')}"
+# Use PostgreSQL (DATABASE_URL from .env)
+_db_url = os.getenv('DATABASE_URL', f"sqlite:///{os.path.join(instance_dir, 'hns.db')}")
+# SQLAlchemy requires 'postgresql://' not 'postgres://' (Heroku-style URLs)
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Initialize SQLAlchemy first
-db = SQLAlchemy(app)
+# Import the db instance from extensions
+from extensions import db
+
+# Initialize the db with the app
+db.init_app(app)  # <-- Use the imported db instance
 
 # Then initialize Flask-Migrate
 migrate = Migrate(app, db)
+
+# Chatbot globals
+_index_lock = threading.Lock()
+_emb_index = None
 
 # Chatbot globals
 _index_lock = threading.Lock()
@@ -136,23 +189,6 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# Ordered array of areas for proximity-based search (Navi Mumbai nodes)
-ORDERED_AREAS = [
-    "Thane", "Airoli", "Rabale", "Ghansoli", "Kopar Khairane",
-    "Turbhe", "Juinagar", "Nerul", "Seawoods", "Belapur",
-    "Kharghar", "Mansarovar", "Khandeshwar", "Panvel"
-]
-
-# Nodes excluded from the Near You section (no property data available)
-EXCLUDED_NEAR_YOU_NODES = [
-    "Rabale", "Juinagar", "Kharghar", "Khandeshwar"
-]
-
-#---------------------------------------------MODELS ---------------------------------------------
-
-#moved to models.py
-
-#---------------------------------------------END OF MODELS ---------------------------------------------
 
 with app.app_context():
     try:
@@ -210,6 +246,7 @@ def login():
     password = data.get('password', None)
 
     user = User.query.filter_by(email=email).first()
+ 
     if not user or user.password != password:
         return jsonify({'message': 'Invalid email or password'}), 401
 
@@ -251,31 +288,53 @@ def logout():
 
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
-# 1 @jwt_required()
+# @jwt_required()
 def get_properties_by_location(loc):
-    # Check if the location is in the excluded nodes list (case-insensitive)
-    loc_normalized = loc.strip().lower()
-    for excluded in EXCLUDED_NEAR_YOU_NODES:
-        if excluded.lower() == loc_normalized:
-            # Return empty list for excluded nodes
-            return jsonify([])
-    
-    properties = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
+    properties = Property.query.filter(Property.Location.like(f'%{loc}%')).all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/properties', methods=['GET'])
-# 2 @jwt_required()
+# @jwt_required()
 def get_properties():
     properties = Property.query.all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/locations', methods=['GET']) 
-# 3 @jwt_required()
+@jwt_required()
+@jwt_required()
 def get_locations(): 
     locations = db.session.query(Property.Location).distinct().all() 
     unique_locations = [loc[0].strip() for loc in locations if loc[0] and loc[0].strip()] 
     unique_locations = sorted(set(unique_locations))
     return jsonify(unique_locations)
+
+# Excluded nodes for the "near you" feature (kept as an empty set for now so all areas are eligible).
+EXCLUDED_NEAR_YOU_NODES = set()
+
+# Ordered list of key nodes/areas used for the "nearest nodes" API.
+# This is used as a logical sequence (roughly along the Navi Mumbai / Thane belt)
+# to compute nearby locations. Update this list if you add more areas.
+ORDERED_AREAS = [
+    "Airoli",
+    "Rabale",
+    "Ghansoli",
+    "Kopar Khairane",
+    "Vashi",
+    "Sanpada",
+    "Juinagar",
+    "Nerul",
+    "Seawoods",
+    "Belapur",
+    "Kharghar",
+    "Mansarovar",
+    "Khandeshwar",
+    "Panvel",
+    "Thane",
+    "Kalyan Subdistrict",
+    "Kalyan-Dombivli",
+    "Mumbai",
+    "Navi Mumbai",
+]
 
 #yaha se nearyou till.. 
 
@@ -368,7 +427,7 @@ def get_properties_by_multiple_locations():
 # yaha tak nearyou. 
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
-# 4 @jwt_required()
+# @jwt_required()
 def get_property(id):
     property = Property.query.get_or_404(id)
     return jsonify(property.to_dict())
@@ -413,7 +472,7 @@ def create_property():
     return jsonify(new_property.to_dict()), 201
 
 @app.route('/api/builders', methods=['GET'])
-# 5 @jwt_required()
+# @jwt_required()
 def get_builders():
     try:
         print("Fetching builders...")  # Debug log
@@ -430,19 +489,92 @@ def get_builders():
 @app.route('/api/builders/name/<company_name>', methods=['GET'])
 # 6 @jwt_required()
 def get_builder_by_name(company_name):
+    """
+    Get builder by company name (case-insensitive, handles URL-encoded names)
+    """
     try:
-        # Normalize: replace hyphens and underscores with spaces for flexible matching
-        normalized_name = company_name.replace('-', ' ').replace('_', ' ')
-        # Use case-insensitive matching since the frontend lowercases the name
-        builder = Builder.query.filter(Builder.company_name.ilike(normalized_name)).first()
+        # Decode URL-encoded name and normalize (replace hyphens/underscores with spaces)
+        normalized_name = company_name.replace('-', ' ').replace('_', ' ').strip()
+        
+        print(f"Searching for builder: '{normalized_name}'")  # Debug log
+        
+        # Try exact match first (case-insensitive)
+        builder = Builder.query.filter(
+            Builder.company_name.ilike(normalized_name)
+        ).first()
+        
+        # If not found, try partial match
         if not builder:
-            return jsonify({'error': 'Builder not found'}), 404
+            builder = Builder.query.filter(
+                Builder.company_name.ilike(f'%{normalized_name}%')
+            ).first()
+        
+        # If still not found, try matching individual words
+        if not builder:
+            words = normalized_name.split()
+            for word in words:
+                if len(word) > 3:  # Only search meaningful words
+                    builder = Builder.query.filter(
+                        Builder.company_name.ilike(f'%{word}%')
+                    ).first()
+                    if builder:
+                        break
+        
+        if not builder:
+            print(f"Builder not found for name: '{normalized_name}'")  # Debug log
+            # List all available builders for debugging
+            all_builders = Builder.query.all()
+            available_names = [b.company_name for b in all_builders]
+            print(f"Available builders: {available_names}")
+            
+            return jsonify({
+                'error': 'Builder not found',
+                'searched_name': normalized_name,
+                'available_builders': available_names[:5]  # Return first 5 for reference
+            }), 404
+        
+        print(f"Builder found: {builder.company_name}")  # Debug log
         return jsonify(builder.to_dict())
+        
+    except Exception as e:
+        print(f"Error in get_builder_by_name: {str(e)}")  # Debug log
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+# Alternative: Add a route that lists all builders for debugging
+@app.route('/api/builders/search', methods=['GET'])
+def search_builders():
+    """
+    Search builders by name with query parameter
+    Usage: /api/builders/search?name=hiranandani
+    """
+    try:
+        search_term = request.args.get('name', '').strip()
+        
+        if not search_term:
+            return jsonify({'error': 'Please provide a search term'}), 400
+        
+        # Search by company name or brand name
+        builders = Builder.query.filter(
+            (Builder.company_name.ilike(f'%{search_term}%')) |
+            (Builder.brand_name.ilike(f'%{search_term}%'))
+        ).all()
+        
+        if not builders:
+            return jsonify({
+                'error': 'No builders found',
+                'searched_term': search_term
+            }), 404
+        
+        return jsonify([builder.to_dict() for builder in builders])
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>', methods=['GET'])
-# 7 @jwt_required()
+# @jwt_required()
 def get_builder(rera_id):
     try:
         builder = Builder.query.get_or_404(rera_id)
@@ -451,6 +583,7 @@ def get_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders', methods=['POST'])
+@admin_only
 @admin_only
 def create_builder():
     try:
@@ -576,7 +709,7 @@ def delete_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>/projects', methods=['GET'])
-# 8 @jwt_required()
+# @jwt_required()
 def get_builder_projects(rera_id):
     try:
         status = request.args.get('status')
@@ -628,6 +761,7 @@ def _create_property_for_project(project, user_id, data):
 #-----------------STEP 1 ROUTING FETCHING DETAILS FROM FRONTEND AND PUSHING TO DATABASE------------------------
 @app.route('/api/builders/<rera_id>/projects/step1', methods=['POST'])
 @admin_only
+@admin_only
 def create_project_step1(rera_id):
     data = request.json
     title = data['title']
@@ -668,6 +802,7 @@ def create_project_step1(rera_id):
 
 @app.route('/api/builders/<rera_id>/projects/step2', methods=['POST'])
 @admin_only
+@admin_only
 def create_project_step2(rera_id):
     data = request.json
     project_id = data.get('project_id')
@@ -687,6 +822,7 @@ def create_project_step2(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step4', methods=['POST'])
+@admin_only
 @admin_only
 def create_project_step4(rera_id):
     # Handle both form data and JSON data
@@ -723,6 +859,7 @@ def create_project_step4(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step5', methods=['POST'])
+@admin_only
 @admin_only
 def create_project_step5(rera_id):
     data = request.json
@@ -879,6 +1016,7 @@ def update_project_step(rera_id, project_id):
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
 @admin_only
+@admin_only
 def delete_project(project_id):
     project = BuilderProject.query.get_or_404(project_id)
     db.session.delete(project)
@@ -890,6 +1028,7 @@ def delete_project(project_id):
 #----------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------
 @app.route('/api/admin/stats', methods=['GET'])
+@admin_only
 @admin_only
 def get_admin_stats():
     try:
@@ -969,6 +1108,7 @@ def get_admin_stats():
 #--------------------------------------------- USER MANAGEMENT ROUTES ---------------------------------------------
 @app.route('/api/users', methods=['GET'])
 @admin_only
+@admin_only
 def get_users():
     try:
         # Get the token from the Authorization header
@@ -993,7 +1133,8 @@ def get_users():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/<int:id>', methods=['GET'])
-# 9 @jwt_required()
+@jwt_required()
+@jwt_required()
 def get_user(id):
     try:
         user = User.query.get_or_404(id)
@@ -1008,7 +1149,7 @@ def get_user(id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 @app.route('/api/projects/<int:project_id>', methods=['GET'])
-# 10 @jwt_required()
+# @jwt_required()
 def get_builder_project_by_id(project_id):
     project = BuilderProject.query.get(project_id)
     if not project:
@@ -1016,6 +1157,7 @@ def get_builder_project_by_id(project_id):
     return jsonify(project.to_dict())
 
 @app.route('/api/users/<int:id>', methods=['PUT'])
+@admin_only
 @admin_only
 def update_user(id):
     try:
@@ -1050,6 +1192,7 @@ def update_user(id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/<int:id>', methods=['DELETE'])
+@admin_only
 @admin_only
 def delete_user(id):
     try:
@@ -1090,6 +1233,7 @@ def save_image(file):
 
 # API to create a blog (multipart/form-data)
 @app.route('/api/blogs', methods=['POST'])
+@admin_only
 @admin_only
 def create_blog():
     try:
@@ -1154,7 +1298,8 @@ def create_blog():
 
 # API to list all blogs (for admin dashboard)
 @app.route('/api/blogs', methods=['GET'])
-# 11 @jwt_required()
+@jwt_required()
+@jwt_required()
 def list_blogs():
     blogs = Blog.query.order_by(Blog.created_at.desc()).all()
     print(f"Found {len(blogs)} blogs")
@@ -1164,14 +1309,15 @@ def list_blogs():
 
 # Get a single blog by ID
 @app.route('/api/blogs/<int:blog_id>', methods=['GET'])
-# 12 @jwt_required()
+@jwt_required()
 def get_blog(blog_id):
     blog = Blog.query.get_or_404(blog_id)
     return jsonify(blog.to_dict())
 
 # Get a single blog by slug
 @app.route('/api/blogs/slug/<slug>', methods=['GET'])
-# 13 @jwt_required()
+@jwt_required()
+@jwt_required()
 def get_blog_by_slug(slug):
     print(f"Fetching blog with slug: {slug}")
     blog = Blog.query.filter_by(slug=slug).first()
@@ -1293,7 +1439,7 @@ def uploaded_file(filename):
 
 # Update /api/projects/slug/<slug> to handle BuilderProject slugs
 @app.route('/api/projects/slug/<slug>', methods=['GET'])
-# 14 @jwt_required()
+# @jwt_required()
 def get_project_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='project').first()
     if not slug_entry:
@@ -1309,7 +1455,8 @@ def get_project_by_slug(slug):
 
 # 3. Redirect alias slugs to primary in /api/properties/slug/<slug>
 @app.route('/api/properties/slug/<slug>', methods=['GET'])
-# 15 @jwt_required()
+@jwt_required()
+@jwt_required()
 def get_property_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='property').first()
     if not slug_entry:
@@ -1325,12 +1472,13 @@ def get_property_by_slug(slug):
     return jsonify(property.to_dict())
 
 @app.route('/api/projects', methods=['GET'])
-# 16 @jwt_required()
+# @jwt_required()
 def get_all_projects():
     projects = BuilderProject.query.all()
     return jsonify([p.to_dict() for p in projects])
 
 @app.route('/api/builders/<rera_id>/projects/upload-image', methods=['POST'])
+@admin_only
 @admin_only
 def upload_project_image(rera_id):
     print(f"Upload project image called with rera_id: {rera_id}")
@@ -1452,6 +1600,7 @@ def get_security_audit():
 
 @app.route('/api/admin/latest-geolocation', methods=['GET'])
 @admin_only
+@admin_only
 def get_latest_geolocation():
     global latest_geolocation
     # If latest_geolocation is not set, return a default empty response
@@ -1464,7 +1613,8 @@ def get_latest_geolocation():
 # ------------------------------------------------------- AI Blog Summarization -------------------------------------------------- ---
 
 @app.route('/api/blogs/<slug>/summary', methods=['GET'])
-# 17 @jwt_required()
+@jwt_required()
+@jwt_required()
 def summarize_blog(slug):
     api_key = os.getenv('PERPLEXITY_API_KEY')
     blog = Blog.query.filter_by(slug=slug).first()
@@ -1725,7 +1875,8 @@ def _canonical_property_status(value: str) -> str:
         return ''
 
 @app.route('/api/properties/filters', methods=['GET'])
-# 18 @jwt_required()
+@jwt_required()
+@jwt_required()
 def get_filters():
     """Return unique filter options sourced from BuilderProject and Property tables.
     Includes amenities (normalized), property_status, project status, and derived society types.
@@ -1777,8 +1928,7 @@ def get_filters():
 
 # Simplified property search endpoint: direct filtering only
 @app.route('/api/properties/search', methods=['GET'])
-# 19 @jwt_required()
-# for budget sec 
+# @jwt_required()
 def search_properties():
     location = request.args.get('location', '', type=str)
     price = request.args.get('price', 0, type=float)  # price in Cr
@@ -1947,6 +2097,7 @@ def google_signin():
     return response, 200
 
 
+
 #... existing imports...
 from models import ChatSession, ChatMessage, UserPreference
 from chatbot.routes import chatbot_bp
@@ -1958,7 +2109,4 @@ app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
 # automatically create the new chatbot tables because we imported them above.
 
 if __name__ == '__main__':
-    host = os.environ.get('FLASK_HOST', '0.0.0.0')
-    port = int(os.environ.get('FLASK_PORT', 5001))
-    debug = os.environ.get('FLASK_DEBUG', 'true').lower() == 'true'
-    app.run(debug=debug, host=host, port=port)
+    app.run(debug=True)

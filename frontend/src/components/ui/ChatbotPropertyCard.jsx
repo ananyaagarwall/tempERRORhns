@@ -8,7 +8,6 @@ const ChatbotPropertyCard = ({ property }) => {
   const navigate = useNavigate();
 
   const pickProjectImage = (p) => {
-    // Ensure the image URL is absolute or correctly prefixed for the backend
     const normalizeUrl = (url) => {
       if (!url) return '';
       if (url.startsWith('http')) return url;
@@ -22,12 +21,48 @@ const ChatbotPropertyCard = ({ property }) => {
 
   const imageUrl = pickProjectImage(property);
 
+  // Parse configurations safely
+  const getConfigurations = () => {
+    const config = property.Existing_Configurations;
+    if (!config) return '';
+    
+    try {
+      if (typeof config === 'string') {
+        const parsed = JSON.parse(config);
+        if (Array.isArray(parsed)) {
+          return parsed.map(c => 
+            typeof c === 'object' && c !== null && c.type ? c.type : String(c)
+          ).join(', ');
+        }
+      }
+      return String(config);
+    } catch (e) {
+      return String(config);
+    }
+  };
+
   return (
-    <div className="chatbot-property-card" onClick={() => navigate(`/property/${property.id}`)}>
-      <img src={imageUrl} alt={property.name} className="chatbot-property-img" />
+    <div 
+      className="chatbot-property-card" 
+      onClick={() => navigate(`/property/${property.id}`)}
+      style={{ cursor: 'pointer' }}
+    >
+      <img 
+        src={imageUrl} 
+        alt={property.Property_Name || 'Property'} 
+        className="chatbot-property-img" 
+        onError={(e) => {
+          e.target.src = 'http://localhost:5000/public/building.webp';
+        }}
+      />
       <div className="chatbot-property-info">
-        <h3 className="chatbot-property-name">{property.Property_Name}</h3>
-        <p className="chatbot-property-address"><CiLocationOn className="chatbot-location-icon" /> {property.Location}</p>
+        <h3 className="chatbot-property-name">
+          {property.Property_Name || 'Property'}
+        </h3>
+        <p className="chatbot-property-address">
+          <CiLocationOn className="chatbot-location-icon" /> 
+          {property.Location || 'Location not specified'}
+        </p>
         <div className="chatbot-property-details-row">
           {property.Existing_Configurations &&
             typeof property.Existing_Configurations === 'string' &&

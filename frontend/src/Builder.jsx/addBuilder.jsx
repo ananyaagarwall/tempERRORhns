@@ -1,4 +1,4 @@
-import API_BASE_URL from '../config';
+/* eslint-disable no-unused-vars */
 import React, { useState, useRef } from 'react';
 // import Sidebar from './Sidebar'; // Removed Sidebar import
 import Tabs from './Tabs';

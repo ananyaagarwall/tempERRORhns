@@ -174,7 +174,7 @@ const BuildersSection = ({ searchFilters }) => {
                   <div
                     className="builders-card-inner"
                     style={{
-                      background: `url(${"\palm.jpg"}) center/cover no-repeat`,
+                      background: `url(${"/palm.jpg"}) center/cover no-repeat`,
                     }}
                   >
                     <div className="builders-card-overlay" />
