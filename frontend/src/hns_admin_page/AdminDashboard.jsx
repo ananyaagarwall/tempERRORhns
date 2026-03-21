@@ -1,3 +1,4 @@
+import API_BASE_URL from '../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaEdit, FaTrash, FaEye, FaUsers, FaHome, FaEnvelope, FaStar, FaUser } from 'react-icons/fa';
@@ -72,7 +73,7 @@ const AdminDashboard = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/users', {
+            const response = await fetch(`${API_BASE_URL}/api/users`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'Content-Type': 'application/json'
@@ -105,7 +106,7 @@ const AdminDashboard = () => {
     const handleUserDelete = async (userId) => {
         if (window.confirm('Are you sure you want to delete this user?')) {
             try {
-                const response = await fetch(`http://localhost:5000/api/users/${userId}`, {
+                const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
                     method: 'DELETE',
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -124,7 +125,7 @@ const AdminDashboard = () => {
 
     const handleUserUpdate = async (updatedUser) => {
         try {
-            const response = await fetch(`http://localhost:5000/api/users/${updatedUser.id}`, {
+            const response = await fetch(`${API_BASE_URL}/api/users/${updatedUser.id}`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -145,7 +146,7 @@ const AdminDashboard = () => {
 
     const fetchDashboardStats = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/admin/stats', {
+            const response = await fetch(`${API_BASE_URL}/api/admin/stats`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`
                 }
@@ -162,7 +163,7 @@ const AdminDashboard = () => {
 
     const fetchProjects = async () => {
         try {
-            const response = await fetch('http://localhost:5000/api/projects');
+            const response = await fetch(`${API_BASE_URL}/api/projects`);
             if (!response.ok) throw new Error('Failed to fetch projects');
             const data = await response.json();
             setProjects(data);
@@ -209,7 +210,7 @@ const AdminDashboard = () => {
         e.preventDefault();
         setError(null);
         try {
-            const res = await fetch('http://localhost:5000/api/builders/' + form.builder_id + '/projects/step1', {
+            const res = await fetch(`${API_BASE_URL}/api/builders/' + form.builder_id + '/projects/step1`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -246,7 +247,7 @@ const AdminDashboard = () => {
         e.preventDefault();
         setError(null);
         try {
-            const res = await fetch(`http://localhost:5000/api/builders/${form.builder_id}/projects/${editingId}`, {
+            const res = await fetch(`${API_BASE_URL}/api/builders/${form.builder_id}/projects/${editingId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -272,7 +273,7 @@ const AdminDashboard = () => {
     const handleDeleteProject = async id => {
         setError(null);
         try {
-            const res = await fetch(`http://localhost:5000/api/projects/${id}`, { method: 'DELETE' });
+            const res = await fetch(`${API_BASE_URL}/api/projects/${id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to delete project');
             setShowDeleteId(null);
             fetchProjects();

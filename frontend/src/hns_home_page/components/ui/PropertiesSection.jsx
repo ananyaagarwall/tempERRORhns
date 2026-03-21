@@ -24,12 +24,17 @@ const sampleProperty = {
 
 function parsePriceInCr(priceStr) {
   if (!priceStr) return 0;
-  let val = priceStr.toString().replace(/₹|,|\+|\s/g, '').toLowerCase();
+  // Take only the starting price if it's a range like "₹72 L – ₹2.5 Cr"
+  const startPart = priceStr.toString().split('–')[0].split('-')[0];
+  let val = startPart.replace(/₹|,|\+|\s/g, '').toLowerCase();
   try {
-    if (val.includes('cr')) {
-      return parseFloat(val.replace('cr', ''));
+    if (val.includes('cr') || val.includes('crore')) {
+      return parseFloat(val.replace('crore', '').replace('cr', ''));
     } else if (val.includes('lakh')) {
       return parseFloat(val.replace('lakh', '')) / 100;
+    } else if (val.endsWith('l')) {
+      // Handle shorthand "L" for Lakhs (e.g., "72l" → 72 lakhs → 0.72 Cr)
+      return parseFloat(val.slice(0, -1)) / 100;
     } else {
       return parseFloat(val);
     }
@@ -79,14 +84,14 @@ const PropertiesSection = ({ searchFilters }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, [searchFilters.location]);
 
-const handleHeartClick = (e, property) => {
-  e.stopPropagation();
-  if (isInCart(property.id)) {
-    removeFromCart(property.id);
-  } else {
-    addToCart(property, 'featured'); // Mark as featured
-  }
-};
+  const handleHeartClick = (e, property) => {
+    e.stopPropagation();
+    if (isInCart(property.id)) {
+      removeFromCart(property.id);
+    } else {
+      addToCart(property, 'featured'); // Mark as featured
+    }
+  };
   const renderPropertyCard = (prop, idx) => (
     <div
       className={`property-card-custom ${isMobile ? 'mobile-card' : ''}`}
@@ -114,7 +119,7 @@ const handleHeartClick = (e, property) => {
       }}
     >
       <img src={prop.img} alt={prop.name} className="property-img-custom" />
-      
+
       {/* Heart Button - TOP RIGHT */}
       <button
         className={`property-heart-button ${isInCart(prop.id) ? 'in-cart' : ''}`}
@@ -124,15 +129,8 @@ const handleHeartClick = (e, property) => {
         <HeartIcon filled={isInCart(prop.id)} />
       </button>
 
-      <div className="property-confidence-badge">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 4 }}>
-          <rect x="2" y="3" width="20" height="18" rx="6" fill="none" />
-          <path d="M12 17.5L7.5 15.5V7.5C7.5 6.39543 8.39543 5.5 9.5 5.5H14.5C15.6046 5.5 16.5 6.39543 16.5 7.5V15.5L12 17.5Z" stroke="#223A5F" strokeWidth="1.5" />
-          <path d="M12 10.5L12.866 12.134C12.9472 12.2872 13.0906 12.3978 13.2598 12.4292L15.0711 12.7712C15.4952 12.8492 15.6682 13.3722 15.3522 13.6682L13.9522 14.9682C13.8252 15.0862 13.7652 15.2662 13.8002 15.4412L14.1712 17.2412C14.2562 17.6652 13.8032 17.9902 13.4292 17.7712L12 16.9412L10.5708 17.7712C10.1968 17.9902 9.74377 17.6652 9.82877 17.2412L10.1998 15.4412C10.2348 15.2662 10.1748 15.0862 10.0478 14.9682L8.64777 13.6682C8.33177 13.3722 8.50477 12.8492 8.92877 12.7712L10.7402 12.4292C10.9094 12.3978 11.0528 12.2872 11.134 12.134L12 10.5Z" stroke="#223A5F" strokeWidth="1.2" />
-        </svg>
-        <span>{prop.confidence}</span>
-      </div>
-      
+
+
       <div className="property-overlay-custom">
         <div className="property-info-custom">
           <h2>{prop.name}</h2>
@@ -149,7 +147,7 @@ const handleHeartClick = (e, property) => {
   return (
     <section className="property-section-custom">
       <div style={{ textAlign: 'center', marginBottom: '120px' }}>
-        <h2 style={{ 
+        <h2 style={{
           fontSize: '2.5rem',
           fontWeight: 800,
           color: '#223A5F',
@@ -159,7 +157,7 @@ const handleHeartClick = (e, property) => {
         }}>
           Properties
         </h2>
-        <span style={{ 
+        <span style={{
           display: 'block',
           width: '80px',
           height: '4px',
@@ -170,7 +168,7 @@ const handleHeartClick = (e, property) => {
           boxShadow: '0 2px 4px rgba(241, 217, 122, 0.3)'
         }} />
       </div>
-      
+
       <div className="property-cards-row-wrapper">
         <div className={`property-cards-row ${isMobile ? 'mobile-cards-row' : ''}`} ref={cardsRowRef}>
           {loading ? (
@@ -295,9 +293,9 @@ const handleHeartClick = (e, property) => {
           width: 100%;
           display: flex;
           align-items: center;
-         padding: 20px 0;        /* Reduced from 40px */
-          margin: 20px 0 0 0;    /* Add positive top margin instead of negative */
-          overflow: hidden;
+         padding: 30px 0;        /* Reduced from 40px */
+          margin: 40px 0 0 0;    /* Add positive top margin instead of negative */
+          overflow: visible;
           background: white;
           border-radius: 8px;
         }
@@ -312,9 +310,9 @@ const handleHeartClick = (e, property) => {
           overflow-x: auto;
           scrollbar-width: none;
           -ms-overflow-style: none;
-          padding: 20px 16px;     /* Reduced from 40px */
+          padding: 30px 16px;     /* Reduced from 40px */
           margin: 0;              /* Remove negative margin */
-          overflow-y: hidden;
+          overflow-y: visible;
           -webkit-overflow-scrolling: touch;
           scroll-behavior: smooth;
           scroll-snap-type: x mandatory;
@@ -471,7 +469,7 @@ const handleHeartClick = (e, property) => {
           .property-cards-row {
             gap: 18px;
             padding: 36px 16px;
-            margin: -36px 0;
+            margin: 36px 0;
           }
           .property-card-custom {
             width: 280px;
@@ -534,7 +532,6 @@ const handleHeartClick = (e, property) => {
             gap: 16px;
             padding: 32px 16px;
             margin: 32px 10px;
-            overflow-y: hidden;
           }
 
           .property-cards-row-wrapper {
@@ -637,7 +634,6 @@ const handleHeartClick = (e, property) => {
             gap: 12px;
             padding: 12px 10px;
             margin: 12px 10px;
-            overflow-y: hidden;
           }
 
           .property-cards-row-wrapper {
@@ -724,7 +720,6 @@ const handleHeartClick = (e, property) => {
             gap: 10px;
             padding: 10px 10px;
             margin: -10px 0;
-            overflow-y: hidden;
           }
 
           .property-cards-row-wrapper {

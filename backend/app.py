@@ -79,11 +79,14 @@ logging.basicConfig(
 security_logger = logging.getLogger('security')
 
 app = Flask(__name__)
+# Read allowed frontend origins from env, with sensible defaults
+_frontend_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174').split(',')
+
 CORS(app, supports_credentials=True, resources={
-    r"/api/*": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/query": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/build_index": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]},
-    r"/health": {"origins": ["http://localhost:3000", "http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:3000", "http://127.0.0.1:5173", "http://127.0.0.1:5174"]}
+    r"/api/*": {"origins": _frontend_origins},
+    r"/query": {"origins": _frontend_origins},
+    r"/build_index": {"origins": _frontend_origins},
+    r"/health": {"origins": _frontend_origins}
 })
 
 # Configure Flask to use UTF-8
@@ -373,36 +376,24 @@ def get_nearest_nodes(location):
             'nearestNodes': nearest
         })
     
-    # Calculate nearest nodes that have properties
+    # Calculate nearest nodes that have properties.
+    # Collect ALL valid candidates with their offset distance, then pick
+    # the 4 closest ordered by position in ORDERED_AREAS.
     total_areas = len(ORDERED_AREAS)
-    nearest = []
-    
-    # Use a spiral search pattern: alternate between before and after the found index
-    # to find nodes with properties
-    max_offset = total_areas
-    
-    for offset in range(1, max_offset):
-        if len(nearest) >= 4:
-            break
-        
-        # Try after
-        idx_after = found_index + offset
-        if idx_after < total_areas:
-            area = ORDERED_AREAS[idx_after]
-            if has_properties_for_location(area):
-                nearest.append(area)
-        
-        if len(nearest) >= 4:
-            break
-        
-        # Try before
-        idx_before = found_index - offset
-        if idx_before >= 0:
-            area = ORDERED_AREAS[idx_before]
-            if has_properties_for_location(area):
-                nearest.insert(0, area)  # Insert at beginning to maintain order
-    
-    nearest = nearest[:4]  # Ensure max 4 nodes
+    candidates = []  # list of (absolute_offset, index_in_ORDERED_AREAS)
+
+    for i, area in enumerate(ORDERED_AREAS):
+        if i == found_index:
+            continue  # skip the user's own location
+        if has_properties_for_location(area):
+            candidates.append((abs(i - found_index), i))
+
+    # Sort by offset distance (closest first), then by actual index for stable ordering
+    candidates.sort(key=lambda x: (x[0], x[1]))
+
+    # Take the 4 closest; re-sort by original index to preserve geographic order
+    closest_four = sorted(candidates[:4], key=lambda x: x[1])
+    nearest = [ORDERED_AREAS[idx] for _, idx in closest_four]
     
     return jsonify({
         'primaryLocation': ORDERED_AREAS[found_index],
@@ -496,7 +487,7 @@ def get_builders():
 
 # New endpoint to fetch builder by company_name
 @app.route('/api/builders/name/<company_name>', methods=['GET'])
-@jwt_required()
+# 6 @jwt_required()
 def get_builder_by_name(company_name):
     """
     Get builder by company name (case-insensitive, handles URL-encoded names)
@@ -1319,7 +1310,6 @@ def list_blogs():
 # Get a single blog by ID
 @app.route('/api/blogs/<int:blog_id>', methods=['GET'])
 @jwt_required()
-@jwt_required()
 def get_blog(blog_id):
     blog = Blog.query.get_or_404(blog_id)
     return jsonify(blog.to_dict())
@@ -1962,12 +1952,17 @@ def search_properties():
     if price and price > 0:
         def price_matches(prop, max_price_cr):
             val = getattr(prop, "Price_Starting_From", "") or ""
-            val_clean = val.replace('₹','').replace(',','').replace('+','').strip().lower()
+            # Handle ranges like "70 L - 2.5 Cr" - take the starting price
+            first_part = val.split('–')[0].split('-')[0].strip()
+            val_clean = first_part.replace('₹','').replace(',','').replace('+','').strip().lower()
+            
             try:
-                if 'cr' in val_clean:
-                    price_val = float(val_clean.replace('cr','').strip())
-                elif 'lakh' in val_clean:
-                    price_val = float(val_clean.replace('lakh','').strip()) / 100  # Lakh → Cr
+                # Handle "Cr" or "Crore"
+                if 'cr' in val_clean or 'crore' in val_clean:
+                    price_val = float(val_clean.replace('crore','').replace('cr','').strip())
+                # Handle "L" or "Lakh"
+                elif 'l' in val_clean or 'lakh' in val_clean:
+                    price_val = float(val_clean.replace('lakh','').replace('l','').strip()) / 100  # Lakh → Cr
                 else:
                     price_val = float(val_clean)
                 return price_val <= max_price_cr

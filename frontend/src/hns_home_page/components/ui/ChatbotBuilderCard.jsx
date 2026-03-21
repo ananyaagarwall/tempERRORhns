@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React from 'react';
 import { Building2, MapPin } from 'lucide-react'; // Using lucide-react for icons
 import { useNavigate } from 'react-router-dom';
@@ -6,7 +7,7 @@ import './ChatbotBuilderCard.css';
 const ChatbotBuilderCard = ({ builder }) => {
   const navigate = useNavigate();
 
-  const builderImage = builder.logo || 'http://localhost:5000/public/building.webp';
+  const builderImage = builder.logo || `${API_BASE_URL}/public/building.webp`;
 
   const handleCardClick = () => {
     // Assuming a builder detail page exists, e.g., /builders/:reraId

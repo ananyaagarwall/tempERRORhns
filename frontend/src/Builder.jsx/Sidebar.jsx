@@ -1,3 +1,4 @@
+import API_BASE_URL from '../config';
 import React, { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 
@@ -14,7 +15,7 @@ const Sidebar = () => {
 
   const fetchGeoLocation = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/latest-geolocation');
+      const res = await fetch(`${API_BASE_URL}/api/admin/latest-geolocation`);
       if (res.ok) {
         const data = await res.json();
         setGeoLocation(data);

@@ -1,3 +1,4 @@
+import API_BASE_URL from '../config';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -10,7 +11,7 @@ function BlogManagement() {
   const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
 
-  const FLASK_API_URL = 'http://localhost:5000/api';
+  const FLASK_API_URL = `${API_BASE_URL}/api`;
 
   useEffect(() => {
     fetchPosts();
@@ -156,7 +157,7 @@ function BlogManagement() {
               {/* Featured Image INSIDE the card */}
               {post.featured_image && (
                 <img
-                  src={`http://localhost:5000/uploads/${post.featured_image?.split('/').pop()}`}
+                  src={`${API_BASE_URL}/uploads/${post.featured_image?.split('/').pop()}`}
                   alt={post.featured_image_alt || post.title}
                   className="w-full h-48 object-cover rounded-t-lg"
                   style={{ objectFit: 'cover' }}
@@ -231,7 +232,7 @@ function BlogManagement() {
               {selectedPost.featured_image && (
                 <div className="mb-6">
                   <img
-                    src={`http://localhost:5000/uploads/${selectedPost.featured_image?.split('/').pop()}`}
+                    src={`${API_BASE_URL}/uploads/${selectedPost.featured_image?.split('/').pop()}`}
                     alt={selectedPost.featured_image_alt || selectedPost.title}
                     className="w-full h-64 object-cover rounded-lg"
                   />
@@ -244,17 +245,17 @@ function BlogManagement() {
                 <h3>{selectedPost.subheading1}</h3>
                 <p>{selectedPost.content1}</p>
                 {selectedPost.image1 && (
-                  <img src={`http://localhost:5000/uploads/${selectedPost.image1?.split('/').pop()}`} alt={selectedPost.alt_text1 || ''} style={{maxWidth: 400}} />
+                  <img src={`${API_BASE_URL}/uploads/${selectedPost.image1?.split('/').pop()}`} alt={selectedPost.alt_text1 || ''} style={{ maxWidth: 400 }} />
                 )}
                 <h3>{selectedPost.subheading2}</h3>
                 <p>{selectedPost.content2}</p>
                 {selectedPost.image2 && (
-                  <img src={`http://localhost:5000/uploads/${selectedPost.image2?.split('/').pop()}`} alt={selectedPost.alt_text2 || ''} style={{maxWidth: 400}} />
+                  <img src={`${API_BASE_URL}/uploads/${selectedPost.image2?.split('/').pop()}`} alt={selectedPost.alt_text2 || ''} style={{ maxWidth: 400 }} />
                 )}
                 <h3>{selectedPost.subheading3}</h3>
                 <p>{selectedPost.content3}</p>
                 {selectedPost.image3 && (
-                  <img src={`http://localhost:5000/uploads/${selectedPost.image3?.split('/').pop()}`} alt={selectedPost.alt_text3 || ''} style={{maxWidth: 400}} />
+                  <img src={`${API_BASE_URL}/uploads/${selectedPost.image3?.split('/').pop()}`} alt={selectedPost.alt_text3 || ''} style={{ maxWidth: 400 }} />
                 )}
                 {/* Interlinks */}
                 {selectedPost.interlinks && selectedPost.interlinks.length > 0 && (

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FaSearch, FaBars, FaTimes, FaHome, FaBuilding, FaRegFileAlt, FaEnvelope, FaUser, FaUserCircle, FaRegUserCircle } from 'react-icons/fa';
-import headerBg from '../../../assets/Header.img1.gradient1.png'; 
+import headerBg from '../../../assets/Header.img1.gradient1.png';
 import { Link, useNavigate } from 'react-router-dom';
-import '../../home_page_css/HeaderSection.css'; 
+import '../../home_page_css/HeaderSection.css';
 
 const HeaderSection = () => {
   const [activeIndex, setActiveIndex] = useState(0);
@@ -27,17 +27,17 @@ const HeaderSection = () => {
     5, 10, 15, 20, 25, 30, 35, 40, 45, 50,
     55, 60, 70, 80, 90, 100, 125, 150, 175, 200,
   ]; // values in Lakhs (L); null represents No Min/No Max
-  
+
   // BHK Type dropdown state
   const [selectedBhkTypes, setSelectedBhkTypes] = useState([]);
   const [showBhkDropdown, setShowBhkDropdown] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const [showBhkMobile, setShowBhkMobile] = useState(false);
   const bhkTriggerRef = useRef(null);
-  
+
   // Search type state (properties or builders)
   const [searchType, setSearchType] = useState('properties'); // 'properties' or 'builders'
-  
+
   const bhkOptions = [
     { id: '1bhk', label: '1 BHK' },
     { id: '2bhk', label: '2 BHK' },
@@ -45,7 +45,7 @@ const HeaderSection = () => {
     { id: '4bhk', label: '4 BHK' },
     { id: '4plus', label: '4+ BHK' }
   ];
-  
+
   const formatCr = (val) => {
     if (val >= 50) return '₹50Cr+';
     if (val === 0) return '₹0';
@@ -63,14 +63,14 @@ const HeaderSection = () => {
     if (!triggerEl) return;
     const rect = triggerEl.getBoundingClientRect();
     const dropdownHeight = 250;
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const shouldShowAbove = spaceBelow < dropdownHeight || rect.bottom > window.innerHeight * 0.6;
-      setDropdownPosition({
-        top: shouldShowAbove ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
-        left: rect.left,
-        width: rect.width,
-        showAbove: shouldShowAbove
-      });
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const shouldShowAbove = spaceBelow < dropdownHeight || rect.bottom > window.innerHeight * 0.6;
+    setDropdownPosition({
+      top: shouldShowAbove ? rect.top - dropdownHeight - 4 : rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+      showAbove: shouldShowAbove
+    });
   };
 
   const toggleBhkDropdown = () => {
@@ -93,13 +93,13 @@ const HeaderSection = () => {
 
   const getBhkDisplayText = () => {
     if (selectedBhkTypes.length === 0) return 'All Type';
-    
+
     // Get selected options in order and format them
     const selectedOptions = bhkOptions
       .filter(option => selectedBhkTypes.includes(option.id))
       .map(option => option.label)
       .join(',');
-    
+
     return selectedOptions;
   };
 
@@ -139,36 +139,36 @@ const HeaderSection = () => {
     setIsSearchbarExpanded(false);
   };
 
-  const handleLogin = () => {/* your login logic here */};
-  const handleSignup = () => {/* your signup logic here */};
+  const handleLogin = () => {/* your login logic here */ };
+  const handleSignup = () => {/* your signup logic here */ };
 
   // Updated toggle function with scroll prevention
- const toggleMenu = () => {
-  const newShowMenu = !showMenu;
-  setShowMenu(newShowMenu);
+  const toggleMenu = () => {
+    const newShowMenu = !showMenu;
+    setShowMenu(newShowMenu);
 
-  if (newShowMenu) {
-    // Save current scroll position and lock body
-    const scrollY = window.scrollY;
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = '100%';
-    document.body.style.overflow = 'hidden';
-  } else {
-    // Restore scroll position
-    const scrollY = document.body.style.top;
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.width = '';
-    document.body.style.overflow = '';
-    window.scrollTo(0, parseInt(scrollY || '0') * -1);
-  }
-};
+    if (newShowMenu) {
+      // Save current scroll position and lock body
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+    } else {
+      // Restore scroll position
+      const scrollY = document.body.style.top;
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+      window.scrollTo(0, parseInt(scrollY || '0') * -1);
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => setWindowWidth(window.innerWidth);
     window.addEventListener('resize', handleResize);
-    
+
     // Add click outside handler to close price range slider only
     const handleClickOutside = (event) => {
       const priceRangeDropdowns = document.querySelectorAll('.price-range-dropdown, .mobile-price-range-dropdown');
@@ -177,60 +177,60 @@ const HeaderSection = () => {
       const expandedContent = document.querySelector('.expanded-price-content');
       const bhkDropdowns = document.querySelectorAll('.bhk-dropdown');
       const bhkTriggers = document.querySelectorAll('.bhk-dropdown-trigger');
-      
+
       let clickedInsideDropdown = false;
       priceRangeDropdowns.forEach(dropdown => {
         if (dropdown && dropdown.contains(event.target)) {
           clickedInsideDropdown = true;
         }
       });
-      
+
       let clickedOnTrigger = false;
       priceRangeTriggers.forEach(trigger => {
         if (trigger && trigger.contains(event.target)) {
           clickedOnTrigger = true;
         }
       });
-      
+
       let clickedOnSlider = false;
       priceRangeSliders.forEach(slider => {
         if (slider && slider.contains(event.target)) {
           clickedOnSlider = true;
         }
       });
-      
+
       let clickedOnExpandedContent = false;
       if (expandedContent && expandedContent.contains(event.target)) {
         clickedOnExpandedContent = true;
       }
-      
+
       let clickedOnBhkDropdown = false;
       bhkDropdowns.forEach(dropdown => {
         if (dropdown && dropdown.contains(event.target)) {
           clickedOnBhkDropdown = true;
         }
       });
-      
+
       let clickedOnBhkTrigger = false;
       bhkTriggers.forEach(trigger => {
         if (trigger && trigger.contains(event.target)) {
           clickedOnBhkTrigger = true;
         }
       });
-      
+
       // Close BHK dropdown if clicking outside
       if (!clickedOnBhkDropdown && !clickedOnBhkTrigger && showBhkDropdown) {
         setShowBhkDropdown(false);
       }
-      
+
       // Don't close price range if clicking on trigger, dropdown, slider, or expanded content
       if (!clickedInsideDropdown && !clickedOnTrigger && !clickedOnSlider && !clickedOnExpandedContent && showPriceRangeSlider) {
         closePriceRange();
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
-    
+
     return () => {
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('mousedown', handleClickOutside);
@@ -253,14 +253,14 @@ const HeaderSection = () => {
   }, [showBhkDropdown]);
 
   // Cleanup effect for body styles
-useEffect(() => {
-  return () => {
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.width = '';
-    document.body.style.overflow = '';
-  };
-}, []);
+  useEffect(() => {
+    return () => {
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      document.body.style.overflow = '';
+    };
+  }, []);
 
   const bgImg = windowWidth <= 600 ? '/main-image.jpeg' : headerBg;
   const bgSize = windowWidth <= 600 ? 'contain' : 'cover';
@@ -368,21 +368,21 @@ useEffect(() => {
   }
 
   return (
-<div 
-  className="header-section relative w-full text-white overflow-hidden"
-  style={{
-    backgroundImage: `url(${headerBg})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
-    // CHANGED: If mobile, use 60vh, otherwise 100vh
-    height: isMobile ? '60vh' : '100vh',           
-    minHeight: isMobile ? '60dvh' : '100dvh',       
-  }}
->
+    <div
+      className="header-section relative w-full text-white overflow-hidden"
+      style={{
+        backgroundImage: `url(${headerBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        // CHANGED: If mobile, use 60vh, otherwise 100vh
+        height: isMobile ? '60vh' : '100vh',
+        minHeight: isMobile ? '60dvh' : '100dvh',
+      }}
+    >
 
       {/* Overlay */}
-      <div 
+      <div
         className="absolute bg-gradient-to-r from-[#16386d] to-[rgba(0,0,0,0.1)] z-0"
         style={isMobile ? {
           top: 0,
@@ -395,67 +395,67 @@ useEffect(() => {
       />
 
       {/* Main Navbar */}
-     {!(isMobile && showMenu) && (
-    <nav
-      className="custom-navbar header-navbar"
-      style={{
-        position: 'absolute',
-        ...navbarStyles,
-        background: 'rgba(30, 48, 80, 0.18)',
-        border: '1px solid rgba(255,255,255,0.35)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        zIndex: 50,
-        boxSizing: 'border-box',
-        boxShadow: '0 2px 16px rgba(34,58,95,0.10)',
-      }}
-    >
+      {!(isMobile && showMenu) && (
+        <nav
+          className="custom-navbar header-navbar"
+          style={{
+            position: 'absolute',
+            ...navbarStyles,
+            background: 'rgba(30, 48, 80, 0.18)',
+            border: '1px solid rgba(255,255,255,0.35)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            zIndex: 50,
+            boxSizing: 'border-box',
+            boxShadow: '0 2px 16px rgba(34,58,95,0.10)',
+          }}
+        >
           {/* Logo inside navbar */}
-          <img 
-            src="/HouseNSeek.png" 
-            alt="HouseNSeek Logo" 
+          <img
+            src="/HouseNSeek.png"
+            alt="HouseNSeek Logo"
             className="header-logo"
-            style={{ 
-              height: isMobile ? (isSmallMobile ? 24 : 28) : isTablet ? 32 : 36, 
-              width: 'auto', 
-              marginRight: isMobile ? (isSmallMobile ? 8 : 12) : isTablet ? 16 : 24, 
-              marginLeft: 0, 
+            style={{
+              height: isMobile ? (isSmallMobile ? 24 : 28) : isTablet ? 32 : 36,
+              width: 'auto',
+              marginRight: isMobile ? (isSmallMobile ? 8 : 12) : isTablet ? 16 : 24,
+              marginLeft: 0,
               zIndex: 31,
               flexShrink: 0
-            }} 
+            }}
           />
 
           {/* Desktop Navigation */}
           {!isMobile && (
-            <div className="desktop-nav" style={{ 
-              display: 'flex', 
-              gap: isTablet ? 24 : isLaptop ? 32 : 40, 
+            <div className="desktop-nav" style={{
+              display: 'flex',
+              gap: isTablet ? 24 : isLaptop ? 32 : 40,
               alignItems: 'center',
               flexWrap: 'nowrap',
               overflow: 'hidden'
             }}>
-              <Link to="/builder" className="nav-link" style={{ 
+              <Link to="/builder" className="nav-link" style={{
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>Builders</Link>
-              <Link to="/properties" className="nav-link" style={{ 
+              <Link to="/properties" className="nav-link" style={{
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>Projects</Link>
-              <Link to="/blogs" className="nav-link" style={{ 
+              <Link to="/blogs" className="nav-link" style={{
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>Blog</Link>
-             <Link to="/cart" className="nav-link" style={{ fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px' }}>
+              <Link to="/cart" className="nav-link" style={{ fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px' }}>
                 Cart
               </Link>
-             <Link to="/about" className="nav-link" style={{ 
+              <Link to="/about" className="nav-link" style={{
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>About Us</Link>
-              <Link to="/login" className="nav-link" style={{ 
+              <Link to="/login" className="nav-link" style={{
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}><FaRegUserCircle size={22} /></Link>
-              </div>
+            </div>
           )}
 
           {/* Mobile Hamburger Menu */}
@@ -529,16 +529,16 @@ useEffect(() => {
           }}
         >
           {/* Top: Welcome card */}
-          <div className="welcome-card" style={{ 
-            background: 'linear-gradient(90deg, #23487c 60%, #3f4c7f 100%)', 
-            borderRadius: '0 0 20px 20px', 
-            boxShadow: '0 4px 18px rgba(34,58,95,0.18)', 
-            minHeight: 80, 
-            padding: '14px 16px 10px 16px', 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'flex-start', 
-            position: 'relative' 
+          <div className="welcome-card" style={{
+            background: 'linear-gradient(90deg, #23487c 60%, #3f4c7f 100%)',
+            borderRadius: '0 0 20px 20px',
+            boxShadow: '0 4px 18px rgba(34,58,95,0.18)',
+            minHeight: 80,
+            padding: '14px 16px 10px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            position: 'relative'
           }}>
             <button
               onClick={toggleMenu}
@@ -548,8 +548,8 @@ useEffect(() => {
                 position: 'absolute', right: 12, top: 10,
                 background: 'none', border: 'none', color: '#fff', fontSize: 40, cursor: 'pointer', padding: 8, borderRadius: 8, fontWeight: 700, lineHeight: 1, boxShadow: '0 2px 8px rgba(34,58,95,0.10)', transition: 'background 0.18s, transform 0.18s',
               }}
-              onMouseOver={e => { e.currentTarget.style.background='#2d5a9f'; e.currentTarget.style.transform='scale(1.12)'; }}
-              onMouseOut={e => { e.currentTarget.style.background='none'; e.currentTarget.style.transform='none'; }}
+              onMouseOver={e => { e.currentTarget.style.background = '#2d5a9f'; e.currentTarget.style.transform = 'scale(1.12)'; }}
+              onMouseOut={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.transform = 'none'; }}
             >
               &times;
             </button>
@@ -565,117 +565,117 @@ useEffect(() => {
               </div>
             </div>
             {!user && (
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 onClick={toggleMenu}
                 className="login-signup-btn"
-                style={{ 
-                  marginTop: 4, 
-                  background: '#fff', 
-                  color: '#23487c', 
-                  fontWeight: 700, 
-                  fontSize: '1.02rem', 
-                  border: 'none', 
-                  borderRadius: 12, 
-                  padding: '7px 0', 
-                  width: '92%', 
-                  marginLeft: '4%', 
-                  boxShadow: '0 3px 12px rgba(34,58,95,0.13)', 
-                  cursor: 'pointer', 
-                  letterSpacing: 0.5, 
-                  transition: 'background 0.18s, color 0.18s', 
-                  display: 'block', 
-                  textAlign: 'center', 
-                  textDecoration: 'none' 
+                style={{
+                  marginTop: 4,
+                  background: '#fff',
+                  color: '#23487c',
+                  fontWeight: 700,
+                  fontSize: '1.02rem',
+                  border: 'none',
+                  borderRadius: 12,
+                  padding: '7px 0',
+                  width: '92%',
+                  marginLeft: '4%',
+                  boxShadow: '0 3px 12px rgba(34,58,95,0.13)',
+                  cursor: 'pointer',
+                  letterSpacing: 0.5,
+                  transition: 'background 0.18s, color 0.18s',
+                  display: 'block',
+                  textAlign: 'center',
+                  textDecoration: 'none'
                 }}
               >
                 Login / Signup
               </Link>
             )}
           </div>
-          
-      {/* Action cards */}
-<div className="action-cards-container" style={{ 
-  width: '100%', 
-  display: 'flex', 
-  flexDirection: 'column', 
-  gap: 16,           // ← Reduced gap for better fit
-  marginTop: 16, 
-  padding: '0 0 40px 0',
-  overflowY: 'auto',
-  flex: 1
-}}>
-  {/* Builder */}
-  <Link 
-    to="/builder" 
-    onClick={toggleMenu}
-    className="action-card"
-  >
-    <div>
-      <div className="action-card-title">Builders</div>
-      <div className="action-card-description">Find your dream home</div>
-    </div>
-    <span className="action-card-icon icon-projects">🏢</span>
-  </Link>
 
-  {/* Projects */}
-  <Link 
-    to="/properties" 
-    onClick={toggleMenu}
-    className="action-card"
-  >
-    <div>
-      <div className="action-card-title">Projects</div>
-      <div className="action-card-description">Explore top real estate projects</div>
-    </div>
-    <span className="action-card-icon icon-buy">🏠</span>
-  </Link>
+          {/* Action cards */}
+          <div className="action-cards-container" style={{
+            width: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,           // ← Reduced gap for better fit
+            marginTop: 16,
+            padding: '0 0 40px 0',
+            overflowY: 'auto',
+            flex: 1
+          }}>
+            {/* Builder */}
+            <Link
+              to="/builder"
+              onClick={toggleMenu}
+              className="action-card"
+            >
+              <div>
+                <div className="action-card-title">Builders</div>
+                <div className="action-card-description">Find your dream home</div>
+              </div>
+              <span className="action-card-icon icon-projects">🏢</span>
+            </Link>
 
-{/* CART ITEM */}
-  <Link 
-    to="/cart" 
-    onClick={toggleMenu}
-    className="action-card"
-  >
-    <div>
-      <div className="action-card-title">Cart</div>
-      <div className="action-card-description">View saved properties</div>
-    </div>
-    <span className="action-card-icon icon-cart">🛒</span>
-  </Link>
+            {/* Projects */}
+            <Link
+              to="/properties"
+              onClick={toggleMenu}
+              className="action-card"
+            >
+              <div>
+                <div className="action-card-title">Projects</div>
+                <div className="action-card-description">Explore top real estate projects</div>
+              </div>
+              <span className="action-card-icon icon-buy">🏠</span>
+            </Link>
 
-  {/* Blog */}
-  <Link 
-    to="/blogs" 
-    onClick={toggleMenu}
-    className="action-card"
-  >
-    <div>
-      <div className="action-card-title">Blog</div>
-      <div className="action-card-description">Read property news & tips</div>
-    </div>
-    <span className="action-card-icon icon-blog">📰</span>
-  </Link>
+            {/* CART ITEM */}
+            <Link
+              to="/cart"
+              onClick={toggleMenu}
+              className="action-card"
+            >
+              <div>
+                <div className="action-card-title">Cart</div>
+                <div className="action-card-description">View saved properties</div>
+              </div>
+              <span className="action-card-icon icon-cart">🛒</span>
+            </Link>
 
-  {/* About Us */}
-  <Link 
-    to="/about" 
-    onClick={toggleMenu}
-    className="action-card"
-  >
-    <div>
-      <div className="action-card-title">About Us</div>
-      <div className="action-card-description">Get in touch with us</div>
-    </div>
-    <span className="action-card-icon icon-contact">✉</span>
-  </Link>
-</div>
+            {/* Blog */}
+            <Link
+              to="/blogs"
+              onClick={toggleMenu}
+              className="action-card"
+            >
+              <div>
+                <div className="action-card-title">Blog</div>
+                <div className="action-card-description">Read property news & tips</div>
+              </div>
+              <span className="action-card-icon icon-blog">📰</span>
+            </Link>
+
+            {/* About Us */}
+            <Link
+              to="/about"
+              onClick={toggleMenu}
+              className="action-card"
+            >
+              <div>
+                <div className="action-card-title">About Us</div>
+                <div className="action-card-description">Get in touch with us</div>
+              </div>
+              <span className="action-card-icon icon-contact">✉</span>
+            </Link>
+          </div>
           {/* Animation styles moved to HeaderSection.css */}
         </div>
-      )}     
+      )}
       {/* We've removed the full search dropdown to only keep the price range dropdown */}
       {/* Main Section */}
-      <main 
+      <main
         className={`relative z-10 flex items-center justify-between max-w-[1400px] mx-auto px-8 header-main ${isMobile ? 'mobile' : ''}`}
         style={isMobile ? {
           height: '60vh',
@@ -708,7 +708,7 @@ useEffect(() => {
           >
             "One home. One decision. One clean journey."
           </p>
-          
+
           {/* Removed old large mobile search button to keep navbar icons only */}
         </div>
       </main>
@@ -730,54 +730,83 @@ useEffect(() => {
                 <FaTimes />
               </button>
             </div>
-            
+
             {/* Location Input */}
             <div className="mobile-search-field-container">
               <label className="mobile-search-label">
                 Location
               </label>
               <div className="mobile-search-input-container">
-                <input 
-                  type="text" 
-                  placeholder="Enter location..." 
+                <input
+                  type="text"
+                  placeholder="Enter location..."
                   className="mobile-search-input"
                   autoFocus
+                  value={location}
+                  onChange={e => setLocation(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const correctedLocation = autocorrectLocation(location);
+                      window.dispatchEvent(new CustomEvent('filterLandingPage', {
+                        detail: {
+                          location: correctedLocation,
+                          priceRange,
+                          bhkTypes: selectedBhkTypes
+                        }
+                      }));
+                      setShowMobileSearch(false);
+                    }
+                  }}
                 />
-                <button style={{
-                  background: '#2563EB',
-                  border: 'none',
-                  color: 'white',
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                }}>
+                <button
+                  style={{
+                    background: '#2563EB',
+                    border: 'none',
+                    color: 'white',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                  }}
+                  onClick={() => {
+                    const correctedLocation = autocorrectLocation(location);
+                    window.dispatchEvent(new CustomEvent('filterLandingPage', {
+                      detail: {
+                        location: correctedLocation,
+                        priceRange,
+                        bhkTypes: selectedBhkTypes
+                      }
+                    }));
+                    setShowMobileSearch(false);
+                  }}
+                >
                   <FaSearch style={{ fontSize: '14px' }} />
                 </button>
               </div>
             </div>
-            
+
             {/* Budget (Mobile) */}
             <div className="mobile-search-field-container">
               <label className="mobile-search-label">Budget in ₹</label>
               <div className="mobile-budget-container">
                 <div className="budget-pill-wrap">
-                <div className="budget-pill" onClick={() => { setShowMinDropdown(!showMinDropdown); setShowMaxDropdown(false); }}>
-                  {formatBudgetLabel(minBudget, 'No Min')}
-                  <span className="budget-caret">▼</span>
-                </div>
-                {showMinDropdown && (
-                    <div className="mobile-budget-dropdown left">
-                    {budgetOptions.map((opt, idx) => (
-                      <div key={`min-${idx}`} className="budget-option" onClick={() => handleSelectMin(opt)}>
-                        {formatBudgetLabel(opt, 'No Min')}
-                      </div>
-                    ))}
+                  <div className="budget-pill" onClick={() => { setShowMinDropdown(!showMinDropdown); setShowMaxDropdown(false); }}>
+                    {formatBudgetLabel(minBudget, 'No Min')}
+                    <span className="budget-caret">▼</span>
                   </div>
-                )}
+                  {showMinDropdown && (
+                    <div className="mobile-budget-dropdown left">
+                      {budgetOptions.map((opt, idx) => (
+                        <div key={`min-${idx}`} className="budget-option" onClick={() => handleSelectMin(opt)}>
+                          {formatBudgetLabel(opt, 'No Min')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <span className="budget-to">to</span>
                 <div className="budget-pill-wrap">
@@ -785,18 +814,18 @@ useEffect(() => {
                     {formatBudgetLabel(maxBudget, 'No Max')}
                     <span className="budget-caret">▼</span>
                   </div>
-                {showMaxDropdown && (
+                  {showMaxDropdown && (
                     <div className="mobile-budget-dropdown right">
-                    {budgetOptions.map((opt, idx) => (
-                      <div key={`max-${idx}`} className="budget-option" onClick={() => handleSelectMax(opt)}>
-                        {formatBudgetLabel(opt, 'No Max')}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      {budgetOptions.map((opt, idx) => (
+                        <div key={`max-${idx}`} className="budget-option" onClick={() => handleSelectMax(opt)}>
+                          {formatBudgetLabel(opt, 'No Max')}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>           
+            </div>
             {/* Property Type */}
             <div className="mobile-search-field-container" style={{ position: 'relative' }}>
               <label className="mobile-search-label">BHK Type</label>
@@ -845,12 +874,19 @@ useEffect(() => {
                   </div>
                 )}
               </div>
-            </div>            
+            </div>
             {/* Search Button */}
-            <button 
+            <button
               className="mobile-search-submit-btn"
               onClick={() => {
-                // Perform search
+                const correctedLocation = autocorrectLocation(location);
+                window.dispatchEvent(new CustomEvent('filterLandingPage', {
+                  detail: {
+                    location: correctedLocation,
+                    priceRange,
+                    bhkTypes: selectedBhkTypes
+                  }
+                }));
                 setShowMobileSearch(false);
               }}>
               <FaSearch style={{ marginRight: '10px', fontSize: '14px' }} />
@@ -865,7 +901,7 @@ useEffect(() => {
           </div>
         </div>
       )}
-        {/* Search Bar (hide on mobile) */}
+      {/* Search Bar (hide on mobile) */}
       {!isMobile && (
         <div
           style={{
@@ -902,223 +938,223 @@ useEffect(() => {
               transition: 'all 0.3s ease',
             }}
           >
-          {/* Row wrapper for non-expanded state */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'row',
-            alignItems: 'center',
-            width: '100%',
-            gap: isMobile ? '4px' : isTablet ? '10px' : isLaptop ? '12px' : '18px',
-          }}>
-            {/* Location Input Group */}
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              flex: 2,
-              maxWidth: isTablet ? 170 : isLaptop ? 200 : 220,
-              minWidth: isMobile ? 160 : isTablet ? 130 : isLaptop ? 150 : 140,
-              justifyContent: 'center',
-              width: 'auto',
-            }}>
-            <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Enter Location</label>
-            <div className="searchbar-input-wrap" style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              height: isMobile ? '36px' : 32, 
-              paddingLeft: 0, 
-              paddingRight: 0, 
+            {/* Row wrapper for non-expanded state */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'row',
+              alignItems: 'center',
               width: '100%',
+              gap: isMobile ? '4px' : isTablet ? '10px' : isLaptop ? '12px' : '18px',
             }}>
-              <input
-                type="text"
-                placeholder="Enter Location"
-                style={{
-                  border: 'none',
-                  outline: 'none',
-                  fontSize: windowWidth <= 350 ? '0.75rem' : 
-                           isMobile ? '0.95rem' : 
-                           isTablet ? '1rem' : '1.08rem',
-                  color: '#1A1A1A',
-                  background: 'transparent',
-                  width: '100%',
-                  padding: '0',
-                  textAlign: 'left',
-                  height: windowWidth <= 350 ? '26px' : undefined,
-                }}
-                className="searchbar-input enter-location-input"
-                value={location}
-                onChange={e => setLocation(e.target.value)}
-              />
-              <FaSearch style={{ color: '#888', fontSize: isMobile ? '1rem' : '1.08rem', marginLeft: 0, cursor: 'pointer' }} />
-            </div>
-          </div>
-          {/* Divider */}
-          <div style={{ width: 1, height: isMobile ? 18 : 32, background: '#bdbdbd', margin: isMobile ? '8px 0' : '0 10px' }} />
-          {/* Price Range Group */}
-          <div style={{ 
-            minWidth: isMobile ? 120 : isTablet ? 130 : isLaptop ? 140 : 160,
-            flex: 1,
-            width: 'auto',
-            marginTop: 0,
-            position: 'relative',
-          }}>
-            <div 
-               onClick={togglePriceRangeSlider}
-               className="price-range-trigger"
-               style={{ 
-                 cursor: 'pointer',
-                 position: 'relative',
-                 zIndex: 50,
-               }}
-             >
-              <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Price Range</label>
+              {/* Location Input Group */}
               <div style={{
-                position: 'relative',
-                height: isMobile ? 36 : 32,
-                border: 'none',
-                paddingLeft: 0,
-                paddingRight: 0,
-                width: '100%',
                 display: 'flex',
-                alignItems: 'center',
-              }}>
-                <span style={{ fontSize: windowWidth <= 350 ? '0.75rem' : isMobile ? '0.95rem' : '1.08rem', fontWeight: 600, color: '#222' }}>
-                  {priceRange === 0 ? 'All Range' : `Up to ${formatCr(priceRange)}`}
-                </span>
-                <span style={{ marginLeft: 'auto', fontSize: '14px', color: '#888' }}>▼</span>
-              </div>
-            </div>
-          </div>
-          {/* Divider - hidden on mobile */}
-          {!isMobile && <div style={{ width: 1, height: 32, background: '#ececec', margin: '0 10px' }} />}
-          {/* BHK Type Group */}
-          <div style={{ 
-            minWidth: isMobile ? 120 : isTablet ? 130 : isLaptop ? 140 : 160,
-            flex: 1,
-            width: 'auto',
-            marginTop: 0,
-            position: 'relative',
-          }}>
-            <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Type</label>
-            <div 
-              onClick={toggleBhkDropdown}
-              className="bhk-dropdown-trigger"
-              ref={bhkTriggerRef}
-              style={{
-                position: 'relative',
-                height: isMobile ? 36 : 32,
-                background: '#fff',
-                borderRadius: '16px',
-                border: 'none',
-                paddingLeft: 0,
-                paddingRight: 8,
-                width: '100%',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <span style={{
-                fontSize: windowWidth <= 350 ? '0.75rem' : 
-                         isMobile ? '0.95rem' : 
-                         isTablet ? '1rem' : '1.08rem',
-                fontWeight: 600,
-                color: '#222',
-                textAlign: 'left',
-                flex: 1,
-              }}>
-                {getBhkDisplayText()}
-              </span>
-              <span style={{ 
-                position: 'absolute', 
-                right: 6, 
-                pointerEvents: 'none', 
-                color: '#888', 
-                fontSize: isMobile ? '1rem' : '1.08rem', 
-                transform: showBhkDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                transition: 'transform 0.2s ease'
-              }}>▼</span>
-            </div>
-            
-          </div>
-          
-          {/* Search Button */}
-          <button
-            className="searchbar-btn"
-              style={{
-                background: '#F1D97A',
-                color: '#222',
-                fontWeight: 600,
-                fontSize: windowWidth <= 350 ? '0.75rem' : 
-                         isMobile ? '0.85rem' : 
-                         isTablet ? '0.95rem' : isLaptop ? '0.98rem' : '1.08rem',
-                border: 'none',
-                borderRadius: isMobile ? '10px' : '24px',
-                padding: windowWidth <= 350 ? '0 4px' : 
-                         isMobile ? '0 8px' : isTablet ? '0 16px' : isLaptop ? '0 18px' : '0 28px',
-                height: windowWidth <= 350 ? '26px' : 
-                        isMobile ? '28px' : isTablet ? '44px' : isLaptop ? '44px' : '56px',
-                lineHeight: windowWidth <= 350 ? '26px' : 
-                            isMobile ? '28px' : isTablet ? '44px' : isLaptop ? '44px' : '56px',
-                marginLeft: '10px',
-                boxShadow: '0 2px 8px rgba(241,217,122,0.18)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
+                flexDirection: 'column',
+                flex: 2,
+                maxWidth: isTablet ? 170 : isLaptop ? 200 : 220,
+                minWidth: isMobile ? 160 : isTablet ? 130 : isLaptop ? 150 : 140,
                 justifyContent: 'center',
-                transition: 'background 0.18s, box-shadow 0.18s, transform 0.18s',
+                width: 'auto',
+              }}>
+                <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Enter Location</label>
+                <div className="searchbar-input-wrap" style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  height: isMobile ? '36px' : 32,
+                  paddingLeft: 0,
+                  paddingRight: 0,
+                  width: '100%',
+                }}>
+                  <input
+                    type="text"
+                    placeholder="Enter Location"
+                    style={{
+                      border: 'none',
+                      outline: 'none',
+                      fontSize: windowWidth <= 350 ? '0.75rem' :
+                        isMobile ? '0.95rem' :
+                          isTablet ? '1rem' : '1.08rem',
+                      color: '#1A1A1A',
+                      background: 'transparent',
+                      width: '100%',
+                      padding: '0',
+                      textAlign: 'left',
+                      height: windowWidth <= 350 ? '26px' : undefined,
+                    }}
+                    className="searchbar-input enter-location-input"
+                    value={location}
+                    onChange={e => setLocation(e.target.value)}
+                  />
+                  <FaSearch style={{ color: '#888', fontSize: isMobile ? '1rem' : '1.08rem', marginLeft: 0, cursor: 'pointer' }} />
+                </div>
+              </div>
+              {/* Divider */}
+              <div style={{ width: 1, height: isMobile ? 18 : 32, background: '#bdbdbd', margin: isMobile ? '8px 0' : '0 10px' }} />
+              {/* Price Range Group */}
+              <div style={{
+                minWidth: isMobile ? 120 : isTablet ? 130 : isLaptop ? 140 : 160,
+                flex: 1,
                 width: 'auto',
                 marginTop: 0,
-                flexShrink: 0,
-              }}
-            onClick={() => {
-              const correctedLocation = autocorrectLocation(location);
-              window.dispatchEvent(new CustomEvent('filterLandingPage', {
-                detail: {
-                  location: correctedLocation,
-                  priceRange,
-                  bhkTypes: selectedBhkTypes
-                }
-              }));
-            }}
-            >
-              Search
-            </button>
-          </div>
-          
-          {/* Expanded Price Range Content - Simple working slider */}
-          {isSearchbarExpanded && (
-            <div className="expanded-price-content" style={{ width: '100%', paddingTop: '10px', borderTop: '1px solid #e5e7eb' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>Min: ₹0</span>
-                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>Max: {formatCr(priceRange || 50)}</span>
+                position: 'relative',
+              }}>
+                <div
+                  onClick={togglePriceRangeSlider}
+                  className="price-range-trigger"
+                  style={{
+                    cursor: 'pointer',
+                    position: 'relative',
+                    zIndex: 50,
+                  }}
+                >
+                  <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Price Range</label>
+                  <div style={{
+                    position: 'relative',
+                    height: isMobile ? 36 : 32,
+                    border: 'none',
+                    paddingLeft: 0,
+                    paddingRight: 0,
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}>
+                    <span style={{ fontSize: windowWidth <= 350 ? '0.75rem' : isMobile ? '0.95rem' : '1.08rem', fontWeight: 600, color: '#222' }}>
+                      {priceRange === 0 ? 'All Range' : `Up to ${formatCr(priceRange)}`}
+                    </span>
+                    <span style={{ marginLeft: 'auto', fontSize: '14px', color: '#888' }}>▼</span>
+                  </div>
+                </div>
               </div>
-              
-              {/* Simple working slider */}
-              <input
-                type="range"
-                min="0"
-                max="50"
-                step="1"
-                value={priceRange}
-                onChange={handlePriceRangeChange}
+              {/* Divider - hidden on mobile */}
+              {!isMobile && <div style={{ width: 1, height: 32, background: '#ececec', margin: '0 10px' }} />}
+              {/* BHK Type Group */}
+              <div style={{
+                minWidth: isMobile ? 120 : isTablet ? 130 : isLaptop ? 140 : 160,
+                flex: 1,
+                width: 'auto',
+                marginTop: 0,
+                position: 'relative',
+              }}>
+                <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Type</label>
+                <div
+                  onClick={toggleBhkDropdown}
+                  className="bhk-dropdown-trigger"
+                  ref={bhkTriggerRef}
+                  style={{
+                    position: 'relative',
+                    height: isMobile ? 36 : 32,
+                    background: '#fff',
+                    borderRadius: '16px',
+                    border: 'none',
+                    paddingLeft: 0,
+                    paddingRight: 8,
+                    width: '100%',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                  }}
+                >
+                  <span style={{
+                    fontSize: windowWidth <= 350 ? '0.75rem' :
+                      isMobile ? '0.95rem' :
+                        isTablet ? '1rem' : '1.08rem',
+                    fontWeight: 600,
+                    color: '#222',
+                    textAlign: 'left',
+                    flex: 1,
+                  }}>
+                    {getBhkDisplayText()}
+                  </span>
+                  <span style={{
+                    position: 'absolute',
+                    right: 6,
+                    pointerEvents: 'none',
+                    color: '#888',
+                    fontSize: isMobile ? '1rem' : '1.08rem',
+                    transform: showBhkDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease'
+                  }}>▼</span>
+                </div>
+
+              </div>
+
+              {/* Search Button */}
+              <button
+                className="searchbar-btn"
                 style={{
-                  width: '100%',
-                  height: '6px',
-                  appearance: 'none',
-                  background: `linear-gradient(to right, #F1D97A 0%, #F1D97A ${(priceRange/50)*100}%, #e5e7eb ${(priceRange/50)*100}%, #e5e7eb 100%)`,
-                  borderRadius: '10px',
-                  outline: 'none',
+                  background: '#F1D97A',
+                  color: '#222',
+                  fontWeight: 600,
+                  fontSize: windowWidth <= 350 ? '0.75rem' :
+                    isMobile ? '0.85rem' :
+                      isTablet ? '0.95rem' : isLaptop ? '0.98rem' : '1.08rem',
+                  border: 'none',
+                  borderRadius: isMobile ? '10px' : '24px',
+                  padding: windowWidth <= 350 ? '0 4px' :
+                    isMobile ? '0 8px' : isTablet ? '0 16px' : isLaptop ? '0 18px' : '0 28px',
+                  height: windowWidth <= 350 ? '26px' :
+                    isMobile ? '28px' : isTablet ? '44px' : isLaptop ? '44px' : '56px',
+                  lineHeight: windowWidth <= 350 ? '26px' :
+                    isMobile ? '28px' : isTablet ? '44px' : isLaptop ? '44px' : '56px',
+                  marginLeft: '10px',
+                  boxShadow: '0 2px 8px rgba(241,217,122,0.18)',
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.18s, box-shadow 0.18s, transform 0.18s',
+                  width: 'auto',
+                  marginTop: 0,
+                  flexShrink: 0,
                 }}
-                className="simple-price-range-slider"
-              />
+                onClick={() => {
+                  const correctedLocation = autocorrectLocation(location);
+                  window.dispatchEvent(new CustomEvent('filterLandingPage', {
+                    detail: {
+                      location: correctedLocation,
+                      priceRange,
+                      bhkTypes: selectedBhkTypes
+                    }
+                  }));
+                }}
+              >
+                Search
+              </button>
             </div>
-          )}
+
+            {/* Expanded Price Range Content - Simple working slider */}
+            {isSearchbarExpanded && (
+              <div className="expanded-price-content" style={{ width: '100%', paddingTop: '10px', borderTop: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>Min: ₹0</span>
+                  <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>Max: {formatCr(priceRange || 50)}</span>
+                </div>
+
+                {/* Simple working slider */}
+                <input
+                  type="range"
+                  min="0"
+                  max="50"
+                  step="1"
+                  value={priceRange}
+                  onChange={handlePriceRangeChange}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    appearance: 'none',
+                    background: `linear-gradient(to right, #F1D97A 0%, #F1D97A ${(priceRange / 50) * 100}%, #e5e7eb ${(priceRange / 50) * 100}%, #e5e7eb 100%)`,
+                    borderRadius: '10px',
+                    outline: 'none',
+                    cursor: 'pointer',
+                  }}
+                  className="simple-price-range-slider"
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
-      
+
       {/* BHK Dropdown Portal - Renders outside container */}
       {showBhkDropdown && createPortal(
         <div className="bhk-dropdown" style={{

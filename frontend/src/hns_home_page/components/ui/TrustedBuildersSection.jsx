@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import "../../home_page_css/TrustedBuildersSection.css";
@@ -23,11 +24,11 @@ const TrustedBuildersSection = ({ location }) => {
   useEffect(() => {
     const fetchBuilders = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/projects');
+        const response = await fetch(`${API_BASE_URL}/api/projects`);
         const data = await response.json();
         const formattedData = data.map(project => ({
           id: project._id || project.id || `builder-${project.title}-${project.location}`,
-          img: project.project_image ? `http://localhost:5000${project.project_image}` : '/palm.jpg',
+          img: project.project_image ? `${API_BASE_URL}${project.project_image}` : '/palm.jpg',
           logo: '',
           name: project.title,
           subtitle: project.location,

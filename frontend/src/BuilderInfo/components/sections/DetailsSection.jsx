@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React from 'react';
 
 // UPDATED: SectionBox with cleaner, more professional styling
@@ -22,8 +23,8 @@ const toArray = (value) => {
 const normalizeFileUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads/')) return `http://localhost:5000${url}`;
-  return `http://localhost:5000/uploads/${url}`;
+  if (url.startsWith('/uploads/')) return `${API_BASE_URL}${url}`;
+  return `${API_BASE_URL}/uploads/${url}`;
 };
 
 const DetailsSection = ({ builder }) => {

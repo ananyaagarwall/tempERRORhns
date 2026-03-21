@@ -1,3 +1,4 @@
+import API_BASE_URL from '../config';
 import React, { useState, useEffect } from 'react';
 
 const TrustedBuildersSection = () => {
@@ -8,10 +9,10 @@ const TrustedBuildersSection = () => {
   useEffect(() => {
     const fetchBuilders = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/projects');
+        const response = await fetch(`${API_BASE_URL}/api/projects`);
         const data = await response.json();
         const formattedData = data.map(project => ({
-          img: project.project_image ? `http://localhost:5000${project.project_image}` : '/default-image.jpg',
+          img: project.project_image ? `${API_BASE_URL}${project.project_image}` : '/default-image.jpg',
           logo: '',
           name: project.title,
           subtitle: project.location,
