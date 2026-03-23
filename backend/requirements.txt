@@ -11,6 +11,8 @@ SQLAlchemy>=2.0.35             # 2.x series - required by new Flask-SQLAlchemy
 pandas>=2.2.3
 requests>=2.32.3
 python-slugify>=8.0.4
+clerk-backend-api>=1.2.0
+PyJWT>=2.8.0
 
 # === LangChain & RAG ecosystem (2025-2026 versions) ===
 langchain>=0.3.17
@@ -29,7 +31,3 @@ huggingface-hub>=0.27.0
 # === Vector Store ===
 psycopg2-binary>=2.9.9             # PostgreSQL adapter (includes pgvector support via langchain-postgres)
 
-# # === Optional but very commonly needed in similar projects ===
-# tiktoken>=0.8.0                # token counting (useful even with non-OpenAI models)
-# pypdf>=5.1.0                   # if reading PDFs
-# pymupdf>=1.25.1                # better PDF handling

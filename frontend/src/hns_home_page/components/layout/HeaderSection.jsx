@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { FaSearch, FaBars, FaTimes, FaHome, FaBuilding, FaRegFileAlt, FaEnvelope, FaUser, FaUserCircle, FaRegUserCircle } from 'react-icons/fa';
+import { FaSearch, FaBars, FaTimes, FaUserCircle, FaRegUserCircle } from 'react-icons/fa';
 import headerBg from '../../../assets/Header.img1.gradient1.png'; 
-import { Link, useNavigate } from 'react-router-dom';
-import { SignedIn, SignedOut, UserButton, useUser, SignInButton } from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
+import { SignedIn, SignedOut, UserButton, useUser } from '@clerk/clerk-react';
 import '../../home_page_css/HeaderSection.css'; 
 
 const HeaderSection = () => {
-  const [activeIndex, setActiveIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const navigate = useNavigate();
-  // const [activeMenu, setActiveMenu] = useState('Projects');
   const { user } = useUser();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   // Price slider state (single slider for max price)
@@ -35,10 +32,7 @@ const HeaderSection = () => {
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const [showBhkMobile, setShowBhkMobile] = useState(false);
   const bhkTriggerRef = useRef(null);
-  
-  // Search type state (properties or builders)
-  const [searchType, setSearchType] = useState('properties'); // 'properties' or 'builders'
-  
+
   const bhkOptions = [
     { id: '1bhk', label: '1 BHK' },
     { id: '2bhk', label: '2 BHK' },
@@ -46,7 +40,7 @@ const HeaderSection = () => {
     { id: '4bhk', label: '4 BHK' },
     { id: '4plus', label: '4+ BHK' }
   ];
-  
+
   const formatCr = (val) => {
     if (val >= 50) return '₹50Cr+';
     if (val === 0) return '₹0';
@@ -139,9 +133,6 @@ const HeaderSection = () => {
     setShowPriceRangeSlider(false);
     setIsSearchbarExpanded(false);
   };
-
-  const handleLogin = () => {/* your login logic here */};
-  const handleSignup = () => {/* your signup logic here */};
 
   // Updated toggle function with scroll prevention
  const toggleMenu = () => {
@@ -268,22 +259,10 @@ useEffect(() => {
   const bgRepeat = 'no-repeat';
   const bgPosition = 'center';
 
-  const propertyData = [
-    { name: "Lodha", location: "Lodha World Towers, Mumbai", score: "98%", img: "/lodha.jpg" },
-    { name: "Kalpataru", location: "Kalpataru Residency, Pune", score: "95%", img: "/kalpa.jpg" },
-    { name: "Rustomjee", location: "Rustomjee Seasons, Mumbai", score: "97%", img: "/rustomujee.jpg" },
-    { name: "Presidential", location: "Presidential Towers, Bangalore", score: "96%", img: "/presidental.jpeg" },
-  ];
-
-  const handleCardClick = () => {
-    setActiveIndex((prevIndex) => (prevIndex + 1) % propertyData.length);
-  };
-
   const isMobile = windowWidth <= 768;
   const isSmallMobile = windowWidth <= 350;
   const isTablet = windowWidth > 768 && windowWidth <= 1024;
   const isLaptop = windowWidth > 1024 && windowWidth <= 1440;
-  const isDesktop = windowWidth > 1440;
 
   // Responsive navbar positioning and sizing
   const getNavbarStyles = () => {
@@ -372,10 +351,10 @@ useEffect(() => {
 <div 
   className="header-section relative w-full text-white overflow-hidden"
   style={{
-    backgroundImage: `url(${headerBg})`,
-    backgroundSize: 'cover',
-    backgroundPosition: 'center',
-    backgroundRepeat: 'no-repeat',
+    backgroundImage: `url(${bgImg})`,
+    backgroundSize: bgSize,
+    backgroundPosition: bgPosition,
+    backgroundRepeat: bgRepeat,
     // CHANGED: If mobile, use 60vh, otherwise 100vh
     height: isMobile ? '60vh' : '100vh',           
     minHeight: isMobile ? '60dvh' : '100dvh',       
@@ -447,7 +426,15 @@ useEffect(() => {
               </SignedOut>
               <SignedIn>
                 <div style={{ marginLeft: '4px', display: 'flex' }}>
-                  <UserButton afterSignOutUrl="/" />
+                  <UserButton 
+                    afterSignOutUrl="/" 
+                    appearance={{
+                      elements: {
+                        userButtonPopoverFooter: "hidden", 
+                        footer: "hidden"
+                      }
+                    }}
+                  />
                 </div>
               </SignedIn>
               </div>
@@ -551,7 +538,15 @@ useEffect(() => {
             <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, marginTop: 2 }}>
               <SignedIn>
                 <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
-                  <UserButton afterSignOutUrl="/" />
+                  <UserButton 
+                    afterSignOutUrl="/" 
+                    appearance={{
+                      elements: {
+                        userButtonPopoverFooter: "hidden", 
+                        footer: "hidden"
+                      }
+                    }}
+                  />
                 </div>
               </SignedIn>
               <SignedOut>

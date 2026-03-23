@@ -14,6 +14,8 @@ import propImg3 from "../../assets/Pimg4.jpg";
 import propImg4 from "../../assets/Pimg9.jpg";
 import propImg5 from "../../assets/property-hero.jpg";
 
+import { useUser } from "@clerk/clerk-react";
+import api from "../../services/apiInstance";
 import { ChatbotContext } from "../../App";
 
 import "./ChatBot.css"
@@ -27,7 +29,7 @@ const getRandomImage = (id) => {
   return PROPERTY_IMAGES[index];
 };
 
-const API_URL = "http://localhost:5000/api/chatbot";
+
 
 const GENERAL_RESPONSES = {
   search_property: {
@@ -124,25 +126,45 @@ const GENERAL_RESPONSES = {
 const ChatBot = () => {
   const navigate = useNavigate();
   const { isChatbotOpen, setIsChatbotOpen } = useContext(ChatbotContext);
+  const { user, isLoaded: isUserLoaded, isSignedIn } = useUser();
 
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: "Hello! I'm here to help you find the perfect property. How can I assist you today?",
-      sender: "bot",
-      timestamp: new Date(),
-      isTypingEffect: false,
-      suggestions: [
-        GENERAL_RESPONSES.search_property,
-        GENERAL_RESPONSES.find_builders,
-        GENERAL_RESPONSES.contact_us,
-      ],
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
+
+  // Handle initial greeting and sign-in requirement
+  useEffect(() => {
+    if (!isUserLoaded) return;
+
+    if (!isSignedIn) {
+      setMessages([
+        {
+          id: 1,
+          text: "Welcome to HouseNseeK! You must be signed in to use our AI Assistant for property and builder searches.",
+          sender: "bot",
+          timestamp: new Date(),
+          isTypingEffect: false,
+          suggestions: [],
+        },
+      ]);
+    } else {
+      setMessages([
+        {
+          id: 1,
+          text: `Hello${user?.firstName ? `, ${user.firstName}` : ""}! I'm here to help you find the perfect property. How can I assist you today?`,
+          sender: "bot",
+          timestamp: new Date(),
+          isTypingEffect: false,
+          suggestions: [
+            GENERAL_RESPONSES.search_property,
+            GENERAL_RESPONSES.find_builders,
+            GENERAL_RESPONSES.contact_us,
+          ],
+        },
+      ]);
+    }
+  }, [isUserLoaded, isSignedIn, user?.firstName]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  const [userId, setUserId] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
@@ -150,30 +172,22 @@ const ChatBot = () => {
 
   useEffect(() => {
     const initializeChat = async () => {
-      const userData = localStorage.getItem("user");
-      if (userData) {
-        const user = JSON.parse(userData);
-        setUserId(user.id);
-      }
-
+      if (!isUserLoaded || !isSignedIn) return;
+      
       try {
-        const response = await fetch(`${API_URL}/session/new`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ user_id: userId }),
+        const response = await api.post(`/chatbot/session/new`, { 
+          user_id: user?.id || null 
         });
-        const data = await response.json();
-        setSessionId(data.session_id);
+        setSessionId(response.data.session_id);
       } catch (error) {
         console.error("Error creating session:", error);
       }
     };
 
-    if (isChatbotOpen && !sessionId) {
+    if (isChatbotOpen && !sessionId && isUserLoaded && isSignedIn) {
       initializeChat();
     }
-  }, [isChatbotOpen, sessionId, userId]);
+  }, [isChatbotOpen, sessionId, user, isUserLoaded, isSignedIn]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -185,6 +199,19 @@ const ChatBot = () => {
 
   const handleSendMessage = async (e, messageText = null) => {
     e.preventDefault();
+    
+    if (!isSignedIn) {
+      const loginMessage = {
+        id: messages.length + 1,
+        text: "Please sign in to send messages and get property recommendations.",
+        sender: "bot",
+        timestamp: new Date(),
+        isTypingEffect: false,
+      };
+      setMessages((prev) => [...prev, loginMessage]);
+      return;
+    }
+
     const textToSend = messageText || inputMessage;
     if (!textToSend.trim()) return;
 
@@ -201,20 +228,12 @@ const ChatBot = () => {
     setIsTyping(true);
 
     try {
-      const response = await fetch(`${API_URL}/ask`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          message: textToSend,
-          user_id: userId,
-          session_id: sessionId,
-        }),
+      const response = await api.post(`/chatbot/ask`, {
+        message: textToSend,
+        session_id: sessionId,
       });
 
-      if (!response.ok) throw new Error("Failed to get response");
-
-      const data = await response.json();
+      const data = response.data;
 
       const botResponse = {
         id: messages.length + 2,
@@ -333,16 +352,11 @@ const ChatBot = () => {
   // 🌍 SERVER PAGINATION (Standard Flow)
   setIsLoadingMore(true);
   try {
-    const response = await fetch(`${API_URL}/load-more`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ session_id: sessionId }),
+    const response = await api.post(`/chatbot/load-more`, { 
+      session_id: sessionId 
     });
 
-    if (!response.ok) throw new Error("Failed to load more");
-
-    const data = await response.json();
+    const data = response.data;
 
     setMessages((prev) => {
       const updated = [...prev];
@@ -688,9 +702,9 @@ const ChatBot = () => {
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Ask about properties, builders, locations..."
+            placeholder={isSignedIn ? "Ask about properties, builders, locations..." : "Please sign in to chat..."}
             className="chatbot-input"
-            disabled={isTyping}
+            disabled={isTyping || !isSignedIn}
           />
           <button
             type="submit"

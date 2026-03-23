@@ -21,6 +21,7 @@ from models import (
     User,
     UserInteraction,
     UserPreference,
+    Favorite,
 )
 
 load_dotenv()
@@ -77,6 +78,7 @@ def migrate_data():
             ChatMessage,
             UserPreference,
             UserInteraction,
+            Favorite,
         ]
 
         sqlite_conn = sqlite3.connect(sqlite_path)

@@ -17,6 +17,7 @@ from .rag_service import (
 )
 
 chatbot_bp = Blueprint('chatbot', __name__)
+from auth import clerk_required
 
 # Session-level tracking (in-memory)
 # For production, consider Redis or database storage
@@ -104,6 +105,7 @@ def sync_db():
 
 
 @chatbot_bp.route('/ask', methods=['POST'])
+@clerk_required()
 def ask_bot():
     """
     Enhanced chatbot endpoint with improved pagination
@@ -413,6 +415,7 @@ def ask_bot():
         }), 500
 
 @chatbot_bp.route('/load-more', methods=['POST'])
+@clerk_required()
 def load_more():
     """
     Load next batch of 10 properties/builders
@@ -525,6 +528,7 @@ def load_more():
         return jsonify({"error": str(e)}), 500
 
 @chatbot_bp.route('/session/new', methods=['POST'])
+@clerk_required()
 def create_session():
     """Create a new chat session"""
     try:
@@ -757,6 +761,7 @@ def track_interaction():
         
         interaction = UserInteraction(
             user_id=data.get('user_id'),
+            guest_id=data.get('guest_id') or request.headers.get('X-Guest-ID'),
             property_id=data.get('property_id'),
             action=data.get('action', 'viewed'),
             duration_seconds=data.get('duration'),

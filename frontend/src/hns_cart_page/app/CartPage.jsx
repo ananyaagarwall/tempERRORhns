@@ -93,6 +93,11 @@ const CartPage = () => {
     }
   };
 
+  const goToProperty = (propertyId) => {
+    if (!propertyId) return;
+    navigate(`/property/${propertyId}`);
+  };
+
   const CompareModal = () => {
     const compareProperties = cartItems.filter(item => compareList.includes(item.id));
     
@@ -361,7 +366,10 @@ const CartPage = () => {
                 return (
                 <div key={item.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition overflow-hidden">
                   <div className="flex flex-col sm:flex-row">
-                    <div className="sm:w-80 h-64 sm:h-auto relative overflow-hidden group">
+                    <div
+                      className="sm:w-80 h-64 sm:h-auto relative overflow-hidden group cursor-pointer"
+                      onClick={() => goToProperty(item.id)}
+                    >
                       <img 
                         src={item.image || '/main-image.jpeg'} 
                         alt={item.name}
@@ -385,7 +393,12 @@ const CartPage = () => {
                     <div className="flex-1 p-6">
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">{item.name}</h3>
+                          <h3
+                            className="text-xl sm:text-2xl font-bold text-gray-900 mb-2 cursor-pointer"
+                            onClick={() => goToProperty(item.id)}
+                          >
+                            {item.name}
+                          </h3>
                           <div className="flex items-center text-gray-600 mb-3">
                             <MapPin size={16} className="mr-1" />
                             <span className="text-sm">{item.location}</span>
@@ -438,7 +451,10 @@ const CartPage = () => {
                             />
                             <span className="text-sm font-medium text-purple-900">Compare</span>
                           </label>
-                          <button className="bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2">
+                          <button
+                            className="bg-blue-600 text-white px-4 sm:px-6 py-2 rounded-lg hover:bg-blue-700 transition font-medium flex items-center gap-2"
+                            onClick={() => goToProperty(item.id)}
+                          >
                             Details <ArrowRight size={16} />
                           </button>
                         </div>

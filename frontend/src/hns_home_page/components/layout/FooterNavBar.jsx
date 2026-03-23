@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FaBars, FaTimes, FaUserCircle, FaRegUserCircle, FaShoppingCart } from 'react-icons/fa'; // ← Added FaShoppingCart
+import { FaUserCircle, FaRegUserCircle, FaShoppingCart } from 'react-icons/fa'; // ← Removed unused FaBars, FaTimes
 import { MdTravelExplore, MdHome, MdBusiness, MdArticle } from 'react-icons/md';
 import { Link } from 'react-router-dom';
-import { SignedIn, SignedOut, UserButton, useUser, SignInButton } from '@clerk/clerk-react';
+import { SignedIn, SignedOut, UserButton, useUser } from '@clerk/clerk-react';
 import "../../home_page_css/FooterNavBar.css";
 
 const FooterNavBar = ({ sticky = false }) => {
@@ -74,7 +74,15 @@ const FooterNavBar = ({ sticky = false }) => {
             </SignedOut>
             <SignedIn>
               <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
-                <UserButton afterSignOutUrl="/" />
+                <UserButton 
+                  afterSignOutUrl="/" 
+                  appearance={{
+                    elements: {
+                      userButtonPopoverFooter: "hidden", 
+                      footer: "hidden"
+                    }
+                  }}
+                />
               </div>
             </SignedIn>
           </nav>
@@ -110,7 +118,15 @@ const FooterNavBar = ({ sticky = false }) => {
             <div className="user-info-container">
               <SignedIn>
                 <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
-                   <UserButton afterSignOutUrl="/" />
+                   <UserButton 
+                     afterSignOutUrl="/" 
+                     appearance={{
+                       elements: {
+                         userButtonPopoverFooter: "hidden", 
+                         footer: "hidden"
+                       }
+                     }}
+                   />
                 </div>
               </SignedIn>
               <SignedOut>

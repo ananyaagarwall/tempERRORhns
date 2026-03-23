@@ -1,3 +1,4 @@
 {
-  "cSpell.words": ["coreference", "erty", "vectorstore"]
+  "cSpell.words": ["coreference", "erty", "vectorstore"],
+  "python.analysis.extraPaths": ["./backend"]
 }

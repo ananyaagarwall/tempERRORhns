@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export const usePropertySearchBar = ({ initialLocation = "", onSearch } = {}) => {
   const [location, setLocation] = useState(initialLocation);
+  const navigate = useNavigate();
 
   const handleSearch = () => {
     if (typeof onSearch === 'function') {
@@ -16,7 +18,11 @@ export const usePropertySearchBar = ({ initialLocation = "", onSearch } = {}) =>
   };
 
   const handleBack = () => {
-    console.log("Back button clicked");
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/');
   };
 
   return {

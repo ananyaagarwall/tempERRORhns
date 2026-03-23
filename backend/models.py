@@ -4,17 +4,19 @@ import json
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
+    clerk_user_id = db.Column(db.String(100), unique=True, nullable=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(128), nullable=False)
     phone = db.Column(db.String(15))
-    role = db.Column(db.String(20))  # 'buyer', 'seller', 'admin'
+    role = db.Column(db.String(20))  # 'buyer', 'seller', 'admin', 'customer'
     is_active = db.Column(db.Boolean, default=True, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     properties = db.relationship('Property', backref='owner', lazy=True)
     enquiries = db.relationship('Enquiry', backref='user', lazy=True)
     reviews = db.relationship('Review', backref='user', lazy=True)
+    favorites = db.relationship('Favorite', backref='user', lazy=True)
 
     def to_dict(self):
         return {
@@ -464,7 +466,8 @@ class UserInteraction(db.Model):
     __tablename__ = 'user_interaction'
     
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    guest_id = db.Column(db.String(100), nullable=True) # UUID for anonymous sessions
     property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=False)
     action = db.Column(db.String(50), nullable=False)  # 'viewed', 'saved', 'shared', 'clicked'
     duration_seconds = db.Column(db.Integer)  # How long they viewed
@@ -484,4 +487,43 @@ class UserInteraction(db.Model):
             'duration_seconds': self.duration_seconds,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None,
             'session_id': self.session_id
+        }
+
+class Favorite(db.Model):
+    """Stores favorite properties for both users and guests"""
+    __tablename__ = 'favorite'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    guest_id = db.Column(db.String(100), nullable=True) # UUID for anonymous users
+    property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=True)
+    # For guest sessions: store cart snapshot and change history in a single row
+    cart_snapshot = db.Column(db.Text, nullable=True)  # JSON list of property IDs
+    change_log = db.Column(db.Text, nullable=True)  # JSON list of change events
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    property = db.relationship('Property', backref='favourited_by')
+    
+    def to_dict(self):
+        def safe_list(raw):
+            try:
+                if not raw:
+                    return []
+                data = json.loads(raw)
+                return data if isinstance(data, list) else []
+            except Exception:
+                return []
+
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'guest_id': self.guest_id,
+            'property_id': self.property_id,
+            'entry_type': 'session' if self.property_id is None else 'item',
+            'cart_snapshot': safe_list(self.cart_snapshot),
+            'change_log': safe_list(self.change_log),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

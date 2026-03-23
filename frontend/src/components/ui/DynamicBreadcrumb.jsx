@@ -1,10 +1,11 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaHome, FaChevronRight } from 'react-icons/fa';
 import './DynamicBreadcrumb.css';
 
 const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const pathname = location.pathname;
   
   // Define breadcrumb configuration for each route
@@ -87,6 +88,30 @@ const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
       { label: 'Home', path: '/', isLast: true }
     ];
   };
+
+  const getFallbackPath = () => {
+    if (pathname.startsWith('/builder/') || pathname === '/builders-page' || pathname === '/builder') {
+      return '/builders-page';
+    }
+    if (pathname.startsWith('/blog/') || pathname === '/blogs') {
+      return '/blogs';
+    }
+    if (pathname.startsWith('/property/') || pathname === '/properties') {
+      return '/properties';
+    }
+    if (pathname === '/cart') {
+      return '/properties';
+    }
+    return '/';
+  };
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate(getFallbackPath());
+  };
   
   const breadcrumbs = getBreadcrumbConfig();
   
@@ -100,6 +125,14 @@ const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
       <div className="breadcrumb-container">
         <div className="breadcrumb-inner">
           <div className="breadcrumb-items">
+            <button
+              type="button"
+              className="breadcrumb-back"
+              onClick={handleBack}
+              aria-label="Go back"
+            >
+              &#8592;
+            </button>
             {breadcrumbs.map((crumb, index) => (
               <React.Fragment key={crumb.path}>
                 {index === 0 ? (

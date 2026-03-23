@@ -16,13 +16,14 @@ from models import (
     ChatSession,
     ChatMessage,
     UserPreference,
-    UserInteraction
+    UserInteraction,
+    Favorite
 )
 
-from flask import Flask, request, jsonify, send_from_directory, redirect, make_response
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
-
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
+from flask import Flask, request, jsonify, send_from_directory, redirect, make_response, g
+import jwt
+from clerk_backend_api import Clerk
+from clerk_backend_api.security import AuthenticateRequestOptions
 
 #flash
 from flask_cors import CORS
@@ -42,24 +43,11 @@ from extensions import db
 from models import ChatSession, ChatMessage, UserPreference
 import logging
 from datetime import timedelta
-from flask_jwt_extended import JWTManager
-from flask_jwt_extended import jwt_required
 from functools import wraps
 import threading
 
 
 
-# Set UTF-8 encoding for stdout
-import logging
-from datetime import timedelta
-from flask_jwt_extended import JWTManager
-from flask_jwt_extended import jwt_required
-from functools import wraps
-import threading
-
-
-
-# Set UTF-8 encoding for stdout
 # Set UTF-8 encoding for stdout
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -102,7 +90,7 @@ CORS(
         r"/health": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
     },
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization", "X-Guest-ID", "x-guest-id"],
 )
 
 
@@ -121,7 +109,7 @@ def add_local_dev_cors_headers(response):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Vary"] = "Origin"
         response.headers["Access-Control-Allow-Credentials"] = "true"
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Guest-ID, x-guest-id"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
     return response
 
@@ -131,44 +119,12 @@ app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
 # Configure Clerk Auth
 CLERK_SECRET_KEY = os.getenv('CLERK_SECRET_KEY')
-
-def clerk_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth_header = request.headers.get('Authorization')
-        if not auth_header:
-            return jsonify({"message": "Token is missing"}), 401
-        
-        token = auth_header.split(" ")[1] if " " in auth_header else auth_header
-        
-        try:
-            response = requests.get(
-                'https://api.clerk.dev/v1/sessions/verify',
-                headers={'Authorization': f'Bearer {CLERK_SECRET_KEY}'},
-                params={'token': token}
-            )
-            
-            if response.status_code != 200:
-                return jsonify({"message": "Invalid token"}), 401
-                
-            request.clerk_user = response.json()
-            
-        except Exception as e:
-            return jsonify({"message": str(e)}), 500
-            
-        return f(*args, **kwargs)
-    return decorated
-
-# Map the old jwt_required and admin_only to clerk_required so your other routes don't break
-def jwt_required(*args, **kwargs):
-    if len(args) == 1 and callable(args[0]):
-        return clerk_required(args[0])
-    def wrapper(fn):
-        return clerk_required(fn)
-    return wrapper
-
-def admin_only(fn):
-    return clerk_required(fn)
+from auth import clerk_required, admin_only
+# Map the old jwt_required to clerk_required
+def jwt_required(fn=None):
+    if fn is None:
+        return clerk_required(optional=False)
+    return clerk_required(optional=False)(fn)
 
 # Get absolute path to the backend folder (where app.py lives)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -193,10 +149,6 @@ db.init_app(app)  # <-- Use the imported db instance
 
 # Then initialize Flask-Migrate
 migrate = Migrate(app, db)
-
-# Chatbot globals
-_index_lock = threading.Lock()
-_emb_index = None
 
 # Chatbot globals
 _index_lock = threading.Lock()
@@ -245,19 +197,16 @@ with app.app_context():
 
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
-# @jwt_required()
 def get_properties_by_location(loc):
     properties = Property.query.filter(Property.Location.like(f'%{loc}%')).all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/properties', methods=['GET'])
-# @jwt_required()
 def get_properties():
     properties = Property.query.all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/locations', methods=['GET']) 
-@jwt_required()
 @jwt_required()
 def get_locations(): 
     locations = db.session.query(Property.Location).distinct().all() 
@@ -396,7 +345,6 @@ def get_properties_by_multiple_locations():
 # yaha tak nearyou. 
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
-# @jwt_required()
 def get_property(id):
     property = Property.query.get_or_404(id)
     return jsonify(property.to_dict())
@@ -441,7 +389,6 @@ def create_property():
     return jsonify(new_property.to_dict()), 201
 
 @app.route('/api/builders', methods=['GET'])
-# @jwt_required()
 def get_builders():
     try:
         print("Fetching builders...")  # Debug log
@@ -543,7 +490,6 @@ def search_builders():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>', methods=['GET'])
-# @jwt_required()
 def get_builder(rera_id):
     try:
         builder = Builder.query.get_or_404(rera_id)
@@ -552,7 +498,6 @@ def get_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders', methods=['POST'])
-@admin_only
 @admin_only
 def create_builder():
     try:
@@ -678,7 +623,6 @@ def delete_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>/projects', methods=['GET'])
-# @jwt_required()
 def get_builder_projects(rera_id):
     try:
         status = request.args.get('status')
@@ -730,7 +674,6 @@ def _create_property_for_project(project, user_id, data):
 #-----------------STEP 1 ROUTING FETCHING DETAILS FROM FRONTEND AND PUSHING TO DATABASE------------------------
 @app.route('/api/builders/<rera_id>/projects/step1', methods=['POST'])
 @admin_only
-@admin_only
 def create_project_step1(rera_id):
     data = request.json
     title = data['title']
@@ -771,7 +714,6 @@ def create_project_step1(rera_id):
 
 @app.route('/api/builders/<rera_id>/projects/step2', methods=['POST'])
 @admin_only
-@admin_only
 def create_project_step2(rera_id):
     data = request.json
     project_id = data.get('project_id')
@@ -791,7 +733,6 @@ def create_project_step2(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step4', methods=['POST'])
-@admin_only
 @admin_only
 def create_project_step4(rera_id):
     # Handle both form data and JSON data
@@ -828,7 +769,6 @@ def create_project_step4(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step5', methods=['POST'])
-@admin_only
 @admin_only
 def create_project_step5(rera_id):
     data = request.json
@@ -985,7 +925,6 @@ def update_project_step(rera_id, project_id):
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
 @admin_only
-@admin_only
 def delete_project(project_id):
     project = BuilderProject.query.get_or_404(project_id)
     db.session.delete(project)
@@ -997,7 +936,6 @@ def delete_project(project_id):
 #----------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------
 @app.route('/api/admin/stats', methods=['GET'])
-@admin_only
 @admin_only
 def get_admin_stats():
     try:
@@ -1077,7 +1015,6 @@ def get_admin_stats():
 #--------------------------------------------- USER MANAGEMENT ROUTES ---------------------------------------------
 @app.route('/api/users', methods=['GET'])
 @admin_only
-@admin_only
 def get_users():
     try:
         # Get the token from the Authorization header
@@ -1103,7 +1040,6 @@ def get_users():
 
 @app.route('/api/users/<int:id>', methods=['GET'])
 @jwt_required()
-@jwt_required()
 def get_user(id):
     try:
         user = User.query.get_or_404(id)
@@ -1118,7 +1054,6 @@ def get_user(id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 @app.route('/api/projects/<int:project_id>', methods=['GET'])
-# @jwt_required()
 def get_builder_project_by_id(project_id):
     project = BuilderProject.query.get(project_id)
     if not project:
@@ -1126,7 +1061,6 @@ def get_builder_project_by_id(project_id):
     return jsonify(project.to_dict())
 
 @app.route('/api/users/<int:id>', methods=['PUT'])
-@admin_only
 @admin_only
 def update_user(id):
     try:
@@ -1161,7 +1095,6 @@ def update_user(id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/<int:id>', methods=['DELETE'])
-@admin_only
 @admin_only
 def delete_user(id):
     try:
@@ -1202,7 +1135,6 @@ def save_image(file):
 
 # API to create a blog (multipart/form-data)
 @app.route('/api/blogs', methods=['POST'])
-@admin_only
 @admin_only
 def create_blog():
     try:
@@ -1268,7 +1200,6 @@ def create_blog():
 # API to list all blogs (for admin dashboard)
 @app.route('/api/blogs', methods=['GET'])
 @jwt_required()
-@jwt_required()
 def list_blogs():
     blogs = Blog.query.order_by(Blog.created_at.desc()).all()
     print(f"Found {len(blogs)} blogs")
@@ -1279,14 +1210,12 @@ def list_blogs():
 # Get a single blog by ID
 @app.route('/api/blogs/<int:blog_id>', methods=['GET'])
 @jwt_required()
-@jwt_required()
 def get_blog(blog_id):
     blog = Blog.query.get_or_404(blog_id)
     return jsonify(blog.to_dict())
 
 # Get a single blog by slug
 @app.route('/api/blogs/slug/<slug>', methods=['GET'])
-@jwt_required()
 @jwt_required()
 def get_blog_by_slug(slug):
     print(f"Fetching blog with slug: {slug}")
@@ -1409,7 +1338,6 @@ def uploaded_file(filename):
 
 # Update /api/projects/slug/<slug> to handle BuilderProject slugs
 @app.route('/api/projects/slug/<slug>', methods=['GET'])
-# @jwt_required()
 def get_project_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='project').first()
     if not slug_entry:
@@ -1426,7 +1354,6 @@ def get_project_by_slug(slug):
 # 3. Redirect alias slugs to primary in /api/properties/slug/<slug>
 @app.route('/api/properties/slug/<slug>', methods=['GET'])
 @jwt_required()
-@jwt_required()
 def get_property_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='property').first()
     if not slug_entry:
@@ -1442,13 +1369,11 @@ def get_property_by_slug(slug):
     return jsonify(property.to_dict())
 
 @app.route('/api/projects', methods=['GET'])
-# @jwt_required()
 def get_all_projects():
     projects = BuilderProject.query.all()
     return jsonify([p.to_dict() for p in projects])
 
 @app.route('/api/builders/<rera_id>/projects/upload-image', methods=['POST'])
-@admin_only
 @admin_only
 def upload_project_image(rera_id):
     print(f"Upload project image called with rera_id: {rera_id}")
@@ -1570,7 +1495,6 @@ def get_security_audit():
 
 @app.route('/api/admin/latest-geolocation', methods=['GET'])
 @admin_only
-@admin_only
 def get_latest_geolocation():
     global latest_geolocation
     # If latest_geolocation is not set, return a default empty response
@@ -1583,8 +1507,7 @@ def get_latest_geolocation():
 # ------------------------------------------------------- AI Blog Summarization -------------------------------------------------- ---
 
 @app.route('/api/blogs/<slug>/summary', methods=['GET'])
-@jwt_required()
-@jwt_required()
+@clerk_required()
 def summarize_blog(slug):
     api_key = os.getenv('PERPLEXITY_API_KEY')
     blog = Blog.query.filter_by(slug=slug).first()
@@ -1845,8 +1768,7 @@ def _canonical_property_status(value: str) -> str:
         return ''
 
 @app.route('/api/properties/filters', methods=['GET'])
-@jwt_required()
-@jwt_required()
+@clerk_required()
 def get_filters():
     """Return unique filter options sourced from BuilderProject and Property tables.
     Includes amenities (normalized), property_status, project status, and derived society types.
@@ -1898,7 +1820,6 @@ def get_filters():
 
 # Simplified property search endpoint: direct filtering only
 @app.route('/api/properties/search', methods=['GET'])
-# @jwt_required()
 def search_properties():
     location = request.args.get('location', '', type=str)
     price = request.args.get('price', 0, type=float)  # price in Cr
@@ -2061,6 +1982,216 @@ def google_signin():
     set_refresh_cookies(response, refresh_token)
     return response, 200
 
+# ------------------------------------------------------- Favorites & Merge -------------------------------------------------- ---
+
+def _safe_json_list(raw):
+    try:
+        if not raw:
+            return []
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+def _get_or_create_guest_cart_session(guest_id):
+    session_row = Favorite.query.filter_by(guest_id=guest_id, property_id=None).first()
+    if not session_row:
+        legacy_favs = Favorite.query.filter_by(guest_id=guest_id).filter(Favorite.property_id.isnot(None)).all()
+        legacy_ids = []
+        for fav in legacy_favs:
+            if fav.property_id is not None and fav.property_id not in legacy_ids:
+                legacy_ids.append(fav.property_id)
+        session_row = Favorite(
+            guest_id=guest_id,
+            property_id=None,
+            cart_snapshot=json.dumps(legacy_ids),
+            change_log=json.dumps([])
+        )
+        db.session.add(session_row)
+        for fav in legacy_favs:
+            db.session.delete(fav)
+    return session_row
+
+def _get_or_create_user_cart_session(user_id):
+    session_row = Favorite.query.filter_by(user_id=user_id, property_id=None).first()
+    if not session_row:
+        legacy_favs = Favorite.query.filter_by(user_id=user_id).filter(Favorite.property_id.isnot(None)).all()
+        legacy_ids = []
+        for fav in legacy_favs:
+            if fav.property_id is not None and fav.property_id not in legacy_ids:
+                legacy_ids.append(fav.property_id)
+        session_row = Favorite(
+            user_id=user_id,
+            guest_id=None,
+            property_id=None,
+            cart_snapshot=json.dumps(legacy_ids),
+            change_log=json.dumps([])
+        )
+        db.session.add(session_row)
+        for fav in legacy_favs:
+            db.session.delete(fav)
+    return session_row
+
+def _append_cart_change(session_row, action, property_id):
+    changes = _safe_json_list(session_row.change_log)
+    changes.append({
+        'action': action,
+        'property_id': property_id,
+        'at': datetime.utcnow().isoformat()
+    })
+    session_row.change_log = json.dumps(changes)
+
+@app.route('/api/favorites', methods=['POST'])
+@clerk_required(optional=True)
+def add_favorite():
+    data = request.json or {}
+    property_id = data.get('property_id')
+    # Accept guest id from body or header to support anonymous favorites
+    guest_id = data.get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+
+    if not property_id:
+        return jsonify({'error': 'property_id is required'}), 400
+    try:
+        property_id = int(property_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'property_id must be an integer'}), 400
+
+    if g.current_user:
+        session_row = _get_or_create_user_cart_session(g.current_user.id)
+        cart_snapshot = _safe_json_list(session_row.cart_snapshot)
+        if property_id in cart_snapshot:
+            return jsonify({'message': 'Already in user cart', 'session': session_row.to_dict()}), 200
+
+        cart_snapshot.append(property_id)
+        session_row.cart_snapshot = json.dumps(cart_snapshot)
+        _append_cart_change(session_row, 'add', property_id)
+        db.session.commit()
+        return jsonify({'message': 'User cart updated', 'session': session_row.to_dict()}), 200
+
+    if not guest_id:
+        return jsonify({'error': 'Authentication or guest_id required'}), 401
+
+    session_row = _get_or_create_guest_cart_session(guest_id)
+    cart_snapshot = _safe_json_list(session_row.cart_snapshot)
+    if property_id in cart_snapshot:
+        return jsonify({'message': 'Already in guest cart', 'session': session_row.to_dict()}), 200
+
+    cart_snapshot.append(property_id)
+    session_row.cart_snapshot = json.dumps(cart_snapshot)
+    _append_cart_change(session_row, 'add', property_id)
+    db.session.commit()
+    return jsonify({'message': 'Guest cart updated', 'session': session_row.to_dict()}), 200
+
+@app.route('/api/favorites', methods=['GET'])
+@clerk_required(optional=True)
+def get_favorites():
+    guest_id = request.args.get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+    
+    if g.current_user:
+        session_row = _get_or_create_user_cart_session(g.current_user.id)
+        return jsonify([session_row.to_dict()] if session_row else [])
+    if guest_id:
+        session_row = Favorite.query.filter_by(guest_id=guest_id, property_id=None).first()
+        return jsonify([session_row.to_dict()] if session_row else [])
+    return jsonify({'favorites': []}), 200
+
+
+@app.route('/api/favorites', methods=['DELETE'])
+@clerk_required(optional=True)
+def remove_favorite():
+    data = request.json or {}
+    property_id = data.get('property_id') or request.args.get('property_id')
+    guest_id = data.get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+
+    if not property_id:
+        return jsonify({'error': 'property_id is required'}), 400
+    try:
+        property_id = int(property_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'property_id must be an integer'}), 400
+
+    if g.current_user:
+        session_row = _get_or_create_user_cart_session(g.current_user.id)
+
+        cart_snapshot = _safe_json_list(session_row.cart_snapshot)
+        if property_id not in cart_snapshot:
+            return jsonify({'message': 'Property not in user cart (noop)', 'session': session_row.to_dict()}), 200
+
+        cart_snapshot = [pid for pid in cart_snapshot if pid != property_id]
+        session_row.cart_snapshot = json.dumps(cart_snapshot)
+        _append_cart_change(session_row, 'remove', property_id)
+        db.session.commit()
+        return jsonify({'message': 'User cart updated', 'session': session_row.to_dict()}), 200
+    elif guest_id:
+        session_row = Favorite.query.filter_by(guest_id=guest_id, property_id=None).first()
+        if not session_row:
+            return jsonify({'message': 'Guest cart not found (noop)'}), 200
+
+        cart_snapshot = _safe_json_list(session_row.cart_snapshot)
+        if property_id not in cart_snapshot:
+            return jsonify({'message': 'Property not in guest cart (noop)', 'session': session_row.to_dict()}), 200
+
+        cart_snapshot = [pid for pid in cart_snapshot if pid != property_id]
+        session_row.cart_snapshot = json.dumps(cart_snapshot)
+        _append_cart_change(session_row, 'remove', property_id)
+        db.session.commit()
+        return jsonify({'message': 'Guest cart updated', 'session': session_row.to_dict()}), 200
+    else:
+        return jsonify({'error': 'Authentication or guest_id required'}), 401
+
+@app.route('/api/auth/merge-guest', methods=['POST'])
+@clerk_required()
+def merge_guest_data():
+    data = request.json
+    guest_id = (data or {}).get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+    
+    if not guest_id:
+        return jsonify({'error': 'guest_id required for merge'}), 400
+
+    user_session = Favorite.query.filter_by(user_id=g.current_user.id, property_id=None).first()
+
+    # Merge guest session rows into user session (or promote guest session to user)
+    session_rows = Favorite.query.filter_by(guest_id=guest_id, property_id=None).all()
+    for session_row in session_rows:
+        if user_session and user_session.id != session_row.id:
+            user_cart = _safe_json_list(user_session.cart_snapshot)
+            guest_cart = _safe_json_list(session_row.cart_snapshot)
+            for pid in guest_cart:
+                if pid not in user_cart:
+                    user_cart.append(pid)
+            user_session.cart_snapshot = json.dumps(user_cart)
+
+            user_changes = _safe_json_list(user_session.change_log)
+            guest_changes = _safe_json_list(session_row.change_log)
+            if guest_changes:
+                user_session.change_log = json.dumps(user_changes + guest_changes)
+
+            db.session.delete(session_row)
+        else:
+            session_row.user_id = g.current_user.id
+            session_row.guest_id = None
+            user_session = session_row
+
+    # Promote legacy guest rows (property_id NOT NULL) to user
+    legacy_guest_rows = Favorite.query.filter_by(guest_id=guest_id).filter(Favorite.property_id.isnot(None)).all()
+    for fav in legacy_guest_rows:
+        existing = Favorite.query.filter_by(user_id=g.current_user.id, property_id=fav.property_id).first()
+        if existing:
+            db.session.delete(fav)
+        else:
+            fav.user_id = g.current_user.id
+            fav.guest_id = None
+    
+    # Update interactions
+    UserInteraction.query.filter_by(guest_id=guest_id).update({
+        'user_id': g.current_user.id,
+        'guest_id': None
+    })
+    # Note: If you have a guest_id column in UserInteraction, update that too.
+    
+    db.session.commit()
+    return jsonify({'message': 'Data merged successfully'}), 200
+
 
 
 #... existing imports...
@@ -2073,5 +2204,74 @@ app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
 # Note: The db.create_all() inside your existing main block will 
 # automatically create the new chatbot tables because we imported them above.
 
+
+
+# ------------------------------------------------------------------ Admin Auth
+@app.route('/api/auth/me', methods=['GET'])
+@clerk_required()
+def get_current_user_profile():
+    """
+    Returns the current authenticated user's profile from the local DB.
+    Used by the frontend AdminRoute to verify if the user has admin role.
+    The role comes from the database — not from email or client-side logic.
+    """
+    user = g.current_user
+    return jsonify({
+        'id': user.id,
+        'email': user.email,
+        'username': user.username,
+        'role': user.role,
+        'is_active': user.is_active,
+    }), 200
+
+
+@app.route('/api/auth/promote-admin', methods=['POST'])
+@clerk_required()
+def promote_to_admin():
+    """
+    Enhanced Admin Setup/Login:
+    Requires:
+    1. Email must be admin@gmail.com
+    2. Local database password check
+    3. ADMIN_SETUP_KEY check
+    """
+    ADMIN_SETUP_KEY = os.getenv('ADMIN_SETUP_KEY', '')
+    if not ADMIN_SETUP_KEY:
+        return jsonify({'error': 'Admin promotion is disabled. ADMIN_SETUP_KEY is not set.'}), 403
+    
+    data = request.json or {}
+    email = data.get('email', '')
+    password = data.get('password', '')
+    provided_key = data.get('setup_key', '')
+    
+    # 1. Exclusive Email Check
+    if email != 'admin@gmail.com':
+        return jsonify({'error': 'Unauthorized email for admin access.'}), 403
+
+    # 2. Check Database Password (Stored in local User table)
+    from models import User
+    admin_db_user = User.query.filter_by(email='admin@gmail.com').first()
+    if not admin_db_user or not admin_db_user.check_password(password):
+        security_logger.warning(f"Failed admin password attempt for {email}")
+        return jsonify({'error': 'Invalid admin password.'}), 401
+    
+    # 3. Check Setup Key (.env)
+    if provided_key != ADMIN_SETUP_KEY:
+        security_logger.warning(f"Failed setup key attempt for {email}")
+        return jsonify({'error': 'Invalid setup key'}), 403
+    
+    # 4. Ensure the current Clerk session actually belongs to admin@gmail.com
+    if g.current_user.email != 'admin@gmail.com':
+        return jsonify({'error': 'Clerk account must match admin@gmail.com'}), 403
+
+    # 5. Success: Promote the user role
+    g.current_user.role = 'admin'
+    db.session.commit()
+    
+    security_logger.info(f"Admin access granted to {g.current_user.email}")
+    return jsonify({'message': 'Admin access verified.', 'role': g.current_user.role}), 200
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+

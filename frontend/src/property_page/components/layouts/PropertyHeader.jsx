@@ -1,19 +1,38 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Home, ArrowLeft, User, Menu, X } from "lucide-react";
 
 const PropertyHeader = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/properties');
+  };
 
   return (
     <header>
       <div className="flex items-center justify-between mt-4 sm:mt-6 px-4 sm:px-8 lg:px-16">
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-1 sm:gap-2">
-          <button className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+          <button
+            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+            onClick={handleBack}
+            aria-label="Go back"
+          >
             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
           </button>
           <div className="hidden sm:flex items-center gap-2 text-sm text-gray-600">
-            <span className="hover:text-blue-600 cursor-pointer transition-colors">View Builders</span>
+            <span
+              className="hover:text-blue-600 cursor-pointer transition-colors"
+              onClick={() => navigate('/builders-page')}
+            >
+              View Builders
+            </span>
             <span className="text-gray-400">›</span>
             <span className="hover:text-blue-600 cursor-pointer transition-colors">Neelkanth Palm Avenue</span>
             <span className="text-gray-400">›</span>
@@ -21,7 +40,12 @@ const PropertyHeader = () => {
           </div>
           {/* Mobile breadcrumb */}
           <div className="sm:hidden flex items-center gap-0.5 text-sm text-gray-600">
-            <span className="hover:text-blue-600 cursor-pointer">Builders</span>
+            <span
+              className="hover:text-blue-600 cursor-pointer"
+              onClick={() => navigate('/builders-page')}
+            >
+              Builders
+            </span>
             <span className="text-gray-400">›</span>
             <span className="font-medium text-gray-900 truncate max-w-[8rem]">Neelkanth...</span>
           </div>
