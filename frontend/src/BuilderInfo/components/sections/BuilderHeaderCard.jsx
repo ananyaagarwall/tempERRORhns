@@ -1,6 +1,7 @@
+import API_BASE_URL from '../../../config';
 import React from 'react';
 import { Heart } from 'lucide-react';
-import { useCart } from '../../../hns_cart_page/js/CartContent.jsx'; 
+import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 
 const Tag = ({ children }) => (
   <span className="px-2 py-0.5 rounded-full bg-gray-100 text-[10px] sm:text-[11px] text-gray-700 border-2 border-yellow-400">{children}</span>
@@ -11,7 +12,7 @@ const BuilderHeaderCard = ({ builder }) => {
 
   const handleHeartClick = () => {
     if (!builder || !builder.rera_id) return;
-    
+
     if (isBuilderSaved(builder.rera_id)) {
       removeBuilder(builder.rera_id);
     } else {
@@ -36,11 +37,10 @@ const BuilderHeaderCard = ({ builder }) => {
       {/* Heart Button */}
       <button
         onClick={handleHeartClick}
-        className={`absolute top-4 right-4 z-10 p-3 rounded-full backdrop-blur-md transition-all duration-300 shadow-lg ${
-          isSaved
+        className={`absolute top-4 right-4 z-10 p-3 rounded-full backdrop-blur-md transition-all duration-300 shadow-lg ${isSaved
             ? 'bg-red-500 text-white scale-110'
             : 'bg-white/90 text-gray-600 hover:bg-red-50 hover:text-red-500'
-        }`}
+          }`}
         aria-label={isSaved ? 'Remove from saved builders' : 'Save builder'}
       >
         <Heart
@@ -54,8 +54,8 @@ const BuilderHeaderCard = ({ builder }) => {
         <div className="flex flex-col items-center justify-between gap-4 md:flex-row md:items-start md:gap-0">
           <div className="flex flex-col items-center text-center gap-4 md:flex-row md:items-center md:text-left md:gap-4">
             {builder.builder_logo ? (
-              <img 
-                src={(builder.builder_logo.startsWith('http') ? builder.builder_logo : `http://localhost:5000${builder.builder_logo.startsWith('/uploads/') ? builder.builder_logo : `/uploads/${builder.builder_logo}`}`)}
+              <img
+                src={(builder.builder_logo.startsWith('http') ? builder.builder_logo : `${API_BASE_URL}${builder.builder_logo.startsWith('/uploads/') ? builder.builder_logo : `/uploads/${builder.builder_logo}`}`)}
                 alt={builder.company_name}
                 className="h-24 w-24 rounded-full bg-gray-200 border-4 border-gray-100 shadow-sm md:h-24 md:w-24 object-cover"
               />
@@ -67,8 +67,8 @@ const BuilderHeaderCard = ({ builder }) => {
             <div>
               <div
                 className="text-gray-900 text-xl leading-tight md:text-2xl md:leading-tight lg:text-3xl lg:leading-tight"
-                style={{ 
-                  fontFamily: 'serif', 
+                style={{
+                  fontFamily: 'serif',
                   fontWeight: 1000
                 }}
               >
@@ -88,7 +88,7 @@ const BuilderHeaderCard = ({ builder }) => {
           <div className="flex w-full items-center justify-center gap-3 md:mt-0 md:w-auto md:gap-3 pr-12 md:pr-0">
             <div className="h-24 w-36 rounded-lg overflow-hidden md:h-24 md:w-36">
               {builder.cover_banner ? (
-                <img src={(builder.cover_banner.startsWith('http') ? builder.cover_banner : `http://localhost:5000${builder.cover_banner.startsWith('/uploads/') ? builder.cover_banner : `/uploads/${builder.cover_banner}`}`)} alt={builder.company_name} className="h-full w-full object-cover" />
+                <img src={(builder.cover_banner.startsWith('http') ? builder.cover_banner : `${API_BASE_URL}${builder.cover_banner.startsWith('/uploads/') ? builder.cover_banner : `/uploads/${builder.cover_banner}`}`)} alt={builder.company_name} className="h-full w-full object-cover" />
               ) : (
                 <img src="/building.webp" alt="preview" className="h-full w-full object-cover" />
               )}

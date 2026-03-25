@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../../home_page_css/NearYouSection.css";
@@ -67,7 +68,7 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
             try {
                 // Use userLocation if available, otherwise fetch default
                 const locationToUse = userLocation || "Thane";
-                const res = await fetch(`http://127.0.0.1:5000/api/nearest-nodes/${encodeURIComponent(locationToUse)}`);
+                const res = await fetch(`${API_BASE_URL}/api/nearest-nodes/${encodeURIComponent(locationToUse)}`);
 
                 if (!res.ok) throw new Error('Failed to fetch nearest nodes');
                 const data = await res.json();
@@ -110,7 +111,7 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
                 const locationName = selectedTab ? selectedTab.label : activeTab;
 
                 const res = await fetch(
-                    `http://127.0.0.1:5000/api/properties/location/${encodeURIComponent(locationName)}`
+                    `${API_BASE_URL}/api/properties/location/${encodeURIComponent(locationName)}`
                 );
                 if (!res.ok) throw new Error('Failed to fetch properties');
                 const data = await res.json();
@@ -184,14 +185,15 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
         // BHK Type filter
         let bhkMatch = true;
         if (searchFilters.bhkTypes && searchFilters.bhkTypes.length > 0) {
-            if (property.Existing_Configurations && Array.isArray(property.Existing_Configurations)) {
+            if (property.Existing_Configurations && Array.isArray(property.Existing_Configurations) && property.Existing_Configurations.length > 0) {
                 bhkMatch = searchFilters.bhkTypes.some(type =>
                     property.Existing_Configurations.some(cfg =>
                         cfg.type && cfg.type.toLowerCase().includes(type.replace('bhk', ' bhk'))
                     )
                 );
             } else {
-                bhkMatch = false;
+                // No configuration data — don't filter out this property
+                bhkMatch = true;
             }
         }
 

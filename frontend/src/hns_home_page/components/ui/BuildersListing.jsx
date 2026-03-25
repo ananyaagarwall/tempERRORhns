@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../../config';
 import React, { useState, useEffect } from 'react';
 import { Search, Building2, MapPin, Award, CheckCircle, Calendar, ExternalLink, Phone, Mail, Heart } from 'lucide-react';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
@@ -11,7 +12,7 @@ const BuildersListing = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('name');
-  
+
   const { addBuilder, removeBuilder, isBuilderSaved } = useCart();
 
   useEffect(() => {
@@ -22,8 +23,8 @@ const BuildersListing = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('token');
-      
-      const response = await fetch('http://127.0.0.1:5000/api/builders', {
+
+      const response = await fetch(`${API_BASE_URL}/api/builders`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -47,14 +48,14 @@ const BuildersListing = () => {
 
   const filteredBuilders = builders
     .filter(builder => {
-      const matchesSearch = 
+      const matchesSearch =
         builder.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         builder.brand_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         builder.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         builder.location?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesType = 
-        filterType === 'all' || 
+      const matchesType =
+        filterType === 'all' ||
         builder.builder_type?.toLowerCase().includes(filterType.toLowerCase());
 
       return matchesSearch && matchesType;
@@ -86,11 +87,10 @@ const BuildersListing = () => {
       {/* Heart Button */}
       <button
         onClick={(e) => handleHeartClick(e, builder)}
-        className={`absolute top-4 right-4 z-10 p-2.5 rounded-full backdrop-blur-md transition-all duration-300 ${
-          isBuilderSaved(builder.rera_id)
+        className={`absolute top-4 right-4 z-10 p-2.5 rounded-full backdrop-blur-md transition-all duration-300 ${isBuilderSaved(builder.rera_id)
             ? 'bg-red-500 text-white shadow-lg scale-110'
             : 'bg-white/90 text-gray-600 hover:bg-red-50 hover:text-red-500'
-        }`}
+          }`}
         aria-label={isBuilderSaved(builder.rera_id) ? 'Remove from saved' : 'Save builder'}
       >
         <Heart
@@ -103,8 +103,8 @@ const BuildersListing = () => {
       {/* Header with Logo/Banner */}
       <div className="relative h-32 bg-gradient-to-r from-blue-600 to-indigo-600">
         {builder.cover_banner && (
-          <img 
-            src={builder.cover_banner} 
+          <img
+            src={builder.cover_banner}
             alt={builder.company_name}
             className="w-full h-full object-cover"
           />
@@ -121,8 +121,8 @@ const BuildersListing = () => {
       <div className="relative px-6 -mt-12">
         <div className="w-24 h-24 bg-white rounded-xl shadow-lg border-4 border-white flex items-center justify-center">
           {builder.builder_logo ? (
-            <img 
-              src={builder.builder_logo} 
+            <img
+              src={builder.builder_logo}
               alt={builder.company_name}
               className="w-full h-full object-contain rounded-lg"
             />
@@ -152,7 +152,7 @@ const BuildersListing = () => {
             <MapPin size={16} className="text-blue-600 flex-shrink-0" />
             <span className="truncate">{builder.city}, {builder.state}</span>
           </div>
-          
+
           <div className="flex items-center gap-2 text-sm text-gray-600">
             <Calendar size={16} className="text-blue-600 flex-shrink-0" />
             <span>Established {builder.established_year}</span>
@@ -208,7 +208,7 @@ const BuildersListing = () => {
         )}
 
         <div className="flex gap-2">
-          <button 
+          <button
             onClick={() => window.location.href = `/builder/${builder.company_name.replace(/\s+/g, '-')}`}
             className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm"
           >
@@ -231,10 +231,14 @@ const BuildersListing = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 font-medium">Loading builders...</p>
+      <div className="min-h-screen bg-gray-50">
+        <FooterNavBar />
+        <DynamicBreadcrumb />
+        <div className="flex items-center justify-center" style={{ minHeight: '60vh' }}>
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 font-medium">Loading builders...</p>
+          </div>
         </div>
       </div>
     );
@@ -242,19 +246,23 @@ const BuildersListing = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
-          <div className="text-red-500 mb-4">
-            <Building2 size={48} className="mx-auto" />
+      <div className="min-h-screen bg-gray-50">
+        <FooterNavBar />
+        <DynamicBreadcrumb />
+        <div className="flex items-center justify-center" style={{ minHeight: '60vh' }}>
+          <div className="bg-white rounded-xl shadow-lg p-8 max-w-md text-center">
+            <div className="text-red-500 mb-4">
+              <Building2 size={48} className="mx-auto" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Builders</h2>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <button
+              onClick={fetchBuilders}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Builders</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button 
-            onClick={fetchBuilders}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-          >
-            Try Again
-          </button>
         </div>
       </div>
     );
@@ -277,7 +285,7 @@ const BuildersListing = () => {
                 Our Builders
               </h1>
               <p className="mt-3 text-lg text-gray-600 max-w-3xl">
-                Discover trusted and verified real estate developers across Navi Mumbai. 
+                Discover trusted and verified real estate developers across Navi Mumbai.
                 Explore premium projects, detailed profiles, and find the perfect builder for your dream home.
               </p>
             </div>

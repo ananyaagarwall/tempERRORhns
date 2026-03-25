@@ -3,91 +3,66 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { FaHome, FaChevronRight } from 'react-icons/fa';
 import './DynamicBreadcrumb.css';
 
+/**
+ * Route-to-label mapping for known pages.
+ * Dynamic segments (e.g. :id, :slug) are handled via customLabels prop.
+ */
+const ROUTE_LABELS = {
+  '/': 'Home',
+  '/about': 'About Us',
+  '/builders-page': 'Builders',
+  '/properties': 'Projects',
+  '/blogs': 'Blog',
+  '/cart': 'My Saved Properties',
+  '/saved-properties': 'My Saved Properties',
+  '/login': 'Login',
+  '/signup': 'Sign Up',
+  '/builder': 'Builder',
+  '/builder-info': 'Builder',
+};
+
+/**
+ * Derive a human-readable label for any pathname.
+ * Priority: customLabels > ROUTE_LABELS > smart guess from URL segments.
+ */
+const labelFor = (pathname, customLabels) => {
+  if (customLabels[pathname]) return customLabels[pathname];
+  if (ROUTE_LABELS[pathname]) return ROUTE_LABELS[pathname];
+
+  // Dynamic routes: /property/:id, /blog/:slug, /builder/:name
+  if (pathname.startsWith('/property/')) {
+    return customLabels[pathname] || 'Property Details';
+  }
+  if (pathname.startsWith('/blog/')) {
+    return customLabels[pathname] || 'Blog Post';
+  }
+  if (pathname.startsWith('/builder/')) {
+    return customLabels[pathname] || decodeURIComponent(pathname.split('/').pop()).replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  // Fallback: capitalise the last segment
+  const last = pathname.split('/').filter(Boolean).pop() || '';
+  return last.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) || 'Page';
+};
+
+/**
+ * Determine the "parent" page for the current route so the breadcrumb
+ * shows: Home > Parent > Current.
+ */
+const parentFor = (pathname) => {
+  if (pathname.startsWith('/property/')) return { path: '/properties', label: 'Projects' };
+  if (pathname.startsWith('/blog/')) return { path: '/blogs', label: 'Blog' };
+  if (pathname.startsWith('/builder/')) return { path: '/builders-page', label: 'Builders' };
+  return null; // no parent beyond Home
+};
+
 const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const pathname = location.pathname;
-  
-  // Define breadcrumb configuration for each route
-  const getBreadcrumbConfig = () => {
-    // Home page - no breadcrumb
-    if (pathname === '/') {
-      return [];
-    }
-    
-    // About Us page
-    if (pathname === '/about') {
-      return [
-        { label: 'Home', path: '/', isLast: false },
-        { label: 'About Us', path: '/about', isLast: true }
-      ];
-    }
-    
-    // Builders page
-    if (pathname === '/builders-page') {
-      return [
-        { label: 'Home', path: '/', isLast: false },
-        { label: 'Builders', path: '/builders-page', isLast: true }
-      ];
-    }
-    
-    // Properties/Projects page
-    if (pathname === '/properties') {
-      return [
-        { label: 'Home', path: '/', isLast: false },
-        { label: 'Projects', path: '/properties', isLast: true }
-      ];
-    }
-    
-    // Blog listing page
-    if (pathname === '/blogs') {
-      return [
-        { label: 'Home', path: '/', isLast: false },
-        { label: 'Blog', path: '/blogs', isLast: true }
-      ];
-    }
-    
-    // Individual blog post
-    if (pathname.startsWith('/blog/')) {
-      const blogTitle = customLabels[pathname] || 'Blog Post';
-      return [
-        { label: 'Home', path: '/', isLast: false },
-        { label: 'Blog', path: '/blogs', isLast: false },
-        { label: blogTitle, path: pathname, isLast: true }
-      ];
-    }
-    
-    // Individual builder page
-    if (pathname.startsWith('/builder/')) {
-      const builderName = customLabels[pathname] || 'Builder';
-      return [
-        { label: 'Home', path: '/', isLast: false },
-        { label: 'Builders', path: '/builders-page', isLast: false },
-        { label: builderName, path: pathname, isLast: true }
-      ];
-    }
 
-        // Cart / Saved Properties page
-    if (pathname === '/cart' || pathname === '/saved-properties') {
-      return [
-        { label: 'Home', path: '/', isLast: false },
-        { label: 'My Saved Properties', path: pathname, isLast: true }
-      ];
-    }
-
-        // Cart / Saved Properties page
-    if (pathname === '/cart') {
-      return [
-        { label: 'Home', path: '/', isLast: false },
-        { label: 'My Saved Properties', path: '/cart', isLast: true }
-      ];
-    }
-    
-    // Default fallback - show Home only
-    return [
-      { label: 'Home', path: '/', isLast: true }
-    ];
-  };
+  // Don't render on the home page
+  if (pathname === '/') return null;
 
   const getFallbackPath = () => {
     if (pathname.startsWith('/builder/') || pathname === '/builders-page' || pathname === '/builder') {
@@ -112,14 +87,21 @@ const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
     }
     navigate(getFallbackPath());
   };
-  
-  const breadcrumbs = getBreadcrumbConfig();
-  
-  // Don't render breadcrumb on home page
-  if (breadcrumbs.length === 0) {
-    return null;
+
+  const crumbs = [];
+
+  // 1. Home is always first
+  crumbs.push({ label: 'Home', path: '/', isHome: true });
+
+  // 2. Parent page (if applicable)
+  const parent = parentFor(pathname);
+  if (parent) {
+    crumbs.push({ label: parent.label, path: parent.path });
   }
-  
+
+  // 3. Current page (last item, not clickable)
+  crumbs.push({ label: labelFor(pathname, customLabels), path: pathname, isCurrent: true });
+
   return (
     <nav className={`dynamic-breadcrumb ${className}`} aria-label="breadcrumb">
       <div className="breadcrumb-container">
@@ -133,26 +115,18 @@ const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
             >
               &#8592;
             </button>
-            {breadcrumbs.map((crumb, index) => (
-              <React.Fragment key={crumb.path}>
-                {index === 0 ? (
-                  // Home icon for first item
-                  <Link to={crumb.path} className="breadcrumb-link">
-                    <FaHome className="breadcrumb-icon" />
-                    <span>{crumb.label}</span>
-                  </Link>
-                ) : crumb.isLast ? (
-                  // Current page (not clickable)
+            {crumbs.map((crumb, idx) => (
+              <React.Fragment key={crumb.path + idx}>
+                {crumb.isCurrent ? (
                   <span className="breadcrumb-current">{crumb.label}</span>
                 ) : (
-                  // Middle items (clickable)
                   <Link to={crumb.path} className="breadcrumb-link">
-                    {crumb.label}
+                    {crumb.isHome && <FaHome className="breadcrumb-icon" />}
+                    <span>{crumb.label}</span>
                   </Link>
                 )}
-                
-                {/* Separator */}
-                {!crumb.isLast && (
+
+                {!crumb.isCurrent && (
                   <FaChevronRight className="breadcrumb-separator" />
                 )}
               </React.Fragment>

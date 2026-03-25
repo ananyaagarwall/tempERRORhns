@@ -257,7 +257,7 @@ const AddBuilder = () => {
 
       console.log('Submitting form data:', Object.fromEntries(formData));
 
-      const response = await fetch('http://localhost:5000/api/builders', {
+      const response = await fetch(`${API_BASE_URL}/api/builders`, {
         method: 'POST',
         body: formData,
       });

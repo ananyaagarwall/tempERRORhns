@@ -1,4 +1,4 @@
-/* eslint-disable no-unused-vars */
+import API_BASE_URL from '../config';
 import React, { useEffect, useState } from 'react';
 import { FaEdit, FaTrash, FaEye, FaPlus } from 'react-icons/fa';
 
@@ -15,7 +15,7 @@ const ProjectList = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:5000/api/projects');
+      const res = await fetch(`${API_BASE_URL}/api/projects`);
       const data = await res.json();
       setProjects(Array.isArray(data) ? data : []);
     } catch (err) {

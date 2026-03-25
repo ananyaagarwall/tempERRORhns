@@ -279,13 +279,26 @@
 .tag {
   display: inline-flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
   background: #facc15 !important;
   color: #111827;
   padding: 0.25rem 0.75rem;
   border-radius: 9999px;
   font-size: 0.875rem;
   font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tag.city-tag {
+  background: #1E3A8A !important;
+  color: #ffffff;
+  padding: 0.35rem 1rem;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(30, 58, 138, 0.2);
+}
+
+.tag.city-tag .tag-remove {
+  color: #ffffff;
 }
 
 .tag-remove {

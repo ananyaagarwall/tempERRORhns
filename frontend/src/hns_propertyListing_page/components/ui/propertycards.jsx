@@ -19,13 +19,13 @@ const Badge = ({ children, className = '', ...props }) => (
 
 const ChevronLeft = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M15 6L9 12L15 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M15 6L9 12L15 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
 const ChevronRight = ({ size = 16 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M9 6L15 12L9 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -101,24 +101,24 @@ const PropertyCard = ({ property }) => {
               {property.status}
             </Badge>
           )}
-          <img 
-            src={property.img || '/main-image.jpeg'} 
+          <img
+            src={property.img || '/main-image.jpeg'}
             alt={`${property.name} main view`}
             className="main-property-image"
           />
         </div>
-        
+
         <div className="thumbnail-slider">
           <div className="thumbnail-container">
-            <div 
+            <div
               className="thumbnail-track"
-              style={{ 
+              style={{
                 transform: `translateX(-${currentThumbnail * 208}px)`,
                 width: `${thumbnailImages.length * 208}px`
               }}
             >
               {thumbnailImages.map((image, index) => (
-                <img 
+                <img
                   key={index}
                   src={image.src}
                   alt={image.alt}
@@ -128,7 +128,7 @@ const PropertyCard = ({ property }) => {
             </div>
           </div>
           <div className="thumbnail-controls">
-            <button 
+            <button
               onClick={prevThumbnail}
               className="thumbnail-btn thumbnail-btn-prev"
               aria-label="Previous image"
@@ -145,7 +145,7 @@ const PropertyCard = ({ property }) => {
                 />
               ))}
             </div>
-            <button 
+            <button
               onClick={nextThumbnail}
               className="thumbnail-btn thumbnail-btn-next"
               aria-label="Next image"
@@ -155,7 +155,7 @@ const PropertyCard = ({ property }) => {
           </div>
         </div>
       </div>
-      
+
       <div className="property-details">
         <div className="property-header">
           <h2 className="property-name">{property.name}</h2>
@@ -169,7 +169,7 @@ const PropertyCard = ({ property }) => {
             )}
           </div>
         </div>
-        
+
         <div className="property-info">
           {property.carpetArea && (
             <p className="carpet-area">Carpet Area: {property.carpetArea}</p>
@@ -188,7 +188,7 @@ const PropertyCard = ({ property }) => {
             <p className="age-maintenance">Connectivity: {property.connectivity.join(', ')}</p>
           )}
         </div>
-        
+
         <div className="highlights-section">
           <span className="highlights-label">Highlights:</span>
           <div className="highlights-list">
@@ -204,10 +204,10 @@ const PropertyCard = ({ property }) => {
             )}
           </div>
         </div>
-        
+
         <div className="action-buttons">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             className="add-to-list-btn"
             onClick={handleAddToList}
           >
@@ -220,7 +220,11 @@ const PropertyCard = ({ property }) => {
   );
 };
 
-const SearchResults = ({ searchFilters = { location: '', priceRange: 0, bhkTypes: [] } }) => {
+const SearchResults = ({
+  searchFilters = { location: '', priceRange: 0, bhkTypes: [] },
+  budgetNodes = [],
+  onNodeSelect
+}) => {
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -228,12 +232,12 @@ const SearchResults = ({ searchFilters = { location: '', priceRange: 0, bhkTypes
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await fetchProperties({ 
-          location: searchFilters.location, 
-          priceRange: searchFilters.priceRange, 
-          bhkTypes: searchFilters.bhkTypes 
+        const data = await fetchProperties({
+          location: searchFilters.location,
+          priceRange: searchFilters.priceRange,
+          bhkTypes: searchFilters.bhkTypes
         });
-        
+
         const mapped = (Array.isArray(data) ? data : []).map((p) => {
           const highlights = [];
           if (Array.isArray(p.Highlights)) highlights.push(...p.Highlights);
@@ -269,9 +273,34 @@ const SearchResults = ({ searchFilters = { location: '', priceRange: 0, bhkTypes
   return (
     <div className="search-results-wrapper">
       <div className="search-results-container">
-        <h1 className="search-results-heading">Results for your Search</h1>
-        {loading && <div>Loading...</div>}
-        {error && <div>{error}</div>}
+        <div className="search-results-header">
+          <h1 className="search-results-heading">Results for your Search</h1>
+
+          {/* Node Selector Row - shown when coming from BudgetSection */}
+          {budgetNodes.length > 0 && (
+            <div className="node-selector-container">
+              <div className="node-selector-row">
+                {budgetNodes.map((node) => (
+                  <button
+                    key={node}
+                    onClick={() => onNodeSelect && onNodeSelect(node)}
+                    className={`node-tab-button ${searchFilters.location === node ? "active" : ""}`}
+                  >
+                    {node}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {loading && <div className="loading-spinner">Loading properties...</div>}
+        {error && <div className="error-message">{error}</div>}
+
+        {!loading && !error && properties.length === 0 && (
+          <div className="no-results">No properties found matching your criteria</div>
+        )}
+
         {!loading && !error && properties.map((prop) => (
           <PropertyCard key={prop.id || Math.random()} property={prop} />
         ))}

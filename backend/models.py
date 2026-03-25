@@ -75,6 +75,20 @@ class Property(db.Model):
     reviews = db.relationship('Review', backref='property', lazy=True)
 
     def to_dict(self):
+        # Helper to safely parse JSON fields that might contain
+        # malformed JSON or already-parsed Python objects.
+        def _safe_json_loads(value, default=None):
+            if value is None:
+                return default
+            # If it's already a list/dict, return as-is
+            if isinstance(value, (list, dict)):
+                return value
+            try:
+                return json.loads(value)
+            except Exception:
+                # Fallback: return original value or default so that
+                # serialization never crashes the API.
+                return default if default is not None else value
         # Get builder project image if available
         builder_project_image = None
         
@@ -105,20 +119,20 @@ class Property(db.Model):
             'Carpet_Area': self.Carpet_Area,
             'Price_Starting_From': self.Price_Starting_From,
             'Pricing': self.Pricing,
-            'Highlights': json.loads(self.Highlights) if self.Highlights else None,
+            'Highlights': _safe_json_loads(self.Highlights),
             'Extra_Charges': self.Extra_Charges,
             'Builder_Name': self.Builder_Name,
-            'Builder_Details': json.loads(self.Builder_Details) if self.Builder_Details else None,
-            'Existing_Configurations': json.loads(self.Existing_Configurations) if self.Existing_Configurations else None,
+            'Builder_Details': _safe_json_loads(self.Builder_Details),
+            'Existing_Configurations': _safe_json_loads(self.Existing_Configurations, default=[]),
             'Built_up_Area': self.Built_up_Area,
             'Main_Door_Facing': self.Main_Door_Facing,
             'Ceiling_Height': self.Ceiling_Height,
             'Kitchen': self.Kitchen,
-            'Key_Highlights': json.loads(self.Key_Highlights) if self.Key_Highlights else None,
+            'Key_Highlights': _safe_json_loads(self.Key_Highlights),
             'Address': self.Address,
-            'Flat_Details': json.loads(self.Flat_Details) if self.Flat_Details else None,
-            'Loan_Availability': json.loads(self.Loan_Availability) if self.Loan_Availability else None,
-            'Approved_by_Authorities': json.loads(self.Approved_by_Authorities) if self.Approved_by_Authorities else None,
+            'Flat_Details': _safe_json_loads(self.Flat_Details),
+            'Loan_Availability': _safe_json_loads(self.Loan_Availability),
+            'Approved_by_Authorities': _safe_json_loads(self.Approved_by_Authorities),
             'Project_Status': self.Project_Status,
             'Possession_Date': self.Possession_Date,
             'RERA_ID': self.RERA_ID,
@@ -126,7 +140,7 @@ class Property(db.Model):
             'Parking': self.Parking,
             'Lift_Availability': self.Lift_Availability,
             'Security': self.Security,
-            'Connectivity': json.loads(self.Connectivity) if self.Connectivity else None,
+            'Connectivity': _safe_json_loads(self.Connectivity),
             'user_id': self.user_id,
             'project_id': self.project_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,

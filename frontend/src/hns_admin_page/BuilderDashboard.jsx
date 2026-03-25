@@ -1,3 +1,4 @@
+import API_BASE_URL from '../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,7 +36,7 @@ const BuilderDashboard = () => {
         try {
             setLoading(true);
             const user = JSON.parse(localStorage.getItem('user'));
-            const response = await fetch(`http://localhost:5000/api/builders/${user.id}`);
+            const response = await fetch(`${API_BASE_URL}/api/builders/${user.id}`);
             const data = await response.json();
             setBuilder(data);
             fetchProjects(data.id);
@@ -49,7 +50,7 @@ const BuilderDashboard = () => {
 
     const fetchProjects = async (builderId) => {
         try {
-            const response = await fetch(`http://localhost:5000/api/builders/${builderId}/projects`);
+            const response = await fetch(`${API_BASE_URL}/api/builders/${builderId}/projects`);
             const data = await response.json();
             setProjects(data);
         } catch (error) {
@@ -61,7 +62,7 @@ const BuilderDashboard = () => {
     const handleAddProject = async (e) => {
         e.preventDefault();
         try {
-            const response = await fetch(`http://localhost:5000/api/builders/${builder.id}/projects`, {
+            const response = await fetch(`${API_BASE_URL}/api/builders/${builder.id}/projects`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -1,3 +1,4 @@
+import API_BASE_URL from '../../config';
 // src/hns_home_page/app/LandingPage.jsx
 import React, { useRef, useEffect, useState } from 'react';
 import HeaderSection from '../components/layout/HeaderSection';
@@ -33,7 +34,7 @@ const LandingPage = () => {
           // Hide banner once user has responded to permission prompt.
           setGeoStatus('');
           const { latitude, longitude } = position.coords;
-          fetch('http://localhost:5000/api/geolocation', {
+          fetch(`${API_BASE_URL}/api/geolocation`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ latitude, longitude }),
