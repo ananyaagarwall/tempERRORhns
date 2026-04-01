@@ -5,7 +5,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import requests
 from models import (
     User,
-    Agent,
     Property,
     Enquiry,
     Review,
@@ -13,45 +12,30 @@ from models import (
     BuilderProject,
     Blog,
     Slug,
-    ChatSession,
-    ChatMessage,
-    UserPreference,
     UserInteraction,
     Favorite
 )
 
-from flask import Flask, request, jsonify, send_from_directory, redirect, make_response, g
-import jwt
-from clerk_backend_api import Clerk
-from clerk_backend_api.security import AuthenticateRequestOptions
+from flask import Flask, request, jsonify, send_from_directory, redirect, g
 
 #flash
 from flask_cors import CORS
-import os
 from dotenv import load_dotenv
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import sqlite3
 from werkzeug.utils import secure_filename
 import json
 from flask_migrate import Migrate
-import requests
-import base64
 import sys
 from slugify import slugify
+from sqlalchemy import inspect, text
 from extensions import db 
-from models import ChatSession, ChatMessage, UserPreference
 import logging
-from datetime import timedelta
-from functools import wraps
 import threading
 
 
 
 # Set UTF-8 encoding for stdout
 sys.stdout.reconfigure(encoding='utf-8')
-
-load_dotenv()
 
 # Configure logging for security events
 # NOTE: File logging disabled during development to prevent huge log files
@@ -118,7 +102,14 @@ app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
 # Configure Clerk Auth
 CLERK_SECRET_KEY = os.getenv('CLERK_SECRET_KEY')
-from auth import clerk_required, admin_only
+from auth import (
+    clerk_required,
+    admin_only,
+    clear_admin_session,
+    has_verified_admin_session,
+    is_primary_admin_email,
+    mark_admin_session_verified,
+)
 # Map the old jwt_required to clerk_required
 def jwt_required(fn=None):
     if fn is None:
@@ -127,6 +118,11 @@ def jwt_required(fn=None):
 
 # Get absolute path to the backend folder (where app.py lives)
 basedir = os.path.abspath(os.path.dirname(__file__))
+dotenv_path = os.path.join(basedir, '.env')
+load_dotenv(dotenv_path=dotenv_path)
+PRIMARY_ADMIN_EMAIL = (os.getenv('PRIMARY_ADMIN_EMAIL') or 'chaitraliwaikar.hns.06@gmail.com').strip().lower()
+ADMIN_SETUP_KEY = (os.getenv('ADMIN_SETUP_KEY') or '').strip()
+
 # Create 'instance' folder if it doesn't exist
 instance_dir = os.path.join(basedir, 'instance')
 os.makedirs(instance_dir, exist_ok=True)  # This line fixes most issues
@@ -139,6 +135,10 @@ if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY') or os.getenv('SECRET_KEY') or CLERK_SECRET_KEY or 'dev-admin-session-secret'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'false').strip().lower() == 'true'
 
 # Import the db instance from extensions
 from extensions import db
@@ -154,7 +154,7 @@ _index_lock = threading.Lock()
 _emb_index = None
 
 # Add these configurations
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -167,22 +167,47 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _table_has_column(table_name, column_name):
+    inspector = inspect(db.engine)
+    if not inspector.has_table(table_name):
+        return False
+    return any(column['name'] == column_name for column in inspector.get_columns(table_name))
+
+
+def _ensure_schema_compatibility():
+    """
+    Repair known additive schema drift for existing PostgreSQL deployments.
+    `db.create_all()` creates tables but does not add columns to existing ones.
+    """
+    if db.engine.dialect.name != 'postgresql':
+        return
+
+    inspector = inspect(db.engine)
+
+    if inspector.has_table('user_interaction'):
+        existing_columns = {column['name'] for column in inspector.get_columns('user_interaction')}
+        if 'guest_id' not in existing_columns:
+            db.session.execute(
+                text("ALTER TABLE user_interaction ADD COLUMN IF NOT EXISTS guest_id VARCHAR(100)")
+            )
+            db.session.commit()
+            print("Applied schema repair: added user_interaction.guest_id")
+
+
 with app.app_context():
     try:
-        # Create tables if they don't exist
-        db.create_all()
+       
         
         # Check if admin exists
-        admin = User.query.filter_by(email='admin@gmail.com').first()
+        admin = User.query.filter_by(email=PRIMARY_ADMIN_EMAIL).first()
         if not admin:
             # Create admin user
-            admin = User(
-                username='admin',
-                email='admin@gmail.com',
-                password='admin',  # Plain text password
-                role='admin',
-                is_active=True
-            )
+            admin = User()
+            admin.username = 'admin'
+            admin.email = PRIMARY_ADMIN_EMAIL
+            admin.password = 'admin'  # Plain text password
+            admin.role = 'admin'
+            admin.is_active = True
             db.session.add(admin)
             db.session.commit()
             print("Admin created successfully!")
@@ -2175,19 +2200,22 @@ def merge_guest_data():
             fav.guest_id = None
     
     # Update interactions
-    UserInteraction.query.filter_by(guest_id=guest_id).update({
-        'user_id': g.current_user.id,
-        'guest_id': None
-    })
-    # Note: If you have a guest_id column in UserInteraction, update that too.
-    
+    # This is best-effort: your DB schema may not have `user_interaction.guest_id`
+    # (migration drift), which would otherwise cause a 500 and break the entire merge.
     db.session.commit()
+    if _table_has_column('user_interaction', 'guest_id'):
+        try:
+            UserInteraction.query.filter_by(guest_id=guest_id).update({
+                'user_id': g.current_user.id,
+                'guest_id': None
+            })
+            db.session.commit()
+        except Exception as ie:
+            db.session.rollback()
+            print(f"Interaction merge error (best-effort): {ie}")
+    
     return jsonify({'message': 'Data merged successfully'}), 200
 
-
-
-#... existing imports...
-from models import ChatSession, ChatMessage, UserPreference
 from chatbot.routes import chatbot_bp
 
 # Register the Blueprintcd..
@@ -2208,12 +2236,15 @@ def get_current_user_profile():
     The role comes from the database — not from email or client-side logic.
     """
     user = g.current_user
+    primary_admin = is_primary_admin_email(user.email)
     return jsonify({
         'id': user.id,
         'email': user.email,
         'username': user.username,
         'role': user.role,
         'is_active': user.is_active,
+        'is_primary_admin': primary_admin,
+        'admin_session_verified': has_verified_admin_session(user),
     }), 200
 
 
@@ -2223,45 +2254,55 @@ def promote_to_admin():
     """
     Enhanced Admin Setup/Login:
     Requires:
-    1. Email must be admin@gmail.com
-    2. Local database password check
-    3. ADMIN_SETUP_KEY check
+    1. Authenticated Clerk user must be the configured primary admin email
+    2. Submitted admin email must match the configured primary admin email
+    3. Local database password check
+    4. Matching setup key
     """
-    ADMIN_SETUP_KEY = os.getenv('ADMIN_SETUP_KEY', '')
-    if not ADMIN_SETUP_KEY:
-        return jsonify({'error': 'Admin promotion is disabled. ADMIN_SETUP_KEY is not set.'}), 403
-    
     data = request.json or {}
-    email = data.get('email', '')
+    email = (data.get('email') or '').strip().lower()
     password = data.get('password', '')
-    provided_key = data.get('setup_key', '')
-    
-    # 1. Exclusive Email Check
-    if email != 'admin@gmail.com':
+    provided_key = (data.get('setup_key') or '').strip()
+    current_email = (g.current_user.email or '').strip().lower()
+
+    if not is_primary_admin_email(current_email):
+        clear_admin_session()
+        security_logger.warning(f"Blocked admin setup attempt by non-primary account: {current_email}")
+        return jsonify({'error': 'Only the primary admin account can access admin setup.'}), 403
+
+    if not email or not password or not provided_key:
+        return jsonify({'error': 'Admin email, password, and setup key are all required.'}), 400
+
+    if email != PRIMARY_ADMIN_EMAIL:
+        security_logger.warning(f"Blocked admin setup attempt with wrong submitted email by {current_email}")
         return jsonify({'error': 'Unauthorized email for admin access.'}), 403
 
-    # 2. Check Database Password (Stored in local User table)
-    from models import User
-    admin_db_user = User.query.filter_by(email='admin@gmail.com').first()
-    if not admin_db_user or not admin_db_user.check_password(password):
-        security_logger.warning(f"Failed admin password attempt for {email}")
-        return jsonify({'error': 'Invalid admin password.'}), 401
-    
-    # 3. Check Setup Key (.env)
-    if provided_key != ADMIN_SETUP_KEY:
-        security_logger.warning(f"Failed setup key attempt for {email}")
-        return jsonify({'error': 'Invalid setup key'}), 403
-    
-    # 4. Ensure the current Clerk session actually belongs to admin@gmail.com
-    if g.current_user.email != 'admin@gmail.com':
-        return jsonify({'error': 'Clerk account must match admin@gmail.com'}), 403
+    if not ADMIN_SETUP_KEY:
+        security_logger.error('ADMIN_SETUP_KEY is not configured on the server.')
+        return jsonify({'error': 'Admin setup is not configured on the server.'}), 500
 
-    # 5. Success: Promote the user role
+    if provided_key != ADMIN_SETUP_KEY:
+        security_logger.warning(f"Failed admin setup key attempt for {current_email}")
+        return jsonify({'error': 'Invalid setup key.'}), 401
+
+    # Check Database Password (Stored in local User table)
+    from models import User
+    admin_db_user = User.query.filter_by(email=PRIMARY_ADMIN_EMAIL).first()
+    if not admin_db_user or not admin_db_user.check_password(password):
+        security_logger.warning(f"Failed admin password attempt for {current_email}")
+        return jsonify({'error': 'Invalid admin password.'}), 401
+
+    # Success: keep the DB role in sync and mark this browser session as verified.
     g.current_user.role = 'admin'
     db.session.commit()
-    
-    security_logger.info(f"Admin access granted to {g.current_user.email}")
-    return jsonify({'message': 'Admin access verified.', 'role': g.current_user.role}), 200
+    mark_admin_session_verified(g.current_user)
+
+    security_logger.info(f"Admin access granted to {current_email}")
+    return jsonify({
+        'message': 'Admin access verified.',
+        'role': g.current_user.role,
+        'admin_session_verified': True,
+    }), 200
 
 
 if __name__ == '__main__':

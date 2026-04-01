@@ -11,7 +11,6 @@ import BlogSection from '../components/ui/BlogSection';
 import FooterSection from '../components/layout/FooterSection';
 import FooterNavBar from '../components/layout/FooterNavBar';
 import MobileFooter from '../../components/ui/MobileFooter';
-import ChatBot from '../components/ui/ChatBot';               // <-- always rendered
 import '../home_page_css/LandingPage.css';
 
 
@@ -135,7 +134,6 @@ const LandingPage = () => {
       <MobileFooter />
 
       {/* ChatBot is always mounted – floating trigger hidden via CSS on mobile */}
-      <ChatBot />
     </div>
   );
 };

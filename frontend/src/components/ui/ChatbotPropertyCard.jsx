@@ -2,9 +2,12 @@ import API_BASE_URL from '../../config';
 import React from 'react';
 import { CiLocationOn } from "react-icons/ci";
 import { useNavigate } from 'react-router-dom';
+import api from '../../services/apiInstance';
 import './ChatbotPropertyCard.css';
 
-const ChatbotPropertyCard = ({ property }) => {
+const FALLBACK_BUILDING_IMAGE = '/building.webp';
+
+const ChatbotPropertyCard = ({ property, sessionId, userId }) => {
   const navigate = useNavigate();
 
   const pickProjectImage = (p) => {
@@ -15,8 +18,7 @@ const ChatbotPropertyCard = ({ property }) => {
     };
 
     if (p.builder_project_image) return normalizeUrl(p.builder_project_image);
-    // Fallback to a default image if no image is available
-    return `${API_BASE_URL}/public/building.webp`; // Ensure this path is correct
+    return FALLBACK_BUILDING_IMAGE;
   };
 
   const imageUrl = pickProjectImage(property);
@@ -41,10 +43,25 @@ const ChatbotPropertyCard = ({ property }) => {
     }
   };
 
+  const handleCardClick = async () => {
+    try {
+      await api.post('/chatbot/track', {
+        user_id: userId || null,
+        property_id: property.id,
+        action: 'viewed',
+        session_id: sessionId || null,
+      });
+    } catch (error) {
+      console.error('Failed to track chatbot property interaction:', error);
+    } finally {
+      navigate(`/property/${property.id}`);
+    }
+  };
+
   return (
     <div 
       className="chatbot-property-card" 
-      onClick={() => navigate(`/property/${property.id}`)}
+      onClick={handleCardClick}
       style={{ cursor: 'pointer' }}
     >
       <img 
@@ -52,7 +69,7 @@ const ChatbotPropertyCard = ({ property }) => {
         alt={property.Property_Name || 'Property'} 
         className="chatbot-property-img" 
         onError={(e) => {
-          e.target.src = 'http://localhost:5000/public/building.webp';
+          e.target.src = FALLBACK_BUILDING_IMAGE;
         }}
       />
       <div className="chatbot-property-info">

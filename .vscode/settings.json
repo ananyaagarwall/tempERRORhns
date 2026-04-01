@@ -1,4 +1,5 @@
 {
-  "cSpell.words": ["coreference", "erty", "vectorstore"],
-  "python.analysis.extraPaths": ["./backend"]
+  // Place your workspace-specific settings here
+  "python.pythonPath": ".venv/Scripts/python.exe",
+  "cSpell.words": ["faiss"]
 }

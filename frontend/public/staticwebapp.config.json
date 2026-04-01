@@ -1,6 +1,12 @@
 {
+  "$schema": "https://json.schemastore.org/staticwebapp.config.json",
   "navigationFallback": {
-    "rewrite": "/index.html",
-    "exclude": ["/images/*.{png,jpg,gif,svg}", "/css/*", "/js/*", "/*.{css,js,ico,png,jpg,svg}"]
-  }
+    "rewrite": "/index.html"
+  },
+  "routes": [
+    {
+      "route": "/api/*",
+      "allowedRoles": ["anonymous", "authenticated"]
+    }
+  ]
 }

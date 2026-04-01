@@ -8,6 +8,7 @@ Werkzeug>=3.1.0                # much newer than 2.0.1 - recommended
 SQLAlchemy>=2.0.35             # 2.x series - required by new Flask-SQLAlchemy
 
 # === Data & Utils ===
+numpy>=2.2.0
 pandas>=2.2.3
 requests>=2.32.3
 python-slugify>=8.0.4
@@ -30,4 +31,8 @@ huggingface-hub>=0.27.0
 
 # === Vector Store ===
 psycopg2-binary>=2.9.9             # PostgreSQL adapter (includes pgvector support via langchain-postgres)
+faiss-cpu>=1.10.0
+
+# === Test / Debug ===
+pytest>=8.3.0
 

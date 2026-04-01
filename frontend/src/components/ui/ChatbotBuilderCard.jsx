@@ -4,16 +4,27 @@ import { Building2, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import './ChatbotBuilderCard.css';
 
+const FALLBACK_BUILDING_IMAGE = '/building.webp';
+
 const ChatbotBuilderCard = ({ builder }) => {
   const navigate = useNavigate();
 
-  const builderImage = builder.logo || `${API_BASE_URL}/public/building.webp`;
+  const builderImage = builder.logo || FALLBACK_BUILDING_IMAGE;
 
   const handleCardClick = () => {
-    // Navigate to builder detail page
     if (builder.rera_id) {
-      navigate(`/builder/${builder.rera_id}`);
-    } else if (builder.company_name) {
+      const slug = builder.company_name
+        ?.toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '');
+
+      if (slug) {
+        navigate(`/builder/${slug}`);
+        return;
+      }
+    }
+
+    if (builder.company_name) {
       navigate(`/builders?name=${encodeURIComponent(builder.company_name)}`);
     }
   };
@@ -29,7 +40,7 @@ const ChatbotBuilderCard = ({ builder }) => {
         alt={builder.company_name || builder.name || "Builder"} 
         className="chatbot-builder-img"
         onError={(e) => {
-          e.target.src = 'http://localhost:5000/public/building.webp';
+          e.target.src = FALLBACK_BUILDING_IMAGE;
         }}
       />
       <div className="chatbot-builder-info">

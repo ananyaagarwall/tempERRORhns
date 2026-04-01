@@ -2,6 +2,7 @@ import API_BASE_URL from '../config';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaEdit, FaTrash, FaEye, FaUsers, FaHome, FaEnvelope, FaStar, FaUser } from 'react-icons/fa';
+import api from '../services/apiInstance';
 
 const initialForm = {
     builder_name: '',
@@ -38,13 +39,6 @@ const AdminDashboard = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Check if user is admin
-        const user = JSON.parse(localStorage.getItem('user'));
-        if (!user || user.role !== 'admin') {
-            navigate('/');
-            return;
-        }
-
         // Fetch dashboard stats and users
         fetchDashboardStats();
         fetchUsers();
@@ -59,7 +53,7 @@ const AdminDashboard = () => {
 
         // Cleanup interval on component unmount
         return () => clearInterval(interval);
-    }, [navigate]);
+    }, []);
 
     // Clear success message after 3 seconds
     useEffect(() => {
@@ -73,21 +67,11 @@ const AdminDashboard = () => {
 
     const fetchUsers = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.message || 'Failed to fetch users');
-            }
-            const data = await response.json();
-            setUsers(data);
+            const response = await api.get('/users');
+            setUsers(response.data);
         } catch (error) {
             console.error('Error fetching users:', error);
-            setError(error.message);
+            setError(error?.response?.data?.message || error?.response?.data?.error || error.message);
         }
     };
 
@@ -106,57 +90,33 @@ const AdminDashboard = () => {
     const handleUserDelete = async (userId) => {
         if (window.confirm('Are you sure you want to delete this user?')) {
             try {
-                const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('token')}`
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error('Failed to delete user');
-                }
+                await api.delete(`/users/${userId}`);
                 fetchUsers();
                 setSuccess('User deleted successfully');
             } catch (error) {
-                setError(error.message);
+                setError(error?.response?.data?.message || error?.response?.data?.error || error.message);
             }
         }
     };
 
     const handleUserUpdate = async (updatedUser) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/${updatedUser.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(updatedUser),
-            });
-            if (!response.ok) {
-                throw new Error('Failed to update user');
-            }
+            await api.put(`/users/${updatedUser.id}`, updatedUser);
             fetchUsers();
             setShowModal(false);
             setSuccess('User updated successfully');
         } catch (error) {
-            setError(error.message);
+            setError(error?.response?.data?.message || error?.response?.data?.error || error.message);
         }
     };
 
     const fetchDashboardStats = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/admin/stats`, {
-                headers: {
-                    'Authorization': `Bearer ${localStorage.getItem('token')}`
-                }
-            });
-            if (!response.ok) throw new Error('Failed to fetch stats');
-            const data = await response.json();
-            setStats(data);
+            const response = await api.get('/admin/stats');
+            setStats(response.data);
             setLoading(false);
         } catch (err) {
-            setError(err.message);
+            setError(err?.response?.data?.message || err?.response?.data?.error || err.message);
             setLoading(false);
         }
     };

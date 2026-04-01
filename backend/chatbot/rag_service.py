@@ -12,19 +12,21 @@ from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.chains import ConversationalRetrievalChain
-from models import Property, Blog, BuilderProject, UserPreference, Builder, UserInteraction, ChatSession, db
+from models import Property, Blog, BuilderProject, UserPreference, Builder, UserInteraction, ChatSession, User, db
 from flask import current_app
 import threading
 
 # --- 1. SETUP ---
-load_dotenv()
+BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(dotenv_path=os.path.join(BACKEND_DIR, ".env"))
 
-print("📂 Vector store: PostgreSQL (pgvector)")
+print("Vector store: PostgreSQL (pgvector)")
 
 # --- 2. EMBEDDINGS SETUP ---
 HF_MODEL_NAME = os.getenv("HF_EMBED_MODEL", "all-MiniLM-L6-v2")
 HF_LOCAL_ONLY = os.getenv("HF_LOCAL_FILES_ONLY", "true").lower() in ("1", "true", "yes", "on")
 FALLBACK_EMBED_DIM = int(os.getenv("FALLBACK_EMBED_DIM", "384"))
+GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 
 
 class LocalFallbackEmbeddings:
@@ -126,6 +128,45 @@ class UserIntent(Enum):
     CONTACT_US = "contact"
 
 
+def _contains_any(msg_lower, keywords):
+    return any(keyword in msg_lower for keyword in keywords)
+
+
+def _has_compare_intent(msg_lower):
+    compare_keywords = [
+        'compare', 'difference', 'vs', 'versus', 'better',
+        'which one', 'between'
+    ]
+    return _contains_any(msg_lower, compare_keywords)
+
+
+def _is_refinement_only_message(user_message, params=None):
+    """
+    Detect short follow-up filter messages like "under 2 cr" or "3 bhk in thane"
+    without forcing the conversation back into comparison mode.
+    """
+    msg_lower = (user_message or "").lower().strip()
+    params = params or sync_extract_params(user_message)
+    if not any(params.values()):
+        return False
+
+    # A fresh location usually means the user is starting a new property search,
+    # not asking to keep the previous comparison thread going.
+    if params.get('location'):
+        return False
+
+    blocker_keywords = [
+        'compare', 'difference', 'vs', 'versus', 'better', 'which one', 'between',
+        'builder', 'builders', 'developer', 'developers', 'construction company',
+        'who built', 'building company', 'details', 'tell me more', 'specific',
+        'what is', 'explain', 'contact', 'support', 'help me', 'reach out',
+        'get in touch', 'phone', 'email', 'call', 'speak to', 'show', 'find',
+        'looking for', 'need', 'want', 'search', 'available', 'options',
+        'properties', 'property', 'list', 'display', 'apartment', 'flat', 'house'
+    ]
+    return not _contains_any(msg_lower, blocker_keywords)
+
+
 def classify_intent(user_message):
     """
     Enhanced intent classification for properties vs builders
@@ -136,38 +177,36 @@ def classify_intent(user_message):
     # Pattern 1: Contact/Support queries
     contact_keywords = ['contact', 'support', 'help me', 'reach out', 'get in touch', 
                         'phone', 'email', 'call', 'speak to']
-    if any(keyword in msg_lower for keyword in contact_keywords):
+    if _contains_any(msg_lower, contact_keywords):
         return UserIntent.CONTACT_US
+
+    # Pattern 2: Explicit comparison should win over generic search keywords
+    if _has_compare_intent(msg_lower):
+        return UserIntent.COMPARE_PROPERTIES
     
-    # Pattern 2: Builder search (PRIORITY CHECK)
+    # Pattern 3: Get specific details
+    detail_keywords = ['details', 'tell me more', 'about', 'info', 'specific',
+                       'what is', 'explain']
+    if _contains_any(msg_lower, detail_keywords):
+        return UserIntent.GET_DETAILS
+
+    # Pattern 4: Builder search
     builder_keywords = ['builder', 'builders', 'developer', 'developers', 
                         'construction company', 'who built', 'building company']
-    if any(keyword in msg_lower for keyword in builder_keywords):
+    if _contains_any(msg_lower, builder_keywords):
         return UserIntent.SEARCH_BUILDERS
     
-    # Pattern 3: Property search
+    # Pattern 5: Property search
     search_keywords = ['show', 'find', 'looking for', 'need', 'want', 'search', 
                        'available', 'options', 'properties', 'property', 'list', 
                        'display', 'apartment', 'flat', 'house', 'bhk']
-    if any(keyword in msg_lower for keyword in search_keywords):
+    if _contains_any(msg_lower, search_keywords):
         return UserIntent.SEARCH_PROPERTIES
-    
-    # Pattern 4: Comparison
-    compare_keywords = ['compare', 'difference', 'vs', 'versus', 'better', 
-                        'which one', 'between']
-    if any(keyword in msg_lower for keyword in compare_keywords):
-        return UserIntent.COMPARE_PROPERTIES
-    
-    # Pattern 5: Get specific details
-    detail_keywords = ['details', 'tell me more', 'about', 'info', 'specific',
-                       'what is', 'explain']
-    if any(keyword in msg_lower for keyword in detail_keywords):
-        return UserIntent.GET_DETAILS
     
     # Pattern 6: Refine filters (follow-up queries)
     filter_keywords = ['other', 'different', 'else', 'more', 'another',
                        'cheaper', 'expensive', 'bigger', 'smaller']
-    if any(keyword in msg_lower for keyword in filter_keywords):
+    if _contains_any(msg_lower, filter_keywords):
         return UserIntent.FILTER_REFINE
     
     # Default: General query
@@ -437,46 +476,49 @@ class ConversationMemory:
             
         if params.get('bhk'):
              self.entities['bhk_configs'].append(params['bhk'])
-             
-    def resolve_coreference(self, user_message):
-        
-        # Extract budget
-        budget_patterns = [
-            r'(\d+\.?\d*)\s*cr',
-            r'(\d+\.?\d*)\s*crore',
-            r'(\d+)\s*lakh'
-        ]
-        for pattern in budget_patterns:
-            match = re.search(pattern, msg_lower)
-            if match:
-                budget = float(match.group(1))
-                if 'lakh' in pattern:
-                    budget = budget / 100
-                self.entities['budgets'].append(budget)
-        
-        # Extract locations
-        common_locations = ['ghansoli', 'airoli', 'nerul', 'vashi', 'kharghar', 
-                           'kopar khairane', 'belapur', 'panvel', 'seawoods', 'thane', 'mumbai', 'navi mumbai']
-        for loc in common_locations:
-            if loc in msg_lower:
-                self.entities['locations'].append(loc.title())
-    
+
     def resolve_coreference(self, message):
-        """Handle pronouns like 'it', 'that', 'the first one'"""
-        msg_lower = message.lower()
-        
-        if any(word in msg_lower for word in ['it', 'that', 'this']):
-            if self.entities['property_ids']:
-                return self.entities['property_ids'][-1]
-        
-        if 'first' in msg_lower:
-            if self.entities['property_ids']:
-                return self.entities['property_ids'][0]
-        
-        if 'second' in msg_lower:
-            if len(self.entities['property_ids']) > 1:
-                return self.entities['property_ids'][1]
-        
+        """Resolve references like 'it', 'the first one', or 'property 2'."""
+        msg_lower = (message or "").lower()
+        property_ids = [str(pid) for pid in self.entities.get('property_ids', []) if pid not in (None, "")]
+        if not property_ids:
+            return None
+
+        explicit_ref = re.search(
+            r'\b(?:prop(?:erty)?|project|home|listing|option)\s*#?\s*(\d+)\b',
+            msg_lower
+        )
+        if explicit_ref:
+            index = int(explicit_ref.group(1)) - 1
+            if 0 <= index < len(property_ids):
+                return property_ids[index]
+
+        ordinal_map = {
+            'first': 0,
+            '1st': 0,
+            'second': 1,
+            '2nd': 1,
+            'third': 2,
+            '3rd': 2,
+            'fourth': 3,
+            '4th': 3,
+            'fifth': 4,
+            '5th': 4,
+        }
+        for token, index in ordinal_map.items():
+            if re.search(rf'\b{re.escape(token)}\b', msg_lower):
+                if 0 <= index < len(property_ids):
+                    return property_ids[index]
+
+        if re.search(r'\b(last|latest|recent|latter)\b', msg_lower):
+            return property_ids[-1]
+
+        if 'former' in msg_lower and len(property_ids) >= 2:
+            return property_ids[0]
+
+        if re.search(r'\b(it|this|that|this one|that one|same one|same property|the property|the project)\b', msg_lower):
+            return property_ids[-1]
+
         return None
     
     def get_current_preferences(self):
@@ -494,6 +536,7 @@ class ConversationMemory:
 
 def analyze_user_behavior(user_id):
     """Learn from user's past actions"""
+    user_id = _resolve_local_user_id(user_id)
     if not user_id:
         return None
     
@@ -697,7 +740,7 @@ def sync_properties_to_vectordb():
                 ).fetchall()
             existing_ids = {row[0] for row in rows}
         except Exception as exc:
-            print(f"  ⚠️  Could not fetch existing IDs ({exc}); will upsert all.")
+            print(f"  Warning: could not fetch existing IDs ({exc}); will upsert all.")
     except Exception:
         existing_ids = set()
 
@@ -705,7 +748,7 @@ def sync_properties_to_vectordb():
     new_ids  = [uid for uid in all_ids if uid not in existing_ids]
 
     if not new_docs:
-        print("✅ All data is already up to date in PGVector!")
+        print("All data is already up to date in PGVector.")
         return
 
     print(f"Syncing {len(new_docs)} new items to PGVector...")
@@ -715,9 +758,9 @@ def sync_properties_to_vectordb():
         batch_ids  = new_ids[i:i + BATCH_SIZE]
         try:
             vectorstore.add_documents(documents=batch_docs, ids=batch_ids)
-            print(f"  Batch {i // BATCH_SIZE + 1} ✅ ({len(batch_docs)} docs)")
+            print(f"  Batch {i // BATCH_SIZE + 1} ok ({len(batch_docs)} docs)")
         except Exception as e:
-            print(f"  Batch {i // BATCH_SIZE + 1} ❌ Error: {e}")
+            print(f"  Batch {i // BATCH_SIZE + 1} error: {e}")
     print("--- PGVector Sync Complete ---")
 
 
@@ -748,8 +791,12 @@ def extract_and_save_preferences(user_message, user_id):
 
 def _extract_preferences_logic(user_message, user_id):
     """Actual logic for extracting preferences"""
+    sync_prefs = sync_extract_params(user_message)
+    if sync_prefs:
+        update_user_preferences_db(user_id, sync_prefs)
+
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash", 
+        model=GEMINI_TEXT_MODEL,
         temperature=0.0,
         google_api_key=os.getenv("GOOGLE_API_KEY")
     )
@@ -763,7 +810,7 @@ Message: "{message}" """
         content = response.content.strip().replace("```json", "").replace("```", "")
         data = json.loads(content)
         if data:
-            print(f"🧠 Learned: {data}")
+            print(f"Learned preferences: {data}")
             
             if 'budget' in data and isinstance(data['budget'], dict):
                 if 'max' in data['budget']:
@@ -773,7 +820,9 @@ Message: "{message}" """
                 else:
                     data['budget'] = str(data['budget'])
             
-            update_user_preferences_db(user_id, data)
+            merged = dict(sync_prefs or {})
+            merged.update(data)
+            update_user_preferences_db(user_id, merged)
     except Exception as e:
         print(f"Auto-learn error: {e}")
 
@@ -782,17 +831,45 @@ def update_user_preferences_db(user_id, prefs):
     """Update user preferences in database"""
     from extensions import db
     try:
+        resolved_user_id = _resolve_local_user_id(user_id)
+        if not resolved_user_id:
+            print(f"Skipping preference update; could not resolve local user id from {user_id!r}")
+            return
+
         for k, v in prefs.items():
             if not v: continue
-            existing = UserPreference.query.filter_by(user_id=user_id, pref_key=k).first()
+            existing = UserPreference.query.filter_by(user_id=resolved_user_id, pref_key=k).first()
             if existing: 
                 existing.pref_value = str(v)
             else: 
-                db.session.add(UserPreference(user_id=user_id, pref_key=k, pref_value=str(v)))
+                db.session.add(UserPreference(user_id=resolved_user_id, pref_key=k, pref_value=str(v)))
         db.session.commit()
     except Exception as e:
         print(f"Error updating preferences: {e}")
         db.session.rollback()
+
+
+def _resolve_local_user_id(user_id):
+    """
+    Normalize a local integer id or Clerk id string to the local user.id.
+    """
+    if user_id in (None, ""):
+        return None
+
+    if isinstance(user_id, int):
+        return user_id if User.query.get(user_id) else None
+
+    value = str(user_id).strip()
+    if not value:
+        return None
+
+    if value.isdigit():
+        user = User.query.get(int(value))
+        if user:
+            return user.id
+
+    user = User.query.filter_by(clerk_user_id=value).first()
+    return user.id if user else None
 
 
 # ============================================
@@ -928,6 +1005,106 @@ def compare_properties(props):
     return "\n".join(lines)
 
 
+def _format_budget_label(user_budget):
+    if user_budget in (None, ""):
+        return None
+    try:
+        value = float(user_budget)
+    except (TypeError, ValueError):
+        return str(user_budget)
+
+    if value >= 1:
+        return f"{value:g} Cr"
+    return f"{round(value * 100):g} L"
+
+
+def summarize_property_search_results(props, location=None, budget=None, bhk=None):
+    if not props:
+        filters = []
+        if bhk:
+            filters.append(f"{bhk} BHK")
+        if location:
+            filters.append(f"in {str(location).title()}")
+        if budget:
+            filters.append(f"within {_format_budget_label(budget)}")
+
+        if filters:
+            return (
+                "I couldn't find matching properties "
+                + " ".join(filters)
+                + ". Try relaxing the budget, BHK, or location filters."
+            )
+        return "I couldn't find matching properties for that query. Try adding a location, budget, or BHK."
+
+    scope = []
+    if bhk:
+        scope.append(f"{bhk} BHK")
+    scope.append("properties")
+    if location:
+        scope.append(f"in {str(location).title()}")
+    if budget:
+        scope.append(f"within {_format_budget_label(budget)}")
+
+    response = [f"I found {len(props)} matching {' '.join(scope)}."]
+
+    price_samples = [
+        str(getattr(prop, 'Price_Starting_From', '')).strip()
+        for prop in props[:3]
+        if getattr(prop, 'Price_Starting_From', None)
+    ]
+    if price_samples:
+        response.append(f"Some of the strongest matches start around {price_samples[0]}.")
+
+    response.append("I'm sharing the most relevant property cards below. Ask for details on any card if you want a deeper breakdown.")
+    return " ".join(response)
+
+
+def summarize_builder_search_results(builders, location=None):
+    if not builders:
+        if location:
+            return f"I couldn't find matching builders in {str(location).title()} for that query. Try another city or area."
+        return "I couldn't find matching builders for that query. Try adding a builder name or location."
+
+    scope = "builders"
+    if location:
+        scope += f" in {str(location).title()}"
+
+    response = [f"I found {len(builders)} matching {scope}."]
+    top_names = [getattr(builder, 'company_name', None) for builder in builders[:3] if getattr(builder, 'company_name', None)]
+    if top_names:
+        response.append(f"Top results include {', '.join(top_names)}.")
+    response.append("I'm sharing the most relevant builder cards below.")
+    return " ".join(response)
+
+
+def _get_memory_property_candidates(conversation_memory, limit=5):
+    if not conversation_memory:
+        return []
+
+    property_ids = [
+        str(pid) for pid in conversation_memory.entities.get('property_ids', [])
+        if pid not in (None, "")
+    ]
+    if not property_ids:
+        return []
+
+    seen = set()
+    props = []
+    for pid in property_ids:
+        if pid in seen:
+            continue
+        seen.add(pid)
+        try:
+            prop = Property.query.get(int(pid))
+        except (TypeError, ValueError):
+            prop = None
+        if prop:
+            props.append(prop)
+        if len(props) >= limit:
+            break
+    return props
+
+
 # ============================================
 # ENHANCED MAIN CHATBOT RESPONSE
 # ============================================
@@ -938,6 +1115,8 @@ def get_chatbot_response(user_query, user_id=None, chat_history=[], session_show
     Returns: (response_text, shown_ids, all_properties, all_builders, intent, buffered_responses)
     """
     
+    user_id = _resolve_local_user_id(user_id)
+
     if session_shown_ids is None:
         session_shown_ids = set()
     
@@ -949,13 +1128,12 @@ def get_chatbot_response(user_query, user_id=None, chat_history=[], session_show
     # CLASSIFY INTENT FIRST
     intent = classify_intent(user_query)
     
-    # Context Override: If we were comparing and user provided budget/bhk details
+    # Keep compare mode only for genuine follow-up refinements, not every later search.
     if last_intent == UserIntent.COMPARE_PROPERTIES.value:
-         # Check if current query is just filters (BHK/Budget)
-         if params.get('budget') or params.get('bhk'):
+         if _is_refinement_only_message(user_query, params):
              intent = UserIntent.COMPARE_PROPERTIES
 
-    print(f"🎯 Detected intent: {intent.value}")
+    print(f"Detected intent: {intent.value}")
     
     # Handle contact intent immediately
     if intent == UserIntent.CONTACT_US:
@@ -1112,7 +1290,17 @@ Our team is available to assist you with any questions or schedule property visi
                     session_shown_ids.add(str(p.id))
                 return comparison, session_shown_ids, specific_props, [], intent.value, []
 
-            # 2. General / Location-Based Comparison
+            # 2. Compare the currently shown cards if user is referring to recent results
+            memory_props = _get_memory_property_candidates(conversation_memory, limit=5)
+            if len(memory_props) >= 2:
+                comparison = compare_properties(memory_props)
+                for p in memory_props:
+                    session_shown_ids.add(str(p.id))
+                if user_id:
+                    extract_and_save_preferences(user_query, user_id)
+                return comparison, session_shown_ids, memory_props, [], intent.value, []
+
+            # 3. General / Location-Based Comparison
             params = sync_extract_params(user_query)
             
             # Merge with memory
@@ -1122,12 +1310,9 @@ Our team is available to assist you with any questions or schedule property visi
             budget = params.get('budget') or mem_prefs.get('budget')
             bhk = params.get('bhk') or mem_prefs.get('bhk')
 
-            # Force follow-up if ANY key preference is missing (Location is mandatory, plus budget OR bhk)
+            # Location is still the main anchor when we are not comparing the currently shown cards.
             if not loc:
                  return "To compare the best properties, I need to know the Location. Which area are you interested in?", session_shown_ids, [], [], intent.value, []
-
-            if not budget and not bhk:
-                 return f"I can find properties in {loc}, but to give you a meaningful comparison, could you tell me your Budget range or preferred BHK?", session_shown_ids, [], [], intent.value, []
             
             # Search DB with filters
             candidates = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
@@ -1162,7 +1347,9 @@ Our team is available to assist you with any questions or schedule property visi
                 # FORCE RETURN text here to bypass LLM
                 return comparison, session_shown_ids, top_5, [], intent.value, []
             else:
-                return f"I found properties in {loc}, but none matched your exact Budget/BHK criteria. Would you like to throw a wider net?", session_shown_ids, [], [], intent.value, []
+                if budget or bhk:
+                    return f"I found properties in {loc}, but none matched your exact Budget/BHK criteria. Would you like to throw a wider net?", session_shown_ids, [], [], intent.value, []
+                return f"I couldn't find enough properties in {loc} to compare right now. Try another area or refine the search.", session_shown_ids, [], [], intent.value, []
 
         except Exception as e:
             print(f"COMPARE handler error: {e}")
@@ -1211,13 +1398,17 @@ Our team is available to assist you with any questions or schedule property visi
                  candidates = filtered[:6] # Top 6
                  
                  if candidates:
-                     # Create detailed list using comparison format
-                     detailed_list = compare_properties(candidates)
+                     search_summary = summarize_property_search_results(
+                         candidates,
+                         location=loc,
+                         budget=budget,
+                         bhk=bhk,
+                     )
                      for p in candidates:
                          session_shown_ids.add(str(p.id))
                      
                      if user_id: extract_and_save_preferences(user_query, user_id)
-                     return detailed_list, session_shown_ids, candidates, [], intent.value, []
+                     return search_summary, session_shown_ids, candidates, [], intent.value, []
         except Exception as e:
              print(f"Search fallback error: {e}")
 
@@ -1430,7 +1621,7 @@ Response (4-6 lines, no formatting):"""
     all_properties = []
     all_builders = []
     
-    print(f"📦 Processing {len(property_docs)} property docs, {len(builder_docs)} builder docs")
+    print(f"Processing {len(property_docs)} property docs, {len(builder_docs)} builder docs")
     
     # Fetch up to 20 properties (regardless of shown status)
     # We'll track shown IDs separately for the FIRST 10
@@ -1477,32 +1668,29 @@ Response (4-6 lines, no formatting):"""
             if _matches_location([b.city, b.location, b.corporate_address], query_location)
         ]
 
-        # Keep text response aligned with card payload when user asked location-specific results.
-        if intent == UserIntent.SEARCH_PROPERTIES:
-            if all_properties:
-                ai_answer = (
-                    f"I found {len(all_properties)} property option(s) in {query_location.title()}. "
-                    "Sharing the most relevant matching cards below."
-                )
-            else:
-                ai_answer = (
-                    f"I couldn't find matching properties in {query_location.title()} for this query. "
-                    "Try nearby areas or relax your budget/BHK filters."
-                )
-        elif intent == UserIntent.SEARCH_BUILDERS:
-            if all_builders:
-                ai_answer = (
-                    f"I found {len(all_builders)} builder option(s) in {query_location.title()}. "
-                    "Sharing the best matching builder cards below."
-                )
-            else:
-                ai_answer = (
-                    f"I couldn't find matching builders in {query_location.title()} for this query. "
-                    "Try nearby locations or a broader builder search."
-                )
+    # Keep text response deterministic for search flows so normal searches do not
+    # accidentally sound like comparisons.
+    if intent in {UserIntent.SEARCH_PROPERTIES, UserIntent.FILTER_REFINE} and all_properties:
+        ai_answer = summarize_property_search_results(
+            all_properties,
+            location=query_location,
+            budget=user_budget,
+            bhk=user_bhk,
+        )
+    elif intent == UserIntent.SEARCH_PROPERTIES and not all_properties:
+        ai_answer = summarize_property_search_results(
+            [],
+            location=query_location,
+            budget=user_budget,
+            bhk=user_bhk,
+        )
+    elif intent in {UserIntent.SEARCH_BUILDERS, UserIntent.FILTER_REFINE} and all_builders and not all_properties:
+        ai_answer = summarize_builder_search_results(all_builders, location=query_location)
+    elif intent == UserIntent.SEARCH_BUILDERS and not all_builders:
+        ai_answer = summarize_builder_search_results([], location=query_location)
 
-    print(f"✅ Retrieved {len(all_properties)} properties, {len(all_builders)} builders")
-    print(f"📊 Will show 10 initially, {max(0, len(all_properties) - 10)} available for 'load more'")
+    print(f"Retrieved {len(all_properties)} properties, {len(all_builders)} builders")
+    print(f"Will show 10 initially, {max(0, len(all_properties) - 10)} available for 'load more'")
     
     # Auto-learn
     if user_id:
@@ -1594,8 +1782,8 @@ def generate_buffered_responses(current_properties, current_builders, current_in
 
     # 2. Logic for Builders
     if current_builders:
-         # Suggest comparing top 2 if available
-         if len(current_builders) >= 2:
+         # Offer compare only after a builder-focused result set.
+         if current_intent == UserIntent.SEARCH_BUILDERS.value and len(current_builders) >= 2:
              top_2 = current_builders[:2]
              names = [getattr(b, 'company_name', 'Builder') for b in top_2]
              label = f"Compare {names[0]} vs {names[1]}"

@@ -49,38 +49,61 @@ const ProtectedRoute = ({ children }) => {
 
 const AdminRoute = ({ children }) => {
   const { isLoaded, isSignedIn, getToken } = useAuth();
-  const [adminStatus, setAdminStatus] = useState(null); // null=loading, true=admin, false=not
+  const [adminState, setAdminState] = useState(null);
 
   useEffect(() => {
     if (!isLoaded) return;
     if (!isSignedIn) {
-      setAdminStatus(false);
+      setAdminState({ allowed: false, needsSetup: false });
       return;
     }
-    // Ask the backend to confirm admin role — backend checks DB role, not just email
+
     const checkAdmin = async () => {
       try {
         const token = await getToken();
         const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
         const res = await api.get('/auth/me', { headers });
-        setAdminStatus(res.data?.role === 'admin');
+        const profile = res.data || {};
+        const isPrimaryAdmin = profile.is_primary_admin === true;
+        const hasAdminRole = profile.role === 'admin';
+        const hasVerifiedSession = profile.admin_session_verified === true;
+
+        if (isPrimaryAdmin && hasAdminRole && hasVerifiedSession) {
+          setAdminState({ allowed: true, needsSetup: false });
+          return;
+        }
+
+        if (isPrimaryAdmin) {
+          setAdminState({ allowed: false, needsSetup: true });
+          return;
+        }
+
+        setAdminState({ allowed: false, needsSetup: false });
       } catch (err) {
-        setAdminStatus(false);
+        setAdminState({ allowed: false, needsSetup: false });
       }
     };
     checkAdmin();
   }, [isLoaded, isSignedIn, getToken]);
 
-  if (!isLoaded || adminStatus === null) {
+  if (!isLoaded || adminState === null) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 12 }}>
         <div style={{ width: 36, height: 36, border: '4px solid #23487c', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-        <p style={{ color: '#23487c', fontWeight: 600 }}>Verifying admin access…</p>
+        <p style={{ color: '#23487c', fontWeight: 600 }}>Verifying admin access...</p>
       </div>
     );
   }
 
-  if (!isSignedIn || !adminStatus) {
+  if (!isSignedIn) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (adminState.needsSetup) {
+    return <Navigate to="/admin-setup" replace />;
+  }
+
+  if (!adminState.allowed) {
     return <Navigate to="/" replace />;
   }
 
@@ -92,29 +115,63 @@ const UserSync = () => {
   const { isSignedIn, isLoaded, getToken } = useAuth();
   
   useEffect(() => {
-    const syncGuest = async () => {
-      if (isLoaded && isSignedIn) {
-        const guestId = getOrCreateGuestId();
-        const token = await getToken();
-        const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-        try {
-          // Ensure local user row exists
-          await api.get('/auth/me', { headers });
-        } catch (err) {
-          console.error('Error syncing user profile:', err);
-        }
+    let cancelled = false;
 
-        if (guestId) {
-          try {
-            await api.post('/auth/merge-guest', { guest_id: guestId }, { headers });
-            console.log('Successfully merged guest data');
-          } catch (err) {
-            console.error('Error merging guest data:', err);
+    const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+    const syncGuest = async (attempt = 0) => {
+      if (!isLoaded || !isSignedIn || cancelled) {
+        return;
+      }
+
+      const guestId = getOrCreateGuestId();
+      const token = await getToken({ skipCache: attempt > 0 });
+
+      if (!token) {
+        if (attempt < 5 && !cancelled) {
+          await wait(800);
+          return syncGuest(attempt + 1);
+        }
+        console.warn('User sync skipped: Clerk session token not available yet.');
+        return;
+      }
+
+      const headers = { Authorization: `Bearer ${token}` };
+
+      try {
+        // Ensure local user row exists and keep frontend role/profile in sync.
+        const profileRes = await api.get('/auth/me', { headers });
+        if (!cancelled && profileRes?.data) {
+          localStorage.setItem('user', JSON.stringify(profileRes.data));
+        }
+      } catch (err) {
+        if (attempt < 5 && err?.response?.status === 401 && !cancelled) {
+          await wait(800);
+          return syncGuest(attempt + 1);
+        }
+        console.error('Error syncing user profile:', err?.response?.data || err);
+        return;
+      }
+
+      if (guestId) {
+        try {
+          await api.post('/auth/merge-guest', { guest_id: guestId }, { headers });
+          console.log('Successfully merged guest data');
+        } catch (err) {
+          if (attempt < 5 && err?.response?.status === 401 && !cancelled) {
+            await wait(800);
+            return syncGuest(attempt + 1);
           }
+          console.error('Error merging guest data:', err?.response?.data || err);
         }
       }
     };
+
     syncGuest();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isLoaded, isSignedIn, getToken]);
   
   return null;

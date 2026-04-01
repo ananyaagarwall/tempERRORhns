@@ -30,6 +30,7 @@ export const getOrCreateGuestId = () => {
 
 const api = axios.create({
   baseURL: API_URL,
+  withCredentials: true,
 });
 
 // Request Interceptor: Attach Clerk Token

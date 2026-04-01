@@ -1,14 +1,11 @@
-from __future__ import annotations
-
 import os
 import re
-import math
 import sqlite3
 from dataclasses import dataclass
 from typing import List, Dict, Tuple, Any
 
 import numpy as np
-import  ss 
+import faiss
 from sentence_transformers import SentenceTransformer
 
 
@@ -39,16 +36,6 @@ def connect_db(db_path: str) -> sqlite3.Connection:
     return conn
 
 
-def table_has_columns(conn: sqlite3.Connection, table: str, columns: List[str]) -> Dict[str, bool]:
-    """Return a map of column -> exists for a given table."""
-    try:
-        cur = conn.execute(f"PRAGMA table_info({table})")
-        existing = {row[1] for row in cur.fetchall()}  # column name at index 1
-    except sqlite3.Error:
-        existing = set()
-    return {col: (col in existing) for col in columns}
-
-
 def safe_row_get(row: sqlite3.Row, key: str, default: str = '') -> str:
     try:
         val = row[key]
@@ -77,8 +64,6 @@ def load_records(conn: sqlite3.Connection) -> List[Record]:
     """
     records: List[Record] = []
 
-    project_cols = ['id', 'builder_name', 'title', 'location', 'full_address', 'locality']
-    _ = table_has_columns(conn, 'builder_project', project_cols)
     try:
         cur = conn.execute("SELECT id, builder_name, title, location, full_address, locality FROM builder_project")
         for row in cur.fetchall():
@@ -121,76 +106,6 @@ def load_records(conn: sqlite3.Connection) -> List[Record]:
             pass
 
     return records
-
-
-# ----------------------------- Tokenization & TF-IDF -----------------------------
-
-_STOPWORDS = set(
-    """
-    a an the and or but if then else when where while of in on at to for from by with without
-    is are was were be been being have has had do does did can could should would may might will
-    this that these those it its as not no yes you your yours we our ours they them their theirs
-    i me my mine he him his she her hers which who whom what why how about into over under more most
-    """.split()
-)
-
-
-def tokenize(text: str) -> List[str]:
-    tokens = re.findall(r"[a-z0-9]+", text.lower())
-    return [t for t in tokens if len(t) > 1 and t not in _STOPWORDS]
-
-
-def build_vocabulary(docs: List[List[str]], min_df: int = 1, max_features: int | None = None) -> Dict[str, int]:
-    df: Dict[str, int] = {}
-    for toks in docs:
-        for t in set(toks):
-            df[t] = df.get(t, 0) + 1
-    items = [(t, c) for t, c in df.items() if c >= min_df]
-    items.sort(key=lambda x: (-x[1], x[0]))
-    if max_features is not None:
-        items = items[:max_features]
-    vocab = {t: idx for idx, (t, _) in enumerate(items)}
-    return vocab
-
-
-def compute_tfidf_matrix(tokenized_docs: List[List[str]], vocab: Dict[str, int]) -> np.ndarray:
-    n_docs = len(tokenized_docs)
-    n_terms = len(vocab)
-    if n_terms == 0 or n_docs == 0:
-        return np.zeros((n_docs, 0), dtype=np.float32)
-
-    df = np.zeros(n_terms, dtype=np.int32)
-    for toks in tokenized_docs:
-        seen = set()
-        for t in toks:
-            idx = vocab.get(t)
-            if idx is not None and idx not in seen:
-                df[idx] += 1
-                seen.add(idx)
-
-    idf = np.log((n_docs + 1) / (df + 1)) + 1.0  # smoothed idf
-
-    X = np.zeros((n_docs, n_terms), dtype=np.float32)
-    for i, toks in enumerate(tokenized_docs):
-        if not toks:
-            continue
-        tf: Dict[int, int] = {}
-        for t in toks:
-            idx = vocab.get(t)
-            if idx is not None:
-                tf[idx] = tf.get(idx, 0) + 1
-        if not tf:
-            continue
-        max_tf = max(tf.values())
-        for idx, cnt in tf.items():
-            tf_norm = 0.5 + 0.5 * (cnt / max_tf)
-            X[i, idx] = tf_norm * idf[idx]
-
-    # L2 normalize rows (cosine-like similarity via inner product)
-    norms = np.linalg.norm(X, axis=1, keepdims=True) + 1e-12
-    X = X / norms
-    return X
-
 
 # ----------------------------- FAISS Indexer -----------------------------
 

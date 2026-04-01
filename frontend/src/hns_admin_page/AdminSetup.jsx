@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import api from '../services/apiInstance';
 
 const AdminSetup = () => {
   const { isLoaded, isSignedIn } = useAuth();
+  const navigate = useNavigate();
   const [setupKey, setSetupKey] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,27 +14,43 @@ const AdminSetup = () => {
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
+
     api.get('/auth/me')
-      .then((res) => setProfile(res.data))
+      .then((res) => {
+        const nextProfile = res.data;
+        setProfile(nextProfile);
+        localStorage.setItem('user', JSON.stringify(nextProfile));
+        setEmail(nextProfile?.email || '');
+      })
       .catch(() => setProfile(null));
   }, [isLoaded, isSignedIn]);
+
+  useEffect(() => {
+    if (profile?.admin_session_verified) {
+      localStorage.setItem('user', JSON.stringify(profile));
+      navigate('/dashboard/admin', { replace: true });
+    }
+  }, [profile, navigate]);
 
   const submit = async (e) => {
     e.preventDefault();
     if (!email || !password || !setupKey) {
-      setStatus({ type: 'error', message: 'All fields are required.' });
+      setStatus({ type: 'error', message: 'Admin email, password, and setup key are all required.' });
       return;
     }
-    setStatus({ type: 'loading', message: 'Verifying admin access…' });
+
+    setStatus({ type: 'loading', message: 'Verifying admin access...' });
     try {
-      const res = await api.post('/auth/promote-admin', { 
-        email, 
-        password, 
-        setup_key: setupKey 
+      const res = await api.post('/auth/promote-admin', {
+        email,
+        password,
+        setup_key: setupKey,
       });
-      setStatus({ type: 'success', message: res.data?.message || 'Admin verification successful.' });
+
+      setStatus({ type: 'success', message: res.data?.message || 'Admin verification successful. Opening dashboard...' });
       const me = await api.get('/auth/me');
       setProfile(me.data);
+      localStorage.setItem('user', JSON.stringify(me.data));
       setSetupKey('');
       setPassword('');
     } catch (err) {
@@ -42,6 +59,10 @@ const AdminSetup = () => {
     }
   };
 
+  if (isLoaded && isSignedIn && profile && !profile.is_primary_admin) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
       <div className="w-full max-w-md bg-white shadow-lg border border-gray-200 rounded-xl p-6">
@@ -49,17 +70,17 @@ const AdminSetup = () => {
           <img src="/HouseNSeek.png" alt="HouseNSeek Logo" />
           <h1 className="text-2xl font-bold text-gray-800 mt-3">Admin Setup</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Use the one-time setup key to promote your account.
+            Only the designated primary admin can continue from here.
           </p>
         </div>
 
         {!isLoaded && (
-          <p className="text-gray-600">Loading…</p>
+          <p className="text-gray-600">Loading...</p>
         )}
 
         {isLoaded && !isSignedIn && (
           <p className="text-gray-600">
-            Please sign in first, then come back here.
+            Please sign in with the primary admin account first.
           </p>
         )}
 
@@ -72,11 +93,7 @@ const AdminSetup = () => {
               </div>
             )}
 
-            {profile?.role === 'admin' ? (
-              <div className="p-3 rounded-lg bg-green-50 text-green-700 text-sm">
-                You are already an admin.
-              </div>
-            ) : (
+            {profile?.is_primary_admin && !profile?.admin_session_verified && (
               <form onSubmit={submit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-gray-700">Admin Email</label>
@@ -85,7 +102,7 @@ const AdminSetup = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="admin@gmail.com"
+                    placeholder="Enter designated admin email"
                     required
                   />
                 </div>
@@ -109,7 +126,7 @@ const AdminSetup = () => {
                     value={setupKey}
                     onChange={(e) => setSetupKey(e.target.value)}
                     className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter .env setup key"
+                    placeholder="Enter setup key"
                     required
                   />
                 </div>
@@ -121,6 +138,7 @@ const AdminSetup = () => {
                 >
                   Verify Admin Access
                 </button>
+
                 {status.type !== 'idle' && (
                   <div
                     className={`text-sm p-2 rounded ${
