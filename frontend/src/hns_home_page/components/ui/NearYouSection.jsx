@@ -1,6 +1,7 @@
 import API_BASE_URL from '../../../config';
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import "../../home_page_css/NearYouSection.css";
 
 // Fallback tabs if API fails or user location not detected
@@ -49,6 +50,7 @@ function parsePriceInCr(priceStr) {
 }
 
 const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) => {
+    const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
     const [tabs, setTabs] = useState(FALLBACK_TABS);
     const [activeTab, setActiveTab] = useState("thane");
     const [properties, setProperties] = useState([]);
@@ -60,6 +62,21 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
     const tabRowRef = useRef(null);
     const cardsRowRef = useRef(null);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 700);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const scrollCards = (direction) => {
+        if (!cardsRowRef.current) return;
+        const scrollAmount = 720; // 2 cards scroll
+        cardsRowRef.current.scrollBy({
+            left: direction === 'left' ? -scrollAmount : scrollAmount,
+            behavior: 'smooth'
+        });
+    };
 
     // Fetch nearest nodes when userLocation changes
     useEffect(() => {
@@ -228,7 +245,25 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
             </div>
 
             {/* Property Cards */}
-            <div className="near-you-cards-container">
+            <div className="near-you-cards-container-wrapper" style={{ position: 'relative' }}>
+                {!isMobile && (
+                    <>
+                        <button
+                            className="scroll-btn left"
+                            onClick={() => scrollCards('left')}
+                            aria-label="Scroll left"
+                        >
+                            <FaChevronLeft />
+                        </button>
+                        <button
+                            className="scroll-btn right"
+                            onClick={() => scrollCards('right')}
+                            aria-label="Scroll right"
+                        >
+                            <FaChevronRight />
+                        </button>
+                    </>
+                )}
                 <div className="near-you-cards-row" ref={cardsRowRef}>
                     {loading ? (
                         <div className="near-you-loading">Loading properties...</div>
@@ -265,6 +300,48 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
                     )}
                 </div>
             </div>
+
+            <style>{`
+                .near-you-cards-container-wrapper:hover .scroll-btn {
+                    opacity: 1;
+                }
+                .scroll-btn {
+                    position: absolute;
+                    top: 50%;
+                    transform: translateY(-50%);
+                    z-index: 100;
+                    background: rgba(250, 248, 245, 0.65);
+                    backdrop-filter: blur(12px);
+                    -webkit-backdrop-filter: blur(12px);
+                    border: 1px solid rgba(255, 255, 255, 0.6);
+                    color: #223A5F;
+                    width: 52px;
+                    height: 52px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    cursor: pointer;
+                    box-shadow: 0 8px 24px rgba(34,58,95,0.15);
+                    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    opacity: 0;
+                }
+                .scroll-btn:hover {
+                    background: rgba(241, 217, 122, 0.9);
+                    border: 1px solid rgba(255, 255, 255, 0.8);
+                    transform: translateY(-50%) scale(1.08);
+                    box-shadow: 0 10px 28px rgba(34,58,95,0.22);
+                }
+                .scroll-btn.left {
+                    left: 20px;
+                }
+                .scroll-btn.right {
+                    right: 20px;
+                }
+                .scroll-btn svg {
+                    font-size: 20px;
+                }
+            `}</style>
         </section>
     );
 };

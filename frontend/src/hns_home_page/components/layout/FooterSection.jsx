@@ -4,11 +4,10 @@ import { FaPhoneAlt, FaMapMarkerAlt, FaEnvelope } from "react-icons/fa";
 import "../../home_page_css/FooterSection.css";
 
 const footerLinks = [
-  { label: 'Home', to: '/' },
+  { label: 'Builders', to: '/builders-page' },
+  { label: 'Projects', to: '/properties' },
+  { label: 'Blog', to: '/blogs' },
   { label: 'About Us', to: '/about' },
-  { label: 'Blogs', to: '/blogs' },
-  { label: 'Sell', to: '/sell' },
-  { label: 'Buy', to: '/buy' },
 ];
 
 const siteLinks = [
@@ -20,19 +19,19 @@ const siteLinks = [
 ];
 
 const contactLinks = [
-  { 
+  {
     label: 'Location',
     text: 'Mumbai, India',
     url: 'https://maps.google.com/?q=Mumbai,India',
     icon: <FaMapMarkerAlt className="footer-icon" />
   },
-  { 
+  {
     label: 'Email',
     text: 'hello@housenseek.com',
     url: 'mailto:hello@housenseek.com',
     icon: <FaEnvelope className="footer-icon" />
   },
-  { 
+  {
     label: 'Phone',
     text: '+91 123-456-7890',
     url: 'tel:+911234567890',
@@ -51,17 +50,17 @@ const FooterSection = () => (
     <div className="footer-container">
       {/* Brand & Info - Always visible */}
       <div className="footer-brand">
-        <img 
+        <img
           src="/HouseNSeek.png"
           alt="HouseNSeek Logo"
           className="footer-logo"
         />
         <div className="footer-description">
-          The best real estate platform for buying, selling, and renting apartments and homes in India.
+          The best real estate platform for buying apartments and homes in India with no brokers involved.
         </div>
         <div className="footer-social">
           {socialLinks.map((s, i) => (
-            <SocialIcon 
+            <SocialIcon
               key={i}
               url={s.url}
               target="_blank"
