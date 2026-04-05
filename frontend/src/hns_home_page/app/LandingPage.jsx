@@ -8,11 +8,14 @@ import BudgetSection from '../components/ui/BudgetSection';
 import BuildersSection from '../components/ui/BuildersSection';
 import NearYouSection from '../components/ui/NearYouSection';
 import BlogSection from '../components/ui/BlogSection';
+import ConsultingSection from '../components/ui/ConsultingSection';
 import FooterSection from '../components/layout/FooterSection';
 import FooterNavBar from '../components/layout/FooterNavBar';
 import MobileFooter from '../../components/ui/MobileFooter';
 import ChatBot from '../components/ui/ChatBot';               // <-- always rendered
 import '../home_page_css/LandingPage.css';
+import { getCookie, setCookie } from '../../utils/cookieUtils';
+
 
 
 const LandingPage = () => {
@@ -26,6 +29,14 @@ const LandingPage = () => {
 
   /* ---------- Geolocation + Filter Listener ---------- */
   useEffect(() => {
+    // Check if location is already stored in cookies
+    const storedLocation = getCookie('user_location');
+    if (storedLocation) {
+      setUserLocation(storedLocation);
+      setGeoStatus('');
+      return; // Skip geolocation if cookie exists
+    }
+
     // Geolocation
     if ('geolocation' in navigator) {
       setGeoStatus('Requesting location permission...');
@@ -42,14 +53,21 @@ const LandingPage = () => {
             .then((res) => res.json())
             .then((data) => {
               // Extract district/location from response
+              let locValue = null;
               if (data.received && data.received.district) {
-                setUserLocation(data.received.district);
+                locValue = data.received.district;
               } else if (data.received && data.received.full_address) {
                 // Try to extract a known area from full address
-                setUserLocation(data.received.full_address);
+                locValue = data.received.full_address;
+              }
+
+              if (locValue) {
+                setUserLocation(locValue);
+                // Store in cookie for 7 days
+                setCookie('user_location', locValue, 7);
               }
             })
-            .catch(() => {});
+            .catch(() => { });
         },
         () => {
           // Hide banner if permission denied/unavailable.
@@ -128,6 +146,8 @@ const LandingPage = () => {
 
       <BudgetSection />
       <TrustedBuildersSection location={searchFilters.location} />
+      <ConsultingSection />
+
       <BlogSection id="blog-section" />
       <FooterSection />
 
