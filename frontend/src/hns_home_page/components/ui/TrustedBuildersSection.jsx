@@ -71,6 +71,9 @@ const TrustedBuildersSection = ({ location }) => {
   const filteredBuilders = location && location.trim() ?
     builders.filter(b => b.subtitle && b.subtitle.toLowerCase().includes(location.toLowerCase())) :
     builders;
+  const sectionTitle = location && location.trim()
+    ? `Explore Trusted Builders in ${location}`
+    : 'Explore Trusted Builders in Area';
   
   const handlePrevious = () => {
     setActiveIdx((prevIdx) => (prevIdx === 0 ? filteredBuilders.length - 1 : prevIdx - 1));
@@ -92,6 +95,17 @@ const TrustedBuildersSection = ({ location }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    if (filteredBuilders.length === 0) {
+      setActiveIdx(0);
+      return;
+    }
+
+    if (activeIdx >= filteredBuilders.length) {
+      setActiveIdx(0);
+    }
+  }, [activeIdx, filteredBuilders.length]);
+
   // Responsive values
   let cardWidth = 380, cardHeight = 400, centerScale = 1.08;
   let visibleCount = 5;
@@ -109,7 +123,7 @@ const TrustedBuildersSection = ({ location }) => {
 
         <div className="trusted-builders-header mobile">
           <h2 className="trusted-builders-heading mobile">
-            Explore Trusted Builders in Area
+            {sectionTitle}
           </h2>
           <span className="trusted-builders-underline mobile" />
         </div>
@@ -191,6 +205,7 @@ const TrustedBuildersSection = ({ location }) => {
   // Desktop/Tablet Layout (carousel with navigation arrows)
   return (
     <section
+      className={`trusted-builders-section ${isTablet ? 'tablet' : 'desktop'}`}
       style={{
         background: '#F7F9FF',
         borderRadius: 18,
@@ -200,35 +215,20 @@ const TrustedBuildersSection = ({ location }) => {
         boxSizing: 'border-box',
         position: 'relative',
         scrollMarginTop: 120,
+        overflow: 'visible',
       }}
     >
-      <div style={{ 
-        width: '100%',
-        position: 'relative',
-        margin: '0 0 32px 0',
-        marginBottom: isTablet ? '40px' : '50px', // Added extra spacing between heading and content
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <h2 style={{ 
-            fontSize: isTablet ? '2.1rem' : '2.5rem',
-            fontWeight: 800,
-            color: '#223A5F',
-            margin: 0,
-            letterSpacing: '-0.5px',
-            fontFamily: "'Abril Fatface', serif"
-          }}>
-            Explore Trusted Builders in Area
-          </h2>
-          <span style={{ 
-            display: 'block',
-            width: isTablet ? '70px' : '80px',
-            height: '4px',
-            background: 'linear-gradient(90deg, #F1D97A 0%, #e6c76a 100%)',
-            margin: '12px auto 0',
-            borderRadius: '2px',
-            boxShadow: '0 2px 4px rgba(241, 217, 122, 0.3)'
-          }} />
-        </div>
+      <div
+        className={`trusted-builders-header ${isTablet ? 'tablet' : 'desktop'}`}
+        style={{ zIndex: 5 }}
+      >
+        <h2
+          className={`trusted-builders-heading ${isTablet ? 'tablet' : 'desktop'}`}
+          style={{ position: 'relative', zIndex: 5 }}
+        >
+          {sectionTitle}
+        </h2>
+        <span className={`trusted-builders-underline ${isTablet ? 'tablet' : 'desktop'}`} />
       </div>
 
       <div
@@ -259,7 +259,7 @@ const TrustedBuildersSection = ({ location }) => {
             borderRadius: '50%',
             width: isTablet ? '44px' : '50px',
             height: isTablet ? '44px' : '50px',
-            display: isMobile ? 'flex' : 'none',
+            display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
@@ -293,7 +293,7 @@ const TrustedBuildersSection = ({ location }) => {
             borderRadius: '50%',
             width: isTablet ? '44px' : '50px',
             height: isTablet ? '44px' : '50px',
-            display: isMobile ? 'flex' : 'none',
+            display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',

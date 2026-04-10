@@ -1,7 +1,7 @@
 import API_BASE_URL from './config';
 import React, { useEffect, useState, useRef } from 'react';
 import { fetchBlogs } from '../services/api';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaUserCircle, FaBars, FaChevronLeft, FaChevronRight, FaHome } from 'react-icons/fa';
 
 const categoryCarousel = [
@@ -38,6 +38,15 @@ const BlogLanding = () => {
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef();
+  const navigate = useNavigate();
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/');
+  };
 
   useEffect(() => {
     fetchBlogs().then(setBlogs).catch(console.error);
@@ -134,7 +143,14 @@ const BlogLanding = () => {
       <div className="bg-[#fdf8ef] flex items-center justify-between px-8 py-3">
         {/* Breadcrumbs */}
         <div className="flex items-center gap-2 text-gray-400 text-sm">
-          <FaChevronLeft className="text-lg" />
+          <button
+            type="button"
+            onClick={handleBack}
+            className="text-lg hover:text-gray-600 transition-colors"
+            aria-label="Go back"
+          >
+            <FaChevronLeft />
+          </button>
           <FaHome className="text-gray-300" />
           <span className="mx-1">View Builders</span>
           <FaChevronRight />

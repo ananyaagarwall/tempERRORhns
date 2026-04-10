@@ -97,7 +97,7 @@ const BlogSection = () => {
         ))}
       </div>
 
-      <style jsx>{`
+      <style>{`
         .blog-section {
           padding: 40px 20px;
           max-width: 1200px;

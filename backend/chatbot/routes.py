@@ -1,12 +1,11 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, g
 from models import Builder, ChatSession, ChatMessage, UserInteraction, Property, User
 from extensions import db 
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError
-from sqlalchemy import text
+from sqlalchemy import text, inspect
 from .rag_service import (
     get_chatbot_response, 
     sync_properties_to_vectordb, 
-    get_direct_sql_results,
     determine_conversation_state,
     update_session_state,
     ConversationMemory,
@@ -17,10 +16,43 @@ from .rag_service import (
 )
 
 chatbot_bp = Blueprint('chatbot', __name__)
+from auth import clerk_required
 
 # Session-level tracking (in-memory)
 # For production, consider Redis or database storage
 session_tracking = {}
+
+
+def _resolve_local_user_id(raw_user_id=None):
+    """
+    Normalize request/auth user identifiers to the local integer user.id.
+    Accepts either a local integer id or a Clerk user id string.
+    """
+    current_user = getattr(g, 'current_user', None)
+    if current_user:
+        return current_user.id
+
+    if raw_user_id in (None, ""):
+        return None
+
+    value = str(raw_user_id).strip()
+    if not value:
+        return None
+
+    if value.isdigit():
+        user = User.query.get(int(value))
+        if user:
+            return user.id
+
+    user = User.query.filter_by(clerk_user_id=value).first()
+    return user.id if user else None
+
+
+def _get_table_columns(table_name):
+    inspector = inspect(db.engine)
+    if not inspector.has_table(table_name):
+        return {}
+    return {column['name']: column for column in inspector.get_columns(table_name)}
 
 
 def _resync_sequence(table_name, pk_column="id"):
@@ -104,6 +136,7 @@ def sync_db():
 
 
 @chatbot_bp.route('/ask', methods=['POST'])
+@clerk_required()
 def ask_bot():
     """
     Enhanced chatbot endpoint with improved pagination
@@ -113,7 +146,7 @@ def ask_bot():
     """
     data = request.json
     user_message = data.get('message')
-    user_id = data.get('user_id') 
+    user_id = _resolve_local_user_id(data.get('user_id'))
     session_id = data.get('session_id')
 
     if not user_message:
@@ -142,16 +175,23 @@ def ask_bot():
         'properties_offset': 0,
         'builders_offset': 0
     })
+
+    if session_id and user_id is not None:
+        session_row = ChatSession.query.get(session_id)
+        if session_row and session_row.user_id != user_id:
+            session_row.user_id = user_id
+            db.session.commit()
     
     session_data['conversation_count'] += 1
     
     # Extract entities
     if session_data.get('memory'):
         memory = session_data['memory']
+        memory.entities['property_ids'] = [str(pid) for pid in session_data.get('last_shown_properties', []) if pid not in (None, "")]
         memory.extract_entities_from_message(user_message)
         resolved_property_id = memory.resolve_coreference(user_message)
         if resolved_property_id:
-            print(f"🔗 Resolved reference to property: {resolved_property_id}")
+            print(f"Resolved reference to property: {resolved_property_id}")
 
     # Prepare Chat History
     chat_history = []
@@ -298,6 +338,8 @@ def ask_bot():
         # Store last shown order for reference (e.g., 'prop 1' -> this mapping)
         session_data['last_shown_properties'] = [p.get('id') for p in properties_to_show]
         session_data['last_shown_builders'] = [b.get('id') for b in builders_to_show]
+        if session_data.get('memory'):
+            session_data['memory'].entities['property_ids'] = [str(pid) for pid in session_data['last_shown_properties'] if pid not in (None, "")]
         # Enforce intent-specific visibility: if user asked for properties only, don't show builders and vice versa
         if last_intent == 'search_properties':
             builders_to_show = []
@@ -413,6 +455,7 @@ def ask_bot():
         }), 500
 
 @chatbot_bp.route('/load-more', methods=['POST'])
+@clerk_required()
 def load_more():
     """
     Load next batch of 10 properties/builders
@@ -421,10 +464,10 @@ def load_more():
         data = request.json
         session_id = data.get('session_id')
         
-        print(f"🔄 Load More Request - Session ID: {session_id}")
+        print(f"Load more request - session ID: {session_id}")
         
         if not session_id or session_id not in session_tracking:
-            print(f"❌ Invalid session: {session_id}")
+            print(f"Invalid session: {session_id}")
             print(f"Available sessions: {list(session_tracking.keys())}")
             return jsonify({"error": "Invalid session"}), 400
         
@@ -442,7 +485,7 @@ def load_more():
         builders_offset = int(session_data.get('builders_offset', 0) or 0)
 
         print(
-            f"📊 Total properties: {len(all_properties)} (offset: {properties_offset}); "
+            f"Total properties: {len(all_properties)} (offset: {properties_offset}); "
             f"Total builders: {len(all_builders)} (offset: {builders_offset})"
         )
 
@@ -460,7 +503,7 @@ def load_more():
 
         # If nothing unseen, return empty and indicate no more
         if not properties_to_show and not builders_to_show:
-            print("ℹ️ No more unseen items to load for this intent.")
+            print("No more unseen items to load for this intent.")
             has_more = False
             return jsonify({
                 "properties": [],
@@ -497,8 +540,8 @@ def load_more():
                 session_data['builders_offset'] < len(all_builders)
             )
         
-        print(f"✅ Returning {len(properties_to_show)} properties, {len(builders_to_show)} builders")
-        print(f"📌 Has more: {has_more}")
+        print(f"Returning {len(properties_to_show)} properties, {len(builders_to_show)} builders")
+        print(f"Has more: {has_more}")
         
         return jsonify({
             "last_intent": session_data.get('last_intent'),
@@ -519,29 +562,22 @@ def load_more():
         })
     
     except Exception as e:
-        print(f"❌ Error in load_more: {str(e)}")
+        print(f"Error in load_more: {str(e)}")
         import traceback
         print(traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @chatbot_bp.route('/session/new', methods=['POST'])
+@clerk_required()
 def create_session():
     """Create a new chat session"""
     try:
         data = request.get_json(silent=True) or {}
         raw_user_id = data.get('user_id')
+        user_id = _resolve_local_user_id(raw_user_id)
 
-        # Allow anonymous sessions when user_id is not provided.
-        user_id = None
-        if raw_user_id not in (None, ""):
-            try:
-                user_id = int(raw_user_id)
-            except (TypeError, ValueError):
-                return jsonify({"error": "Invalid user_id. It must be an integer."}), 400
-
-            # Validate foreign key target early to avoid DB-level 500s.
-            if not User.query.get(user_id):
-                return jsonify({"error": f"user_id {user_id} does not exist."}), 404
+        if raw_user_id not in (None, "") and user_id is None:
+            return jsonify({"error": "Invalid user_id. Use a local user.id or a valid clerk_user_id."}), 400
         
         new_session = ChatSession(
             user_id=user_id, 
@@ -690,11 +726,14 @@ def get_session_state(session_id):
         return jsonify({"error": str(e)}), 500
 
 
-@chatbot_bp.route('/preferences/<int:user_id>', methods=['GET'])
-def get_user_preferences(user_id):
+@chatbot_bp.route('/preferences/<user_ref>', methods=['GET'])
+def get_user_preferences(user_ref):
     """Get learned preferences for a user"""
     try:
         from models import UserPreference
+        user_id = _resolve_local_user_id(user_ref)
+        if user_id is None:
+            return jsonify({"error": "Valid user reference required"}), 400
         prefs = UserPreference.query.filter_by(user_id=user_id).all()
         return jsonify({
             "user_id": user_id,
@@ -710,12 +749,15 @@ def get_user_preferences(user_id):
         return jsonify({"error": str(e)}), 500
 
 
-@chatbot_bp.route('/preferences/<int:user_id>', methods=['PUT'])
-def update_user_preference(user_id):
+@chatbot_bp.route('/preferences/<user_ref>', methods=['PUT'])
+def update_user_preference(user_ref):
     """Manually update user preferences"""
     try:
         from models import UserPreference
-        data = request.json
+        data = request.get_json(silent=True) or {}
+        user_id = _resolve_local_user_id(user_ref)
+        if user_id is None:
+            return jsonify({"error": "Valid user reference required"}), 400
         
         pref_key = data.get('pref_key')
         pref_value = data.get('pref_value')
@@ -753,15 +795,67 @@ def update_user_preference(user_id):
 def track_interaction():
     """Track when user views/clicks a property"""
     try:
-        data = request.json
-        
-        interaction = UserInteraction(
-            user_id=data.get('user_id'),
-            property_id=data.get('property_id'),
-            action=data.get('action', 'viewed'),
-            duration_seconds=data.get('duration'),
-            session_id=data.get('session_id')
-        )
+        data = request.get_json(silent=True) or {}
+        table_columns = _get_table_columns('user_interaction')
+        if not table_columns:
+            return jsonify({"error": "user_interaction table not found"}), 500
+
+        local_user_id = _resolve_local_user_id(data.get('user_id'))
+        guest_id = data.get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+        property_id = data.get('property_id')
+        duration_value = data.get('duration_seconds', data.get('duration'))
+        session_value = data.get('session_id')
+
+        if property_id in (None, ""):
+            return jsonify({"error": "property_id required"}), 400
+        try:
+            property_id = int(property_id)
+        except (TypeError, ValueError):
+            return jsonify({"error": "property_id must be an integer"}), 400
+
+        if not Property.query.get(property_id):
+            return jsonify({"error": f"property_id {property_id} does not exist"}), 404
+
+        duration_seconds = None
+        if duration_value not in (None, ""):
+            try:
+                duration_seconds = int(duration_value)
+            except (TypeError, ValueError):
+                return jsonify({"error": "duration_seconds must be an integer"}), 400
+
+        session_id = None
+        if session_value not in (None, ""):
+            try:
+                session_id = int(session_value)
+            except (TypeError, ValueError):
+                return jsonify({"error": "session_id must be an integer"}), 400
+
+        if local_user_id is None and session_id is not None:
+            session_row = ChatSession.query.get(session_id)
+            if session_row and session_row.user_id is not None:
+                local_user_id = session_row.user_id
+
+        user_id_column = table_columns.get('user_id')
+        guest_id_column = table_columns.get('guest_id')
+        if local_user_id is None and user_id_column and not user_id_column.get('nullable', True):
+            if guest_id and not guest_id_column:
+                return jsonify({
+                    "error": "user_interaction in hns.db requires a valid local user_id; guest_id is not available in this schema"
+                }), 400
+            return jsonify({"error": "user_id required"}), 400
+
+        interaction_payload = {
+            'property_id': property_id,
+            'action': str(data.get('action') or 'viewed'),
+            'duration_seconds': duration_seconds,
+            'session_id': session_id,
+        }
+        if local_user_id is not None:
+            interaction_payload['user_id'] = local_user_id
+        if guest_id_column and guest_id:
+            interaction_payload['guest_id'] = str(guest_id)
+
+        interaction = UserInteraction(**interaction_payload)
         
         db.session.add(interaction)
         db.session.commit()
@@ -876,8 +970,9 @@ def get_all_sessions_analytics():
 def get_sessions():
     """Get all sessions for a user"""
     try:
-        user_id = request.args.get('user_id')
-        if not user_id:
+        raw_user_id = request.args.get('user_id')
+        user_id = _resolve_local_user_id(raw_user_id)
+        if user_id is None:
             return jsonify({"error": "user_id query parameter required"}), 400
         
         sessions = ChatSession.query.filter_by(user_id=user_id).order_by(ChatSession.created_at.desc()).all()
@@ -892,10 +987,11 @@ def get_sessions():
 def list_sessions():
     """List all sessions (with optional user filter)"""
     try:
-        user_id = request.args.get('user_id', type=int)
+        raw_user_id = request.args.get('user_id')
+        user_id = _resolve_local_user_id(raw_user_id) if raw_user_id not in (None, "") else None
         
         query = ChatSession.query
-        if user_id:
+        if user_id is not None:
             query = query.filter_by(user_id=user_id)
         
         sessions = query.order_by(ChatSession.created_at.desc()).limit(50).all()

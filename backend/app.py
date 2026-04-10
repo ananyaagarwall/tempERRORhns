@@ -5,7 +5,6 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import requests
 from models import (
     User,
-    Agent,
     Property,
     Enquiry,
     Review,
@@ -13,57 +12,30 @@ from models import (
     BuilderProject,
     Blog,
     Slug,
-    ChatSession,
-    ChatMessage,
-    UserPreference,
-    UserInteraction
+    UserInteraction,
+    Favorite
 )
 
-from flask import Flask, request, jsonify, send_from_directory, redirect, make_response
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
-
-from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity, JWTManager, set_access_cookies, set_refresh_cookies, unset_jwt_cookies, verify_jwt_in_request
+from flask import Flask, request, jsonify, send_from_directory, redirect, g
 
 #flash
 from flask_cors import CORS
-import os
 from dotenv import load_dotenv
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import sqlite3
 from werkzeug.utils import secure_filename
 import json
 from flask_migrate import Migrate
-import requests
-import base64
 import sys
 from slugify import slugify
+from sqlalchemy import inspect, text
 from extensions import db 
-from models import ChatSession, ChatMessage, UserPreference
 import logging
-from datetime import timedelta
-from flask_jwt_extended import JWTManager
-from flask_jwt_extended import jwt_required
-from functools import wraps
 import threading
 
 
 
-# Set UTF-8 encoding for stdout
-import logging
-from datetime import timedelta
-from flask_jwt_extended import JWTManager
-from flask_jwt_extended import jwt_required
-from functools import wraps
-import threading
-
-
-
-# Set UTF-8 encoding for stdout
 # Set UTF-8 encoding for stdout
 sys.stdout.reconfigure(encoding='utf-8')
-
-load_dotenv()
 
 # Configure logging for security events
 # NOTE: File logging disabled during development to prevent huge log files
@@ -79,73 +51,78 @@ logging.basicConfig(
 security_logger = logging.getLogger('security')
 
 app = Flask(__name__)
-# Read allowed frontend origins from env, with sensible defaults
-_frontend_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:3000,http://localhost:5173,http://localhost:5174,http://127.0.0.1:3000,http://127.0.0.1:5173,http://127.0.0.1:5174').split(',')
+LOCAL_DEV_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+]
 
-CORS(app, supports_credentials=True, resources={
-    r"/api/*": {"origins": _frontend_origins},
-    r"/query": {"origins": _frontend_origins},
-    r"/build_index": {"origins": _frontend_origins},
-    r"/health": {"origins": _frontend_origins}
-})
+# Allow localhost/127.0.0.1 on any port for development.
+LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+CORS(
+    app,
+    supports_credentials=True,
+    resources={
+        r"/api/*": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/query": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/build_index": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/health": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+    },
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "X-Guest-ID", "x-guest-id"],
+)
+
+
+@app.after_request
+def add_local_dev_cors_headers(response):
+    """
+    Safety net for local development: ensure CORS headers are present even on
+    framework-generated error/redirect responses.
+    """
+    origin = request.headers.get("Origin")
+    if origin and (
+        origin in LOCAL_DEV_ORIGINS
+        or origin.startswith("http://localhost:")
+        or origin.startswith("http://127.0.0.1:")
+    ):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Vary"] = "Origin"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Guest-ID, x-guest-id"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+    return response
 
 # Configure Flask to use UTF-8
 app.config['JSON_AS_ASCII'] = False
 app.config['JSONIFY_PRETTYPRINT_REGULAR'] = False
 
-# Configure JWT
-app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change this!
-app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_COOKIE_SECURE"] = False  # Set True in production
-app.config["JWT_COOKIE_SAMESITE"] = "Lax"
-app.config["JWT_COOKIE_CSRF_PROTECT"] = False
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=15)
-app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
-
-jwt = JWTManager(app)
-
-# Simplified RBAC - Only 2 roles: customer and admin
-def admin_only(fn):
-    """Admin-only access decorator"""
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        try:
-            verify_jwt_in_request()
-            identity = get_jwt_identity()
-            if identity.get('role') != 'admin':
-                return jsonify({'error': 'Admin access required'}), 403
-            return fn(*args, **kwargs)
-        except Exception as e:
-            return jsonify({'error': 'Authentication required'}), 401
-    return wrapper
-# Configure JWT
-app.config["JWT_SECRET_KEY"] = os.environ.get('JWT_SECRET_KEY', 'super-secret-key')  # Change this!
-app.config["JWT_TOKEN_LOCATION"] = ["cookies"]
-app.config["JWT_COOKIE_SECURE"] = False  # Set True in production
-app.config["JWT_COOKIE_SAMESITE"] = "Lax"
-app.config["JWT_COOKIE_CSRF_PROTECT"] = False
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(minutes=15)
-app.config["JWT_REFRESH_TOKEN_EXPIRES"] = timedelta(days=7)
-
-jwt = JWTManager(app)
-
-# Simplified RBAC - Only 2 roles: customer and admin
-def admin_only(fn):
-    """Admin-only access decorator"""
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        try:
-            verify_jwt_in_request()
-            identity = get_jwt_identity()
-            if identity.get('role') != 'admin':
-                return jsonify({'error': 'Admin access required'}), 403
-            return fn(*args, **kwargs)
-        except Exception as e:
-            return jsonify({'error': 'Authentication required'}), 401
-    return wrapper
+# Configure Clerk Auth
+CLERK_SECRET_KEY = os.getenv('CLERK_SECRET_KEY')
+from auth import (
+    clerk_required,
+    admin_only,
+    clear_admin_session,
+    has_verified_admin_session,
+    is_primary_admin_email,
+    mark_admin_session_verified,
+)
+# Map the old jwt_required to clerk_required
+def jwt_required(fn=None):
+    if fn is None:
+        return clerk_required(optional=False)
+    return clerk_required(optional=False)(fn)
 
 # Get absolute path to the backend folder (where app.py lives)
 basedir = os.path.abspath(os.path.dirname(__file__))
+dotenv_path = os.path.join(basedir, '.env')
+load_dotenv(dotenv_path=dotenv_path)
+PRIMARY_ADMIN_EMAIL = (os.getenv('PRIMARY_ADMIN_EMAIL') or 'chaitraliwaikar.hns.06@gmail.com').strip().lower()
+ADMIN_SETUP_KEY = (os.getenv('ADMIN_SETUP_KEY') or '').strip()
+
 # Create 'instance' folder if it doesn't exist
 instance_dir = os.path.join(basedir, 'instance')
 os.makedirs(instance_dir, exist_ok=True)  # This line fixes most issues
@@ -158,6 +135,10 @@ if _db_url.startswith('postgres://'):
     _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY') or os.getenv('SECRET_KEY') or CLERK_SECRET_KEY or 'dev-admin-session-secret'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'false').strip().lower() == 'true'
 
 # Import the db instance from extensions
 from extensions import db
@@ -172,12 +153,8 @@ migrate = Migrate(app, db)
 _index_lock = threading.Lock()
 _emb_index = None
 
-# Chatbot globals
-_index_lock = threading.Lock()
-_emb_index = None
-
 # Add these configurations
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -190,22 +167,47 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def _table_has_column(table_name, column_name):
+    inspector = inspect(db.engine)
+    if not inspector.has_table(table_name):
+        return False
+    return any(column['name'] == column_name for column in inspector.get_columns(table_name))
+
+
+def _ensure_schema_compatibility():
+    """
+    Repair known additive schema drift for existing PostgreSQL deployments.
+    `db.create_all()` creates tables but does not add columns to existing ones.
+    """
+    if db.engine.dialect.name != 'postgresql':
+        return
+
+    inspector = inspect(db.engine)
+
+    if inspector.has_table('user_interaction'):
+        existing_columns = {column['name'] for column in inspector.get_columns('user_interaction')}
+        if 'guest_id' not in existing_columns:
+            db.session.execute(
+                text("ALTER TABLE user_interaction ADD COLUMN IF NOT EXISTS guest_id VARCHAR(100)")
+            )
+            db.session.commit()
+            print("Applied schema repair: added user_interaction.guest_id")
+
+
 with app.app_context():
     try:
-        # Create tables if they don't exist
-        db.create_all()
+       
         
         # Check if admin exists
-        admin = User.query.filter_by(email='admin@gmail.com').first()
+        admin = User.query.filter_by(email=PRIMARY_ADMIN_EMAIL).first()
         if not admin:
             # Create admin user
-            admin = User(
-                username='admin',
-                email='admin@gmail.com',
-                password='admin',  # Plain text password
-                role='admin',
-                is_active=True
-            )
+            admin = User()
+            admin.username = 'admin'
+            admin.email = PRIMARY_ADMIN_EMAIL
+            admin.password = 'admin'  # Plain text password
+            admin.role = 'admin'
+            admin.is_active = True
             db.session.add(admin)
             db.session.commit()
             print("Admin created successfully!")
@@ -213,94 +215,22 @@ with app.app_context():
         print(f"Error during database initialization: {str(e)}")
         db.session.rollback()
 
-#--------------------------------------------- AUTH ROUTES ---------------------------------------------
-@app.route('/api/auth/signup', methods=['POST'])
-def signup():
-    data = request.json
-    
-    # Check if user already exists
-    if User.query.filter_by(email=data['email']).first():
-        return jsonify({'message': 'Email already registered'}), 400
-    
-    # Create new user
-    new_user = User(
-        username=data['username'],
-        email=data['email'],
-        password=data['password'],  # Plain text password
-        phone=data.get('phone'),
-        role=data.get('role', 'customer')
-    )
-    
-    db.session.add(new_user)
-    db.session.commit()
-    
-    return jsonify({
-        'message': 'User created successfully',
-        'user': new_user.to_dict()
-    }), 201
-
-@app.route('/api/auth/login', methods=['POST'])
-def login():
-    data = request.json
-    email = data.get('email', None)
-    password = data.get('password', None)
-
-    user = User.query.filter_by(email=email).first()
- 
-    if not user or user.password != password:
-        return jsonify({'message': 'Invalid email or password'}), 401
-
-    #  tokens ------------------------------------------------------------------------------------------
-    access_token = create_access_token(identity={
-        'username': user.username, 
-        'role': user.role, 
-        'user_id': user.id,
-        'email': user.email
-    })
-    refresh_token = create_refresh_token(identity={
-        'username': user.username, 
-        'role': user.role, 
-        'user_id': user.id,
-        'email': user.email
-    })
-
-    # cookies ------------------------------------------------------------------------------------------
-    response = jsonify({'message': 'Login successful', 'user': user.to_dict()})
-    set_access_cookies(response, access_token)
-    set_refresh_cookies(response, refresh_token)
-    
-    return response, 200
-
-@app.route('/api/auth/refresh', methods=['POST'])
-@jwt_required(refresh=True)
-def refresh():
-    identity = get_jwt_identity()
-    access_token = create_access_token(identity=identity)
-    response = jsonify(access_token=access_token)
-    set_access_cookies(response, access_token)
-    return response, 200
-
-@app.route('/api/auth/logout', methods=['POST'])
-def logout():
-    response = jsonify({'message': 'Logout successful'})
-    unset_jwt_cookies(response)
-    return response, 200
+#--------------------------------------------- AUTHENTICATION HANDLED BY CLERK ---------------------------------------------
+# Removed /api/auth/signup, /api/auth/login, /api/auth/refresh, /api/auth/logout routes
+# as these are now fully managed by Clerk's frontend UI components and backend token verification.
 
 #--------------------------------------------- ROUTERS AND API ENDPOINTS ---------------------------------------------
 @app.route('/api/properties/location/<string:loc>', methods=['GET'])
-# @jwt_required()
 def get_properties_by_location(loc):
     properties = Property.query.filter(Property.Location.like(f'%{loc}%')).all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/properties', methods=['GET'])
-# @jwt_required()
 def get_properties():
     properties = Property.query.all()
     return jsonify([property.to_dict() for property in properties])
 
 @app.route('/api/locations', methods=['GET']) 
-@jwt_required()
 @jwt_required()
 def get_locations(): 
     locations = db.session.query(Property.Location).distinct().all() 
@@ -427,7 +357,6 @@ def get_properties_by_multiple_locations():
 # yaha tak nearyou. 
 
 @app.route('/api/properties/<int:id>', methods=['GET'])
-# @jwt_required()
 def get_property(id):
     property = Property.query.get_or_404(id)
     return jsonify(property.to_dict())
@@ -472,7 +401,6 @@ def create_property():
     return jsonify(new_property.to_dict()), 201
 
 @app.route('/api/builders', methods=['GET'])
-# @jwt_required()
 def get_builders():
     try:
         print("Fetching builders...")  # Debug log
@@ -574,7 +502,6 @@ def search_builders():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>', methods=['GET'])
-# @jwt_required()
 def get_builder(rera_id):
     try:
         builder = Builder.query.get_or_404(rera_id)
@@ -583,7 +510,6 @@ def get_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders', methods=['POST'])
-@admin_only
 @admin_only
 def create_builder():
     try:
@@ -709,7 +635,6 @@ def delete_builder(rera_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>/projects', methods=['GET'])
-# @jwt_required()
 def get_builder_projects(rera_id):
     try:
         status = request.args.get('status')
@@ -761,7 +686,6 @@ def _create_property_for_project(project, user_id, data):
 #-----------------STEP 1 ROUTING FETCHING DETAILS FROM FRONTEND AND PUSHING TO DATABASE------------------------
 @app.route('/api/builders/<rera_id>/projects/step1', methods=['POST'])
 @admin_only
-@admin_only
 def create_project_step1(rera_id):
     data = request.json
     title = data['title']
@@ -802,7 +726,6 @@ def create_project_step1(rera_id):
 
 @app.route('/api/builders/<rera_id>/projects/step2', methods=['POST'])
 @admin_only
-@admin_only
 def create_project_step2(rera_id):
     data = request.json
     project_id = data.get('project_id')
@@ -822,7 +745,6 @@ def create_project_step2(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step4', methods=['POST'])
-@admin_only
 @admin_only
 def create_project_step4(rera_id):
     # Handle both form data and JSON data
@@ -859,7 +781,6 @@ def create_project_step4(rera_id):
     return jsonify(project.to_dict()), 200
 
 @app.route('/api/builders/<rera_id>/projects/step5', methods=['POST'])
-@admin_only
 @admin_only
 def create_project_step5(rera_id):
     data = request.json
@@ -1016,7 +937,6 @@ def update_project_step(rera_id, project_id):
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
 @admin_only
-@admin_only
 def delete_project(project_id):
     project = BuilderProject.query.get_or_404(project_id)
     db.session.delete(project)
@@ -1028,7 +948,6 @@ def delete_project(project_id):
 #----------------------------------------------------------------------------------------------------------
 #----------------------------------------------------------------------------------------------------------
 @app.route('/api/admin/stats', methods=['GET'])
-@admin_only
 @admin_only
 def get_admin_stats():
     try:
@@ -1108,7 +1027,6 @@ def get_admin_stats():
 #--------------------------------------------- USER MANAGEMENT ROUTES ---------------------------------------------
 @app.route('/api/users', methods=['GET'])
 @admin_only
-@admin_only
 def get_users():
     try:
         # Get the token from the Authorization header
@@ -1134,7 +1052,6 @@ def get_users():
 
 @app.route('/api/users/<int:id>', methods=['GET'])
 @jwt_required()
-@jwt_required()
 def get_user(id):
     try:
         user = User.query.get_or_404(id)
@@ -1149,7 +1066,6 @@ def get_user(id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 @app.route('/api/projects/<int:project_id>', methods=['GET'])
-# @jwt_required()
 def get_builder_project_by_id(project_id):
     project = BuilderProject.query.get(project_id)
     if not project:
@@ -1157,7 +1073,6 @@ def get_builder_project_by_id(project_id):
     return jsonify(project.to_dict())
 
 @app.route('/api/users/<int:id>', methods=['PUT'])
-@admin_only
 @admin_only
 def update_user(id):
     try:
@@ -1192,7 +1107,6 @@ def update_user(id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/users/<int:id>', methods=['DELETE'])
-@admin_only
 @admin_only
 def delete_user(id):
     try:
@@ -1233,7 +1147,6 @@ def save_image(file):
 
 # API to create a blog (multipart/form-data)
 @app.route('/api/blogs', methods=['POST'])
-@admin_only
 @admin_only
 def create_blog():
     try:
@@ -1299,7 +1212,6 @@ def create_blog():
 # API to list all blogs (for admin dashboard)
 @app.route('/api/blogs', methods=['GET'])
 @jwt_required()
-@jwt_required()
 def list_blogs():
     blogs = Blog.query.order_by(Blog.created_at.desc()).all()
     print(f"Found {len(blogs)} blogs")
@@ -1316,7 +1228,6 @@ def get_blog(blog_id):
 
 # Get a single blog by slug
 @app.route('/api/blogs/slug/<slug>', methods=['GET'])
-@jwt_required()
 @jwt_required()
 def get_blog_by_slug(slug):
     print(f"Fetching blog with slug: {slug}")
@@ -1439,7 +1350,6 @@ def uploaded_file(filename):
 
 # Update /api/projects/slug/<slug> to handle BuilderProject slugs
 @app.route('/api/projects/slug/<slug>', methods=['GET'])
-# @jwt_required()
 def get_project_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='project').first()
     if not slug_entry:
@@ -1456,7 +1366,6 @@ def get_project_by_slug(slug):
 # 3. Redirect alias slugs to primary in /api/properties/slug/<slug>
 @app.route('/api/properties/slug/<slug>', methods=['GET'])
 @jwt_required()
-@jwt_required()
 def get_property_by_slug(slug):
     slug_entry = Slug.query.filter_by(slug=slug, target_type='property').first()
     if not slug_entry:
@@ -1472,13 +1381,11 @@ def get_property_by_slug(slug):
     return jsonify(property.to_dict())
 
 @app.route('/api/projects', methods=['GET'])
-# @jwt_required()
 def get_all_projects():
     projects = BuilderProject.query.all()
     return jsonify([p.to_dict() for p in projects])
 
 @app.route('/api/builders/<rera_id>/projects/upload-image', methods=['POST'])
-@admin_only
 @admin_only
 def upload_project_image(rera_id):
     print(f"Upload project image called with rera_id: {rera_id}")
@@ -1600,7 +1507,6 @@ def get_security_audit():
 
 @app.route('/api/admin/latest-geolocation', methods=['GET'])
 @admin_only
-@admin_only
 def get_latest_geolocation():
     global latest_geolocation
     # If latest_geolocation is not set, return a default empty response
@@ -1613,8 +1519,7 @@ def get_latest_geolocation():
 # ------------------------------------------------------- AI Blog Summarization -------------------------------------------------- ---
 
 @app.route('/api/blogs/<slug>/summary', methods=['GET'])
-@jwt_required()
-@jwt_required()
+@clerk_required()
 def summarize_blog(slug):
     api_key = os.getenv('PERPLEXITY_API_KEY')
     blog = Blog.query.filter_by(slug=slug).first()
@@ -1875,8 +1780,7 @@ def _canonical_property_status(value: str) -> str:
         return ''
 
 @app.route('/api/properties/filters', methods=['GET'])
-@jwt_required()
-@jwt_required()
+@clerk_required()
 def get_filters():
     """Return unique filter options sourced from BuilderProject and Property tables.
     Includes amenities (normalized), property_status, project status, and derived society types.
@@ -1928,7 +1832,6 @@ def get_filters():
 
 # Simplified property search endpoint: direct filtering only
 @app.route('/api/properties/search', methods=['GET'])
-# @jwt_required()
 def search_properties():
     location = request.args.get('location', '', type=str)
     price = request.args.get('price', 0, type=float)  # price in Cr
@@ -2096,10 +1999,223 @@ def google_signin():
     set_refresh_cookies(response, refresh_token)
     return response, 200
 
+# ------------------------------------------------------- Favorites & Merge -------------------------------------------------- ---
+
+def _safe_json_list(raw):
+    try:
+        if not raw:
+            return []
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+def _get_or_create_guest_cart_session(guest_id):
+    session_row = Favorite.query.filter_by(guest_id=guest_id, property_id=None).first()
+    if not session_row:
+        legacy_favs = Favorite.query.filter_by(guest_id=guest_id).filter(Favorite.property_id.isnot(None)).all()
+        legacy_ids = []
+        for fav in legacy_favs:
+            if fav.property_id is not None and fav.property_id not in legacy_ids:
+                legacy_ids.append(fav.property_id)
+        session_row = Favorite(
+            guest_id=guest_id,
+            property_id=None,
+            cart_snapshot=json.dumps(legacy_ids),
+            change_log=json.dumps([])
+        )
+        db.session.add(session_row)
+        for fav in legacy_favs:
+            db.session.delete(fav)
+    return session_row
+
+def _get_or_create_user_cart_session(user_id):
+    session_row = Favorite.query.filter_by(user_id=user_id, property_id=None).first()
+    if not session_row:
+        legacy_favs = Favorite.query.filter_by(user_id=user_id).filter(Favorite.property_id.isnot(None)).all()
+        legacy_ids = []
+        for fav in legacy_favs:
+            if fav.property_id is not None and fav.property_id not in legacy_ids:
+                legacy_ids.append(fav.property_id)
+        session_row = Favorite(
+            user_id=user_id,
+            guest_id=None,
+            property_id=None,
+            cart_snapshot=json.dumps(legacy_ids),
+            change_log=json.dumps([])
+        )
+        db.session.add(session_row)
+        for fav in legacy_favs:
+            db.session.delete(fav)
+    return session_row
+
+def _append_cart_change(session_row, action, property_id):
+    changes = _safe_json_list(session_row.change_log)
+    changes.append({
+        'action': action,
+        'property_id': property_id,
+        'at': datetime.utcnow().isoformat()
+    })
+    session_row.change_log = json.dumps(changes)
+
+@app.route('/api/favorites', methods=['POST'])
+@clerk_required(optional=True)
+def add_favorite():
+    data = request.json or {}
+    property_id = data.get('property_id')
+    # Accept guest id from body or header to support anonymous favorites
+    guest_id = data.get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+
+    if not property_id:
+        return jsonify({'error': 'property_id is required'}), 400
+    try:
+        property_id = int(property_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'property_id must be an integer'}), 400
+
+    if g.current_user:
+        session_row = _get_or_create_user_cart_session(g.current_user.id)
+        cart_snapshot = _safe_json_list(session_row.cart_snapshot)
+        if property_id in cart_snapshot:
+            return jsonify({'message': 'Already in user cart', 'session': session_row.to_dict()}), 200
+
+        cart_snapshot.append(property_id)
+        session_row.cart_snapshot = json.dumps(cart_snapshot)
+        _append_cart_change(session_row, 'add', property_id)
+        db.session.commit()
+        return jsonify({'message': 'User cart updated', 'session': session_row.to_dict()}), 200
+
+    if not guest_id:
+        return jsonify({'error': 'Authentication or guest_id required'}), 401
+
+    session_row = _get_or_create_guest_cart_session(guest_id)
+    cart_snapshot = _safe_json_list(session_row.cart_snapshot)
+    if property_id in cart_snapshot:
+        return jsonify({'message': 'Already in guest cart', 'session': session_row.to_dict()}), 200
+
+    cart_snapshot.append(property_id)
+    session_row.cart_snapshot = json.dumps(cart_snapshot)
+    _append_cart_change(session_row, 'add', property_id)
+    db.session.commit()
+    return jsonify({'message': 'Guest cart updated', 'session': session_row.to_dict()}), 200
+
+@app.route('/api/favorites', methods=['GET'])
+@clerk_required(optional=True)
+def get_favorites():
+    guest_id = request.args.get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+    
+    if g.current_user:
+        session_row = _get_or_create_user_cart_session(g.current_user.id)
+        return jsonify([session_row.to_dict()] if session_row else [])
+    if guest_id:
+        session_row = Favorite.query.filter_by(guest_id=guest_id, property_id=None).first()
+        return jsonify([session_row.to_dict()] if session_row else [])
+    return jsonify({'favorites': []}), 200
 
 
-#... existing imports...
-from models import ChatSession, ChatMessage, UserPreference
+@app.route('/api/favorites', methods=['DELETE'])
+@clerk_required(optional=True)
+def remove_favorite():
+    data = request.json or {}
+    property_id = data.get('property_id') or request.args.get('property_id')
+    guest_id = data.get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+
+    if not property_id:
+        return jsonify({'error': 'property_id is required'}), 400
+    try:
+        property_id = int(property_id)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'property_id must be an integer'}), 400
+
+    if g.current_user:
+        session_row = _get_or_create_user_cart_session(g.current_user.id)
+
+        cart_snapshot = _safe_json_list(session_row.cart_snapshot)
+        if property_id not in cart_snapshot:
+            return jsonify({'message': 'Property not in user cart (noop)', 'session': session_row.to_dict()}), 200
+
+        cart_snapshot = [pid for pid in cart_snapshot if pid != property_id]
+        session_row.cart_snapshot = json.dumps(cart_snapshot)
+        _append_cart_change(session_row, 'remove', property_id)
+        db.session.commit()
+        return jsonify({'message': 'User cart updated', 'session': session_row.to_dict()}), 200
+    elif guest_id:
+        session_row = Favorite.query.filter_by(guest_id=guest_id, property_id=None).first()
+        if not session_row:
+            return jsonify({'message': 'Guest cart not found (noop)'}), 200
+
+        cart_snapshot = _safe_json_list(session_row.cart_snapshot)
+        if property_id not in cart_snapshot:
+            return jsonify({'message': 'Property not in guest cart (noop)', 'session': session_row.to_dict()}), 200
+
+        cart_snapshot = [pid for pid in cart_snapshot if pid != property_id]
+        session_row.cart_snapshot = json.dumps(cart_snapshot)
+        _append_cart_change(session_row, 'remove', property_id)
+        db.session.commit()
+        return jsonify({'message': 'Guest cart updated', 'session': session_row.to_dict()}), 200
+    else:
+        return jsonify({'error': 'Authentication or guest_id required'}), 401
+
+@app.route('/api/auth/merge-guest', methods=['POST'])
+@clerk_required()
+def merge_guest_data():
+    data = request.json
+    guest_id = (data or {}).get('guest_id') or request.headers.get('X-Guest-ID') or request.headers.get('x-guest-id')
+    
+    if not guest_id:
+        return jsonify({'error': 'guest_id required for merge'}), 400
+
+    user_session = Favorite.query.filter_by(user_id=g.current_user.id, property_id=None).first()
+
+    # Merge guest session rows into user session (or promote guest session to user)
+    session_rows = Favorite.query.filter_by(guest_id=guest_id, property_id=None).all()
+    for session_row in session_rows:
+        if user_session and user_session.id != session_row.id:
+            user_cart = _safe_json_list(user_session.cart_snapshot)
+            guest_cart = _safe_json_list(session_row.cart_snapshot)
+            for pid in guest_cart:
+                if pid not in user_cart:
+                    user_cart.append(pid)
+            user_session.cart_snapshot = json.dumps(user_cart)
+
+            user_changes = _safe_json_list(user_session.change_log)
+            guest_changes = _safe_json_list(session_row.change_log)
+            if guest_changes:
+                user_session.change_log = json.dumps(user_changes + guest_changes)
+
+            db.session.delete(session_row)
+        else:
+            session_row.user_id = g.current_user.id
+            session_row.guest_id = None
+            user_session = session_row
+
+    # Promote legacy guest rows (property_id NOT NULL) to user
+    legacy_guest_rows = Favorite.query.filter_by(guest_id=guest_id).filter(Favorite.property_id.isnot(None)).all()
+    for fav in legacy_guest_rows:
+        existing = Favorite.query.filter_by(user_id=g.current_user.id, property_id=fav.property_id).first()
+        if existing:
+            db.session.delete(fav)
+        else:
+            fav.user_id = g.current_user.id
+            fav.guest_id = None
+    
+    # Update interactions
+    # This is best-effort: your DB schema may not have `user_interaction.guest_id`
+    # (migration drift), which would otherwise cause a 500 and break the entire merge.
+    db.session.commit()
+    if _table_has_column('user_interaction', 'guest_id'):
+        try:
+            UserInteraction.query.filter_by(guest_id=guest_id).update({
+                'user_id': g.current_user.id,
+                'guest_id': None
+            })
+            db.session.commit()
+        except Exception as ie:
+            db.session.rollback()
+            print(f"Interaction merge error (best-effort): {ie}")
+    
+    return jsonify({'message': 'Data merged successfully'}), 200
+
 from chatbot.routes import chatbot_bp
 
 # Register the Blueprintcd..
@@ -2108,5 +2224,87 @@ app.register_blueprint(chatbot_bp, url_prefix='/api/chatbot')
 # Note: The db.create_all() inside your existing main block will 
 # automatically create the new chatbot tables because we imported them above.
 
+
+
+# ------------------------------------------------------------------ Admin Auth
+@app.route('/api/auth/me', methods=['GET'])
+@clerk_required()
+def get_current_user_profile():
+    """
+    Returns the current authenticated user's profile from the local DB.
+    Used by the frontend AdminRoute to verify if the user has admin role.
+    The role comes from the database — not from email or client-side logic.
+    """
+    user = g.current_user
+    primary_admin = is_primary_admin_email(user.email)
+    return jsonify({
+        'id': user.id,
+        'email': user.email,
+        'username': user.username,
+        'role': user.role,
+        'is_active': user.is_active,
+        'is_primary_admin': primary_admin,
+        'admin_session_verified': has_verified_admin_session(user),
+    }), 200
+
+
+@app.route('/api/auth/promote-admin', methods=['POST'])
+@clerk_required()
+def promote_to_admin():
+    """
+    Enhanced Admin Setup/Login:
+    Requires:
+    1. Authenticated Clerk user must be the configured primary admin email
+    2. Submitted admin email must match the configured primary admin email
+    3. Local database password check
+    4. Matching setup key
+    """
+    data = request.json or {}
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password', '')
+    provided_key = (data.get('setup_key') or '').strip()
+    current_email = (g.current_user.email or '').strip().lower()
+
+    if not is_primary_admin_email(current_email):
+        clear_admin_session()
+        security_logger.warning(f"Blocked admin setup attempt by non-primary account: {current_email}")
+        return jsonify({'error': 'Only the primary admin account can access admin setup.'}), 403
+
+    if not email or not password or not provided_key:
+        return jsonify({'error': 'Admin email, password, and setup key are all required.'}), 400
+
+    if email != PRIMARY_ADMIN_EMAIL:
+        security_logger.warning(f"Blocked admin setup attempt with wrong submitted email by {current_email}")
+        return jsonify({'error': 'Unauthorized email for admin access.'}), 403
+
+    if not ADMIN_SETUP_KEY:
+        security_logger.error('ADMIN_SETUP_KEY is not configured on the server.')
+        return jsonify({'error': 'Admin setup is not configured on the server.'}), 500
+
+    if provided_key != ADMIN_SETUP_KEY:
+        security_logger.warning(f"Failed admin setup key attempt for {current_email}")
+        return jsonify({'error': 'Invalid setup key.'}), 401
+
+    # Check Database Password (Stored in local User table)
+    from models import User
+    admin_db_user = User.query.filter_by(email=PRIMARY_ADMIN_EMAIL).first()
+    if not admin_db_user or not admin_db_user.check_password(password):
+        security_logger.warning(f"Failed admin password attempt for {current_email}")
+        return jsonify({'error': 'Invalid admin password.'}), 401
+
+    # Success: keep the DB role in sync and mark this browser session as verified.
+    g.current_user.role = 'admin'
+    db.session.commit()
+    mark_admin_session_verified(g.current_user)
+
+    security_logger.info(f"Admin access granted to {current_email}")
+    return jsonify({
+        'message': 'Admin access verified.',
+        'role': g.current_user.role,
+        'admin_session_verified': True,
+    }), 200
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+

@@ -3,9 +3,9 @@ import re
 import json
 import pandas as pd
 from datetime import datetime
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
-from app import *
+from app import app
+from extensions import db
+from models import Builder, BuilderProject, Property
 def safe_json(val):
     try:
         if pd.isna(val) or val is None or str(val).strip() == '':
@@ -39,9 +39,9 @@ def format_carpet_area(val):
     if not val or pd.isna(val):
         return None
     text = str(val).strip().lower()
-    text = re.sub(r"\s*to\s*", " – ", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s*to\s*", " - ", text, flags=re.IGNORECASE)
     text = re.sub(r"sq\s*\.?\s*ft", "sq.ft", text)
-    text = re.sub(r"(\d+\.?\d*)", r"₹\1", text)
+    text = re.sub(r"(\d+\.?\d*)", r"INR \1", text)
     return text
 
 
@@ -49,8 +49,8 @@ def format_price(val):
     if not val or pd.isna(val):
         return None
     text = str(val).strip()
-    text = re.sub(r"\s*to\s*", " – ", text, flags=re.IGNORECASE)
-    text = re.sub(r"(\d+\.?\d*)", r"₹\1", text)
+    text = re.sub(r"\s*to\s*", " - ", text, flags=re.IGNORECASE)
+    text = re.sub(r"(\d+\.?\d*)", r"INR \1", text)
     return text
 
 

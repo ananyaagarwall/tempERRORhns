@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import api from '../../services/apiInstance';
 
 const CartContext = createContext();
 
@@ -54,10 +55,24 @@ export const CartProvider = ({ children }) => {
         addedAt: new Date().toISOString()
       }];
     });
+
+    if (property?.id) {
+      api.post('/favorites', { property_id: property.id })
+        .catch((error) => {
+          console.warn('Failed to persist favorite:', error);
+        });
+    }
   };
 
   const removeFromCart = (propertyId) => {
     setCartItems(prev => prev.filter(item => item.id !== propertyId));
+
+    if (propertyId) {
+      api.delete('/favorites', { data: { property_id: propertyId } })
+        .catch((error) => {
+          console.warn('Failed to remove favorite:', error);
+        });
+    }
   };
 
   const isInCart = (propertyId) => {

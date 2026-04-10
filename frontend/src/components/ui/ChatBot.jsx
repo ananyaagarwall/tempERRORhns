@@ -1,6 +1,5 @@
 /* eslint-disable no-unused-vars */
 import React, { useState, useRef, useEffect, useContext } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   FiMessageCircle,
   FiX,
@@ -8,26 +7,16 @@ import {
   FiUser,
   FiChevronDown,
 } from "react-icons/fi";
-import propImg1 from "../../assets/Pimg1.jpg";
-import propImg2 from "../../assets/Pimg3.jpg";
-import propImg3 from "../../assets/Pimg4.jpg";
-import propImg4 from "../../assets/Pimg9.jpg";
-import propImg5 from "../../assets/property-hero.jpg";
 
+import { useUser } from "@clerk/clerk-react";
+import api from "../../services/apiInstance";
 import { ChatbotContext } from "../../App";
+import ChatbotPropertyCard from "./ChatbotPropertyCard";
+import ChatbotBuilderCard from "./ChatbotBuilderCard";
 
 import "./ChatBot.css"
 
-const PROPERTY_IMAGES = [propImg1, propImg2, propImg3, propImg4, propImg5];
 
-// get random image for property
-const getRandomImage = (id) => {
-  if (!id) return PROPERTY_IMAGES[0];
-  const index = id % PROPERTY_IMAGES.length;
-  return PROPERTY_IMAGES[index];
-};
-
-const API_URL = "http://localhost:5000/api/chatbot";
 
 const GENERAL_RESPONSES = {
   search_property: {
@@ -122,58 +111,73 @@ const GENERAL_RESPONSES = {
 };
 
 const ChatBot = () => {
-  const navigate = useNavigate();
   const { isChatbotOpen, setIsChatbotOpen } = useContext(ChatbotContext);
+  const { user, isLoaded: isUserLoaded, isSignedIn } = useUser();
 
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      text: "Hello! I'm here to help you find the perfect property. How can I assist you today?",
-      sender: "bot",
-      timestamp: new Date(),
-      isTypingEffect: false,
-      suggestions: [
-        GENERAL_RESPONSES.search_property,
-        GENERAL_RESPONSES.find_builders,
-        GENERAL_RESPONSES.contact_us,
-      ],
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
+
+  // Handle initial greeting and sign-in requirement
+  useEffect(() => {
+    if (!isUserLoaded) return;
+
+    if (!isSignedIn) {
+      setMessages([
+        {
+          id: 1,
+          text: "Welcome to HouseNseeK! You must be signed in to use our AI Assistant for property and builder searches.",
+          sender: "bot",
+          timestamp: new Date(),
+          isTypingEffect: false,
+          suggestions: [],
+        },
+      ]);
+    } else {
+      setMessages([
+        {
+          id: 1,
+          text: `Hello${user?.firstName ? `, ${user.firstName}` : ""}! I'm here to help you find the perfect property. How can I assist you today?`,
+          sender: "bot",
+          timestamp: new Date(),
+          isTypingEffect: false,
+          suggestions: [
+            GENERAL_RESPONSES.search_property,
+            GENERAL_RESPONSES.find_builders,
+            GENERAL_RESPONSES.contact_us,
+          ],
+        },
+      ]);
+    }
+  }, [isUserLoaded, isSignedIn, user?.firstName]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const [sessionId, setSessionId] = useState(null);
-  const [userId, setUserId] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const isCreatingSessionRef = useRef(false);
 
   useEffect(() => {
     const initializeChat = async () => {
-      const userData = localStorage.getItem("user");
-      if (userData) {
-        const user = JSON.parse(userData);
-        setUserId(user.id);
-      }
-
+      if (!isUserLoaded || !isSignedIn || isCreatingSessionRef.current) return;
+      
       try {
-        const response = await fetch(`${API_URL}/session/new`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ user_id: userId }),
+        isCreatingSessionRef.current = true;
+        const response = await api.post(`/chatbot/session/new`, { 
+          user_id: user?.id || null 
         });
-        const data = await response.json();
-        setSessionId(data.session_id);
+        setSessionId(response.data.session_id);
       } catch (error) {
         console.error("Error creating session:", error);
+      } finally {
+        isCreatingSessionRef.current = false;
       }
     };
 
-    if (isChatbotOpen && !sessionId) {
+    if (isChatbotOpen && !sessionId && isUserLoaded && isSignedIn) {
       initializeChat();
     }
-  }, [isChatbotOpen, sessionId, userId]);
+  }, [isChatbotOpen, sessionId, user?.id, isUserLoaded, isSignedIn]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -185,6 +189,19 @@ const ChatBot = () => {
 
   const handleSendMessage = async (e, messageText = null) => {
     e.preventDefault();
+    
+    if (!isSignedIn) {
+      const loginMessage = {
+        id: messages.length + 1,
+        text: "Please sign in to send messages and get property recommendations.",
+        sender: "bot",
+        timestamp: new Date(),
+        isTypingEffect: false,
+      };
+      setMessages((prev) => [...prev, loginMessage]);
+      return;
+    }
+
     const textToSend = messageText || inputMessage;
     if (!textToSend.trim()) return;
 
@@ -201,20 +218,13 @@ const ChatBot = () => {
     setIsTyping(true);
 
     try {
-      const response = await fetch(`${API_URL}/ask`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          message: textToSend,
-          user_id: userId,
-          session_id: sessionId,
-        }),
+      const response = await api.post(`/chatbot/ask`, {
+        message: textToSend,
+        session_id: sessionId,
+        user_id: user?.id || null,
       });
 
-      if (!response.ok) throw new Error("Failed to get response");
-
-      const data = await response.json();
+      const data = response.data;
 
       const botResponse = {
         id: messages.length + 2,
@@ -333,16 +343,11 @@ const ChatBot = () => {
   // 🌍 SERVER PAGINATION (Standard Flow)
   setIsLoadingMore(true);
   try {
-    const response = await fetch(`${API_URL}/load-more`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ session_id: sessionId }),
+    const response = await api.post(`/chatbot/load-more`, { 
+      session_id: sessionId 
     });
 
-    if (!response.ok) throw new Error("Failed to load more");
-
-    const data = await response.json();
+    const data = response.data;
 
     setMessages((prev) => {
       const updated = [...prev];
@@ -383,7 +388,7 @@ const ChatBot = () => {
       });
       
       // If we have buffered responses, we can return early or mix them
-      return suggestions;
+      return suggestions.slice(0, 3);
     }
 
     // Don't show "Show more" as a suggestion chip
@@ -598,7 +603,8 @@ const ChatBot = () => {
                       >
                         <ChatbotPropertyCard
                           property={prop}
-                          navigate={navigate}
+                          sessionId={sessionId}
+                          userId={user?.id}
                         />
                       </div>
                     ))}
@@ -615,7 +621,6 @@ const ChatBot = () => {
                       >
                         <ChatbotBuilderCard
                           builder={builder}
-                          navigate={navigate}
                         />
                       </div>
                     ))}
@@ -688,9 +693,9 @@ const ChatBot = () => {
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Ask about properties, builders, locations..."
+            placeholder={isSignedIn ? "Ask about properties, builders, locations..." : "Please sign in to chat..."}
             className="chatbot-input"
-            disabled={isTyping}
+            disabled={isTyping || !isSignedIn}
           />
           <button
             type="submit"
@@ -724,7 +729,7 @@ const TypingEffect = ({ text }) => {
 };
 
 // Property Card Component
-const ChatbotPropertyCard = ({ property, navigate }) => {
+const LegacyChatbotPropertyCard = ({ property, navigate, sessionId, userId }) => {
   const pickProjectImage = (p) => {
     const normalizeUrl = (url) => {
       if (!url) return "";
@@ -763,10 +768,25 @@ const ChatbotPropertyCard = ({ property, navigate }) => {
     }
   };
 
+  const handleCardClick = async () => {
+    try {
+      await api.post("/chatbot/track", {
+        user_id: userId || null,
+        property_id: property.id,
+        action: "viewed",
+        session_id: sessionId || null,
+      });
+    } catch (error) {
+      console.error("Error tracking chatbot interaction:", error);
+    } finally {
+      navigate(`/property/${property.id}`);
+    }
+  };
+
   return (
     <div
       className="chatbot-property-card"
-      onClick={() => navigate(`/property/${property.id}`)}
+      onClick={handleCardClick}
       style={{ cursor: "pointer" }}
     >
       <img
@@ -801,7 +821,7 @@ const ChatbotPropertyCard = ({ property, navigate }) => {
 };
 
 // Builder Card Component
-const ChatbotBuilderCard = ({ builder, navigate }) => {
+const LegacyChatbotBuilderCard = ({ builder, navigate }) => {
   const getBuilderImage = () => {
     if (builder.logo) return builder.logo;
     // Generate a pseudo-random index from builder name or ID

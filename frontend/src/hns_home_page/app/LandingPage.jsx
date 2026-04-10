@@ -12,7 +12,6 @@ import ConsultingSection from '../components/ui/ConsultingSection';
 import FooterSection from '../components/layout/FooterSection';
 import FooterNavBar from '../components/layout/FooterNavBar';
 import MobileFooter from '../../components/ui/MobileFooter';
-import ChatBot from '../components/ui/ChatBot';               // <-- always rendered
 import '../home_page_css/LandingPage.css';
 import { getCookie, setCookie } from '../../utils/cookieUtils';
 
@@ -155,7 +154,6 @@ const LandingPage = () => {
       <MobileFooter />
 
       {/* ChatBot is always mounted – floating trigger hidden via CSS on mobile */}
-      <ChatBot />
     </div>
   );
 };

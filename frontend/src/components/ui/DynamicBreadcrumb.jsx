@@ -58,10 +58,35 @@ const parentFor = (pathname) => {
 
 const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const pathname = location.pathname;
 
   // Don't render on the home page
   if (pathname === '/') return null;
+
+  const getFallbackPath = () => {
+    if (pathname.startsWith('/builder/') || pathname === '/builders-page' || pathname === '/builder') {
+      return '/builders-page';
+    }
+    if (pathname.startsWith('/blog/') || pathname === '/blogs') {
+      return '/blogs';
+    }
+    if (pathname.startsWith('/property/') || pathname === '/properties') {
+      return '/properties';
+    }
+    if (pathname === '/cart') {
+      return '/properties';
+    }
+    return '/';
+  };
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate(getFallbackPath());
+  };
 
   const crumbs = [];
 
@@ -82,6 +107,14 @@ const DynamicBreadcrumb = ({ customLabels = {}, className = '' }) => {
       <div className="breadcrumb-container">
         <div className="breadcrumb-inner">
           <div className="breadcrumb-items">
+            <button
+              type="button"
+              className="breadcrumb-back"
+              onClick={handleBack}
+              aria-label="Go back"
+            >
+              &#8592;
+            </button>
             {crumbs.map((crumb, idx) => (
               <React.Fragment key={crumb.path + idx}>
                 {crumb.isCurrent ? (
