@@ -26,7 +26,8 @@ session_tracking = {}
 def _resolve_local_user_id(raw_user_id=None):
     """
     Normalize request/auth user identifiers to the local integer user.id.
-    Accepts either a local integer id or a Clerk user id string.
+    Accepts a local integer id and still tolerates a Clerk user id string
+    for backward compatibility.
     """
     current_user = getattr(g, 'current_user', None)
     if current_user:
@@ -577,7 +578,7 @@ def create_session():
         user_id = _resolve_local_user_id(raw_user_id)
 
         if raw_user_id not in (None, "") and user_id is None:
-            return jsonify({"error": "Invalid user_id. Use a local user.id or a valid clerk_user_id."}), 400
+            return jsonify({"error": "Invalid user_id. Use a local user.id. Clerk ids are only accepted for backward compatibility."}), 400
         
         new_session = ChatSession(
             user_id=user_id, 

@@ -22,6 +22,7 @@ from flask import Flask, request, jsonify, send_from_directory, redirect, g
 from flask_cors import CORS
 from dotenv import load_dotenv
 from datetime import datetime
+from itertools import groupby
 from werkzeug.utils import secure_filename
 import json
 from flask_migrate import Migrate
@@ -174,6 +175,113 @@ def _table_has_column(table_name, column_name):
     return any(column['name'] == column_name for column in inspector.get_columns(table_name))
 
 
+def _parse_json_list(raw):
+    try:
+        if not raw:
+            return []
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def _merge_unique_sequence(*groups):
+    merged = []
+    seen = set()
+
+    for group in groups:
+        for item in group or []:
+            if isinstance(item, (dict, list)):
+                marker = json.dumps(item, sort_keys=True, default=str)
+            else:
+                marker = str(item)
+            if marker in seen:
+                continue
+            seen.add(marker)
+            merged.append(item)
+
+    return merged
+
+
+def _dedupe_favorite_session_rows(owner_field):
+    owner_column = getattr(Favorite, owner_field)
+    rows = (
+        Favorite.query
+        .filter(owner_column.isnot(None), Favorite.property_id.is_(None))
+        .order_by(owner_column.asc(), Favorite.id.asc())
+        .all()
+    )
+
+    merged_groups = 0
+    removed_rows = 0
+
+    for _, grouped_rows in groupby(rows, key=lambda row: getattr(row, owner_field)):
+        group = list(grouped_rows)
+        if len(group) <= 1:
+            continue
+
+        keeper = group[0]
+        keeper.cart_snapshot = json.dumps(
+            _merge_unique_sequence(*[_parse_json_list(row.cart_snapshot) for row in group])
+        )
+        keeper.change_log = json.dumps(
+            _merge_unique_sequence(*[_parse_json_list(row.change_log) for row in group])
+        )
+
+        for duplicate in group[1:]:
+            db.session.delete(duplicate)
+            removed_rows += 1
+
+        merged_groups += 1
+
+    return merged_groups, removed_rows
+
+
+def _dedupe_favorite_item_rows(owner_field):
+    owner_column = getattr(Favorite, owner_field)
+    rows = (
+        Favorite.query
+        .filter(owner_column.isnot(None), Favorite.property_id.isnot(None))
+        .order_by(owner_column.asc(), Favorite.property_id.asc(), Favorite.id.asc())
+        .all()
+    )
+
+    removed_rows = 0
+
+    for _, grouped_rows in groupby(rows, key=lambda row: (getattr(row, owner_field), row.property_id)):
+        group = list(grouped_rows)
+        if len(group) <= 1:
+            continue
+        for duplicate in group[1:]:
+            db.session.delete(duplicate)
+            removed_rows += 1
+
+    return removed_rows
+
+
+def _dedupe_favorite_rows():
+    user_session_groups, removed_user_sessions = _dedupe_favorite_session_rows("user_id")
+    guest_session_groups, removed_guest_sessions = _dedupe_favorite_session_rows("guest_id")
+    removed_user_items = _dedupe_favorite_item_rows("user_id")
+    removed_guest_items = _dedupe_favorite_item_rows("guest_id")
+
+    total_removed = (
+        removed_user_sessions
+        + removed_guest_sessions
+        + removed_user_items
+        + removed_guest_items
+    )
+    total_merged_groups = user_session_groups + guest_session_groups
+
+    if total_removed:
+        print(
+            "Normalized favorite rows before index hardening: "
+            f"merged_session_groups={total_merged_groups}, removed_rows={total_removed}"
+        )
+
+    return total_removed
+
+
 def _ensure_schema_compatibility():
     """
     Repair known additive schema drift for existing PostgreSQL deployments.
@@ -190,12 +298,51 @@ def _ensure_schema_compatibility():
             db.session.execute(
                 text("ALTER TABLE user_interaction ADD COLUMN IF NOT EXISTS guest_id VARCHAR(100)")
             )
-            db.session.commit()
             print("Applied schema repair: added user_interaction.guest_id")
+            
+            # // Add indexes for user_interaction after schema repair
+
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_user_id ON user_interaction (user_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_guest_id ON user_interaction (guest_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_property_id ON user_interaction (property_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_session_id ON user_interaction (session_id)"))
+
+    if inspector.has_table('favorite'):
+        _dedupe_favorite_rows()
+        db.session.flush()
+
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_favorite_user_id ON favorite (user_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_favorite_guest_id ON favorite (guest_id)"))
+        db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_favorite_property_id ON favorite (property_id)"))
+        db.session.execute(text("DROP INDEX IF EXISTS ix_favorite_user_property"))
+        db.session.execute(text("DROP INDEX IF EXISTS ix_favorite_guest_property"))
+        db.session.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_favorite_user_session "
+            "ON favorite (user_id) "
+            "WHERE user_id IS NOT NULL AND property_id IS NULL"
+        ))
+        db.session.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_favorite_guest_session "
+            "ON favorite (guest_id) "
+            "WHERE guest_id IS NOT NULL AND property_id IS NULL"
+        ))
+        db.session.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_favorite_user_property "
+            "ON favorite (user_id, property_id) "
+            "WHERE user_id IS NOT NULL AND property_id IS NOT NULL"
+        ))
+        db.session.execute(text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_favorite_guest_property "
+            "ON favorite (guest_id, property_id) "
+            "WHERE guest_id IS NOT NULL AND property_id IS NOT NULL"
+        ))
+
+    db.session.commit()
 
 
 with app.app_context():
     try:
+        _ensure_schema_compatibility()
        
         
         # Check if admin exists
