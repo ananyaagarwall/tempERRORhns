@@ -496,6 +496,12 @@ class UserInteraction(db.Model):
     duration_seconds = db.Column(db.Integer)  # How long they viewed
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
     session_id = db.Column(db.Integer, db.ForeignKey('chat_session.id'))
+    __table_args__ = (
+        db.Index('ix_user_interaction_user_id', 'user_id'),
+        db.Index('ix_user_interaction_guest_id', 'guest_id'),
+        db.Index('ix_user_interaction_property_id', 'property_id'),
+        db.Index('ix_user_interaction_session_id', 'session_id'),
+    )
     
     # Relationships
     user = db.relationship('User', backref='interactions')
@@ -525,6 +531,13 @@ class Favorite(db.Model):
     change_log = db.Column(db.Text, nullable=True)  # JSON list of change events
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # PostgreSQL-only partial unique indexes for session/item deduplication
+    # are created in backend/app.py during schema compatibility checks.
+    __table_args__ = (
+        db.Index('ix_favorite_user_id', 'user_id'),
+        db.Index('ix_favorite_guest_id', 'guest_id'),
+        db.Index('ix_favorite_property_id', 'property_id'),
+    )
     
     # Relationships
     property = db.relationship('Property', backref='favourited_by')

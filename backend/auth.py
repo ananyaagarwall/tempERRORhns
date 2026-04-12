@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 from dotenv import load_dotenv
 
 # Forces the backend directory into the top of the search path
@@ -15,15 +16,53 @@ import jwt
 from clerk_backend_api import Clerk
 from clerk_backend_api.security import authenticate_request, AuthenticateRequestOptions
 from sqlalchemy import inspect
+from sqlalchemy.exc import DataError, IntegrityError, OperationalError, SQLAlchemyError
 from extensions import db
 from models import User
 
-def _ensure_unique_username(base, clerk_user_id):
-    base = (base or f"hns_user_{clerk_user_id[:8]}").strip()
+EMAIL_MAX_LENGTH = 120
+USERNAME_MAX_LENGTH = 80
+EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+USERNAME_SANITIZER = re.compile(r"[^a-zA-Z0-9_.-]+")
+
+
+def _normalize_email(email):
+    if email is None:
+        return None
+    value = str(email).strip().lower()
+    if not value or len(value) > EMAIL_MAX_LENGTH:
+        return None
+    return value if EMAIL_REGEX.match(value) else None
+
+
+def _sanitize_username(base, fallback_seed):
+    seed = str(fallback_seed or "user")
+    candidate = (base or f"hns_user_{seed[:8]}").strip()
+    candidate = USERNAME_SANITIZER.sub("_", candidate)
+    candidate = re.sub(r"_+", "_", candidate).strip("._-")
+    candidate = candidate[:USERNAME_MAX_LENGTH]
+    if candidate:
+        return candidate
+    return f"hns_user_{seed[:8]}"
+
+
+def _find_conflicting_user(field_name, value, exclude_user_id=None):
+    if value in (None, ""):
+        return None
+
+    query = User.query.filter(getattr(User, field_name) == value)
+    if exclude_user_id is not None:
+        query = query.filter(User.id != exclude_user_id)
+    return query.first()
+
+
+def _ensure_unique_username(base, fallback_seed, local_user_id=None):
+    base = _sanitize_username(base, fallback_seed)
     candidate = base
     counter = 1
-    while User.query.filter_by(username=candidate).first():
-        candidate = f"{base}_{counter}"
+    while _find_conflicting_user("username", candidate, exclude_user_id=local_user_id):
+        suffix = f"_{counter}"
+        candidate = f"{base[: max(1, USERNAME_MAX_LENGTH - len(suffix))]}{suffix}"
         counter += 1
     return candidate
 
@@ -84,6 +123,180 @@ def _extract_email_from_clerk_user(clerk_user_data):
             return email_value
 
     return None
+
+
+def _extract_email_from_payload(payload):
+    payload = payload or {}
+
+    direct_email = _first_non_empty(
+        _model_or_dict_get(payload, 'email'),
+        _model_or_dict_get(payload, 'email_address'),
+        _model_or_dict_get(payload, 'primary_email_address'),
+        _model_or_dict_get(payload, 'https://clerk.dev/email'),
+        _model_or_dict_get(payload, 'https://clerk.com/email'),
+    )
+    if direct_email:
+        return direct_email
+
+    claims = _model_or_dict_get(payload, 'claims', {}) or {}
+    nested_email = _first_non_empty(
+        _model_or_dict_get(claims, 'email'),
+        _model_or_dict_get(claims, 'email_address'),
+        _model_or_dict_get(claims, 'primary_email_address'),
+        _model_or_dict_get(claims, 'https://clerk.dev/email'),
+        _model_or_dict_get(claims, 'https://clerk.com/email'),
+    )
+    if nested_email:
+        return nested_email
+
+    for container in (payload, claims):
+        email_addresses = _model_or_dict_get(container, 'email_addresses', []) or []
+        for item in email_addresses:
+            value = _model_or_dict_get(item, 'email_address')
+            if value:
+                return value
+
+    return None
+
+
+def _placeholder_email_for_clerk_user(clerk_user_id):
+    safe_user_id = ''.join(ch for ch in str(clerk_user_id or '') if ch.isalnum()).lower() or 'unknown'
+    return f"{safe_user_id}@clerk.local"
+
+
+def _fetch_clerk_user(clerk_user_id):
+    if not clerk_user_id:
+        return None
+    try:
+        return sdk.users.get(user_id=clerk_user_id)
+    except Exception as e:
+        print(f"Clerk User Fetch Error: {str(e)}")
+        return None
+
+
+def _build_local_user_identity(payload, clerk_user_data, clerk_user_id):
+    email = _normalize_email(_first_non_empty(
+        _extract_email_from_payload(payload),
+        _extract_email_from_clerk_user(clerk_user_data),
+    ))
+    if not email:
+        email = _placeholder_email_for_clerk_user(clerk_user_id)
+
+    raw_username = _first_non_empty(
+        _model_or_dict_get(payload, 'username'),
+        _model_or_dict_get(payload, 'preferred_username'),
+        _model_or_dict_get(payload, 'given_name'),
+        _model_or_dict_get(payload, 'name'),
+        _model_or_dict_get(clerk_user_data, 'username'),
+        _model_or_dict_get(clerk_user_data, 'first_name'),
+        email.split('@')[0],
+        f"hns_user_{clerk_user_id[:8]}",
+    )
+    final_username = _sanitize_username(raw_username, clerk_user_id)
+    return email, final_username
+
+
+def _save_user(user):
+    db.session.add(user)
+    try:
+        db.session.commit()
+        return True, None
+    except IntegrityError as db_err:
+        db.session.rollback()
+        print(f"Database Save IntegrityError: {db_err}")
+        return False, "A duplicate or conflicting user record blocked the save."
+    except DataError as db_err:
+        db.session.rollback()
+        print(f"Database Save DataError: {db_err}")
+        return False, "User data failed validation before save."
+    except OperationalError as db_err:
+        db.session.rollback()
+        print(f"Database Save OperationalError: {db_err}")
+        return False, "The database was temporarily unavailable while saving the user."
+    except SQLAlchemyError as db_err:
+        db.session.rollback()
+        print(f"Database Save Error: {db_err}")
+        return False, "The database rejected the user update."
+
+
+def _get_or_create_local_user(payload):
+    clerk_user_id = _model_or_dict_get(payload, 'sub')
+    if not clerk_user_id:
+        return None, ('Unauthorized', 'Missing Clerk user id in token.')
+
+    user = User.query.filter_by(clerk_user_id=clerk_user_id).first()
+    clerk_user_data = None
+
+    # If the local DB row is missing or incomplete, pull the Clerk profile as fallback.
+    if (
+        not user
+        or not getattr(user, 'email', None)
+        or not getattr(user, 'username', None)
+    ):
+        clerk_user_data = _fetch_clerk_user(clerk_user_id)
+
+    email, final_username = _build_local_user_identity(payload, clerk_user_data, clerk_user_id)
+
+    if not user:
+        user = User.query.filter_by(email=email).first()
+
+    if user:
+        final_username = _ensure_unique_username(final_username, clerk_user_id, local_user_id=user.id)
+        conflicting_clerk = _find_conflicting_user("clerk_user_id", clerk_user_id, exclude_user_id=user.id)
+        if conflicting_clerk:
+            return None, ('Failed to sync user to local DB', 'Another local user already owns this Clerk identity.')
+        conflicting_email = _find_conflicting_user("email", email, exclude_user_id=user.id)
+        if conflicting_email:
+            return None, ('Failed to sync user to local DB', 'Another local user already owns this email address.')
+
+        changed = False
+        if user.clerk_user_id != clerk_user_id:
+            user.clerk_user_id = clerk_user_id
+            changed = True
+        if (
+            not user.email
+            or str(user.email).endswith('@clerk.local')
+        ) and email:
+            user.email = email
+            changed = True
+        if not user.username:
+            user.username = final_username
+            changed = True
+        if user.password is None:
+            user.password = ""
+            changed = True
+        if user.role is None:
+            user.role = 'customer'
+            changed = True
+        if user.is_active is None:
+            user.is_active = True
+            changed = True
+
+        if changed:
+            ok, err = _save_user(user)
+            if not ok:
+                return None, ('Failed to sync user to local DB', err)
+        return user, None
+
+    final_username = _ensure_unique_username(final_username, clerk_user_id)
+    if _find_conflicting_user("clerk_user_id", clerk_user_id):
+        return None, ('Failed to sync user to local DB', 'Another local user already owns this Clerk identity.')
+    if _find_conflicting_user("email", email):
+        return None, ('Failed to sync user to local DB', 'Another local user already owns this email address.')
+
+    user = User(
+        clerk_user_id=clerk_user_id,
+        email=email,
+        username=final_username,
+        password="",
+        role='customer',
+        is_active=True,
+        phone=None,
+    )
+    ok, err = _save_user(user)
+    if not ok:
+        return None, ('Failed to sync user to local DB', err)
+    return user, None
 
 # Configure Clerk Auth
 CLERK_SECRET_KEY = os.getenv('CLERK_SECRET_KEY')
@@ -160,90 +373,17 @@ def clerk_required(optional=False):
                 if not payload:
                     return jsonify({'error': 'Unauthorized', 'reason': 'No token payload found'}), 401
 
-                clerk_user_id = payload.get('sub')
                 g.clerk_session_id = payload.get('sid')
 
-                # 3. Database Lookup
-                user = User.query.filter_by(clerk_user_id=clerk_user_id).first()
-
-                if not user:
-                    clerk_user_data = None
-
-                    # Prefer claims already present in the session token so local user sync
-                    # does not depend entirely on an extra Clerk API call.
-                    email = _first_non_empty(
-                        payload.get('email'),
-                        payload.get('email_address'),
-                        payload.get('primary_email_address'),
-                    )
-                    raw_username = _first_non_empty(
-                        payload.get('username'),
-                        payload.get('preferred_username'),
-                        payload.get('given_name'),
-                        payload.get('name'),
-                    )
-
-                    # Fetch profile from Clerk for missing data
-                    try:
-                        clerk_user_data = sdk.users.get(user_id=clerk_user_id)
-                    except Exception as e:
-                        print(f"Clerk User Fetch Error: {str(e)}")
-                    
-                    # --- HANDLING NULL CONSTRAINTS (THE SAFETY NET) ---
-                    # A. Email Fallback
-                    if not email:
-                        email = _extract_email_from_clerk_user(clerk_user_data)
-                    
-                    if not email:
-                        return jsonify({"error": "Unauthorized", "reason": "User must have a valid email address."}), 401
-
-                    # B. Username Fallback
-                    raw_username = _first_non_empty(raw_username, _model_or_dict_get(clerk_user_data, 'username'))
-                    first_name = _first_non_empty(
-                        payload.get('given_name'),
-                        payload.get('first_name'),
-                        _model_or_dict_get(clerk_user_data, 'first_name'),
-                    )
-                    email_prefix = email.split('@')[0] if email else None
-
-                    final_username = raw_username or first_name or email_prefix or f"hns_user_{clerk_user_id[:8]}"
-                    final_username = _ensure_unique_username(final_username, clerk_user_id)
-
-                    # If a user exists with this email, attach Clerk ID and use it
-                    existing_by_email = User.query.filter_by(email=email).first()
-                    if existing_by_email:
-                        if not existing_by_email.clerk_user_id:
-                            existing_by_email.clerk_user_id = clerk_user_id
-                            if not existing_by_email.username:
-                                existing_by_email.username = _ensure_unique_username(
-                                    final_username, clerk_user_id
-                                )
-                            db.session.add(existing_by_email)
-                            try:
-                                db.session.commit()
-                            except Exception as db_err:
-                                db.session.rollback()
-                                print(f"Database Save Error: {db_err}")
-                                return jsonify({"error": "Failed to sync user to local DB"}), 500
-                        user = existing_by_email
-                    else:
-                        # C. Create User with defaults for all NOT NULL fields
-                        user = User(
-                            clerk_user_id=clerk_user_id,
-                            email=email,
-                            username=final_username,
-                            password="", # Provided an empty string to satisfy NOT NULL
-                            role='customer',
-                            is_active=True,
-                            phone=None
-                        )
-                        db.session.add(user)
-                        try:
-                            db.session.commit()
-                        except Exception as db_err:
-                            db.session.rollback()
-                            print(f"Database Save Error: {db_err}")
-                            return jsonify({"error": "Failed to sync user to local DB"}), 500
+                # 3. Always resolve to a local DB user, creating one if needed.
+                user, user_error = _get_or_create_local_user(payload)
+                if user_error:
+                    error_title, error_detail = user_error
+                    status_code = 401 if error_title == 'Unauthorized' else 500
+                    return jsonify({
+                        'error': error_title,
+                        'reason': str(error_detail),
+                    }), status_code
                 
                 # 4. Attach to Global Context
                 g.current_user = user
