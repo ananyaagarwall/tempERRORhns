@@ -98,7 +98,7 @@
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "*",
     "@esbuild/linux-x64": "*",
-    "lightningcss-linux-x64-gnu": "*"
+    "lightningcss-linux-x64-gnu": "*",
     "vite": "^4.0.0"
   }
 }
