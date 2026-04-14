@@ -9,7 +9,7 @@ const FALLBACK_BUILDING_IMAGE = '/building.webp';
 const ChatbotBuilderCard = ({ builder }) => {
   const navigate = useNavigate();
 
-  const builderImage = builder.logo || FALLBACK_BUILDING_IMAGE;
+  const builderImage = builder.builder_logo || builder.logo || FALLBACK_BUILDING_IMAGE;
 
   const handleCardClick = () => {
     if (builder.rera_id) {
@@ -66,10 +66,10 @@ const ChatbotBuilderCard = ({ builder }) => {
             )}
           </div>
         )}
-        {(builder.city || builder.cities) && (
+        {(builder.city || builder.location || builder.cities) && (
           <p className="chatbot-builder-location">
             <MapPin className="chatbot-icon" size={14} /> 
-            {builder.cities || builder.city}
+            {builder.cities || builder.city || builder.location}
           </p>
         )}
       </div>
