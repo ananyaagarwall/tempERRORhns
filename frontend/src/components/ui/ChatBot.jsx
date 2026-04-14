@@ -4,6 +4,7 @@ import {
   FiMessageCircle,
   FiX,
   FiSend,
+  FiSquare,
   FiUser,
   FiChevronDown,
 } from "react-icons/fi";
@@ -15,6 +16,23 @@ import ChatbotPropertyCard from "./ChatbotPropertyCard";
 import ChatbotBuilderCard from "./ChatbotBuilderCard";
 
 import "./ChatBot.css"
+
+const createMessageId = (prefix) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const buildLoadingLabel = (queryText = "") => {
+  const text = String(queryText || "").toLowerCase();
+  if (text.includes("builder") || text.includes("developer")) {
+    return "Checking our builder database";
+  }
+  if (text.includes("compare")) {
+    return "Comparing the best matches";
+  }
+  if (text.includes("property") || text.includes("bhk") || text.includes("flat")) {
+    return "Searching live property matches";
+  }
+  return "Thinking through the best response";
+};
 
 
 
@@ -150,12 +168,18 @@ const ChatBot = () => {
   }, [isUserLoaded, isSignedIn, user?.firstName]);
   const [inputMessage, setInputMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
   const [sessionId, setSessionId] = useState(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   const messagesEndRef = useRef(null);
   const isCreatingSessionRef = useRef(false);
+  const activeRequestControllerRef = useRef(null);
+  const activeLoadingMessageIdRef = useRef(null);
+  const activeTypingMessageIdRef = useRef(null);
+  const bufferedResponseTimeoutRef = useRef(null);
+  const [stoppedTypingMessageId, setStoppedTypingMessageId] = useState(null);
 
   useEffect(() => {
     const initializeChat = async () => {
@@ -187,6 +211,140 @@ const ChatBot = () => {
     scrollToBottom();
   }, [messages]);
 
+  const revealBotResponse = (messageId) => {
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== messageId) return msg;
+        return {
+          ...msg,
+          isTypingEffect: false,
+          properties: msg.pendingProperties || [],
+          builders: msg.pendingBuilders || [],
+          allProperties: msg.pendingAllProperties || [],
+          allBuilders: msg.pendingAllBuilders || [],
+          hasMore: msg.pendingHasMore || false,
+          totalResults: msg.pendingTotalResults || {},
+          currentPage: msg.pendingCurrentPage || 0,
+          suggestions: msg.pendingSuggestions || [],
+          stats: msg.pendingStats,
+          pendingProperties: [],
+          pendingBuilders: [],
+          pendingAllProperties: [],
+          pendingAllBuilders: [],
+          pendingHasMore: false,
+          pendingTotalResults: {},
+          pendingCurrentPage: 0,
+          pendingSuggestions: [],
+          pendingStats: undefined,
+        };
+      }),
+    );
+    activeTypingMessageIdRef.current = null;
+    activeLoadingMessageIdRef.current = null;
+    setStoppedTypingMessageId(null);
+    setIsTyping(false);
+  };
+
+  const stageBotResponse = (messageId, payload) => {
+    activeTypingMessageIdRef.current = payload.text ? messageId : null;
+    setStoppedTypingMessageId(null);
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== messageId) return msg;
+        return {
+          ...msg,
+          text: payload.text || "",
+          isLoading: false,
+          isTypingEffect: true,
+          properties: [],
+          builders: [],
+          allProperties: [],
+          allBuilders: [],
+          hasMore: false,
+          totalResults: {},
+          currentPage: 0,
+          suggestions: [],
+          stats: undefined,
+          pendingProperties: payload.properties || [],
+          pendingBuilders: payload.builders || [],
+          pendingAllProperties: payload.allProperties || [],
+          pendingAllBuilders: payload.allBuilders || [],
+          pendingHasMore: payload.hasMore || false,
+          pendingTotalResults: payload.totalResults || {},
+          pendingCurrentPage: payload.currentPage || 0,
+          pendingSuggestions: payload.suggestions || [],
+          pendingStats: payload.stats,
+        };
+      }),
+    );
+    if (payload.text) {
+      setIsTyping(true);
+      return;
+    }
+    revealBotResponse(messageId);
+  };
+
+  const stopBotResponse = (messageId, partialText = "") => {
+    const finalText = partialText?.trim() ? partialText : "Response stopped.";
+
+    setMessages((prev) =>
+      prev.map((msg) => {
+        if (msg.id !== messageId) return msg;
+        return {
+          ...msg,
+          text: finalText,
+          isLoading: false,
+          isTypingEffect: false,
+          properties: [],
+          builders: [],
+          allProperties: [],
+          allBuilders: [],
+          hasMore: false,
+          totalResults: {},
+          currentPage: 0,
+          suggestions: [GENERAL_RESPONSES.retry],
+          pendingProperties: [],
+          pendingBuilders: [],
+          pendingAllProperties: [],
+          pendingAllBuilders: [],
+          pendingHasMore: false,
+          pendingTotalResults: {},
+          pendingCurrentPage: 0,
+          pendingSuggestions: [],
+          pendingStats: undefined,
+        };
+      }),
+    );
+
+    activeRequestControllerRef.current = null;
+    activeLoadingMessageIdRef.current = null;
+    activeTypingMessageIdRef.current = null;
+    setStoppedTypingMessageId(null);
+    setIsWaitingForResponse(false);
+    setIsTyping(false);
+  };
+
+  const handleStopResponse = () => {
+    if (bufferedResponseTimeoutRef.current) {
+      clearTimeout(bufferedResponseTimeoutRef.current);
+      bufferedResponseTimeoutRef.current = null;
+    }
+
+    if (activeRequestControllerRef.current) {
+      activeRequestControllerRef.current.abort();
+      activeRequestControllerRef.current = null;
+    }
+
+    if (isWaitingForResponse && activeLoadingMessageIdRef.current) {
+      stopBotResponse(activeLoadingMessageIdRef.current, "Response stopped.");
+      return;
+    }
+
+    if (isTyping && activeTypingMessageIdRef.current) {
+      setStoppedTypingMessageId(activeTypingMessageIdRef.current);
+    }
+  };
+
   const handleSendMessage = async (e, messageText = null) => {
     e.preventDefault();
     
@@ -206,79 +364,94 @@ const ChatBot = () => {
     if (!textToSend.trim()) return;
 
     const userMessage = {
-      id: messages.length + 1,
+      id: createMessageId("user"),
       text: textToSend,
       sender: "user",
       timestamp: new Date(),
       isTypingEffect: false,
     };
+    const loadingMessageId = createMessageId("bot");
+    const loadingMessage = {
+      id: loadingMessageId,
+      text: "",
+      sender: "bot",
+      timestamp: new Date(),
+      isTypingEffect: false,
+      isLoading: true,
+      loadingLabel: buildLoadingLabel(textToSend),
+      suggestions: [],
+      properties: [],
+      builders: [],
+    };
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [...prev, userMessage, loadingMessage]);
     setInputMessage("");
-    setIsTyping(true);
+    setIsWaitingForResponse(true);
+    setIsTyping(false);
+    setStoppedTypingMessageId(null);
+
+    const controller = new AbortController();
+    activeRequestControllerRef.current = controller;
+    activeLoadingMessageIdRef.current = loadingMessageId;
+    activeTypingMessageIdRef.current = null;
 
     try {
       const response = await api.post(`/chatbot/ask`, {
         message: textToSend,
         session_id: sessionId,
         user_id: user?.id || null,
+      }, {
+        signal: controller.signal,
       });
 
-      const data = response.data;
+      if (activeLoadingMessageIdRef.current !== loadingMessageId) {
+        return;
+      }
 
-      const botResponse = {
-        id: messages.length + 2,
+      const data = response.data;
+      activeRequestControllerRef.current = null;
+      stageBotResponse(loadingMessageId, {
         text: data.response,
-        sender: "bot",
-        timestamp: new Date(),
-        isTypingEffect: true,
         properties: data.properties || [],
+        allProperties: data.all_properties || [],
         builders: data.builders || [],
+        allBuilders: data.all_builders || [],
         hasMore: data.has_more || false,
         totalResults: data.total_results || {},
         currentPage: data.current_page || 0,
         suggestions: generateSuggestions(data),
         stats: data.stats,
-      };
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: messages.length + 2,
-          text: "",
-          sender: "bot",
-          timestamp: new Date(),
-          isTypingEffect: true,
-        },
-      ]);
-
-      setTimeout(() => {
-        setMessages((prev) => {
-          const updatedMessages = prev.map((msg) =>
-            msg.id === messages.length + 2
-              ? { ...botResponse, isTypingEffect: false }
-              : msg,
-          );
-          return updatedMessages;
-        });
-        setIsTyping(false);
-      }, 1000);
+      });
+      setIsWaitingForResponse(false);
     } catch (error) {
+      if (error?.code === "ERR_CANCELED" || error?.name === "CanceledError") {
+        return;
+      }
+
+      if (activeLoadingMessageIdRef.current !== loadingMessageId) {
+        return;
+      }
+
       console.error("Error sending message:", error);
-
-      const errorMessage = {
-        id: messages.length + 2,
-        text: "Sorry, I encountered an error. Please try again.",
-        sender: "bot",
-        timestamp: new Date(),
-        isTypingEffect: false,
-        suggestions: [
-          GENERAL_RESPONSES.retry,
-          { text: "Contact support", action: "contact_support" },
-        ],
-      };
-
-      setMessages((prev) => [...prev, errorMessage]);
+      activeRequestControllerRef.current = null;
+      activeLoadingMessageIdRef.current = null;
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === loadingMessageId
+            ? {
+                ...msg,
+                isLoading: false,
+                text: "Sorry, I encountered an error. Please try again.",
+                isTypingEffect: false,
+                suggestions: [
+                  GENERAL_RESPONSES.retry,
+                  { text: "Contact support", action: "contact_support" },
+                ],
+              }
+            : msg,
+        ),
+      );
+      setIsWaitingForResponse(false);
       setIsTyping(false);
     }
   };
@@ -424,59 +597,58 @@ const ChatBot = () => {
 
         // 1. Add User Message
         const userMessage = {
-            id: messages.length + 1,
+            id: createMessageId("user"),
             text: userText,
             sender: "user",
             timestamp: new Date(),
             isTypingEffect: false,
         };
-        setMessages((prev) => [...prev, userMessage]);
+        const loadingMessageId = createMessageId("bot");
+        const loadingMessage = {
+            id: loadingMessageId,
+            text: "",
+            sender: "bot",
+            timestamp: new Date(),
+            isTypingEffect: false,
+            isLoading: true,
+            loadingLabel: buildLoadingLabel(userText),
+            suggestions: [],
+            properties: [],
+            builders: [],
+        };
+        setMessages((prev) => [...prev, userMessage, loadingMessage]);
 
         // 2. Simulate Bot Processing
-        setIsTyping(true);
+        setIsWaitingForResponse(true);
+        setIsTyping(false);
+        setStoppedTypingMessageId(null);
+        activeLoadingMessageIdRef.current = loadingMessageId;
+        activeTypingMessageIdRef.current = null;
         
         // 3. Render Bot Response from Buffer
-        setTimeout(() => {
-             const botResponse = {
-                id: messages.length + 2,
+        bufferedResponseTimeoutRef.current = setTimeout(() => {
+             bufferedResponseTimeoutRef.current = null;
+             if (activeLoadingMessageIdRef.current !== loadingMessageId) {
+               return;
+             }
+             stageBotResponse(loadingMessageId, {
                 text: payload.response,
-                sender: "bot",
-                timestamp: new Date(),
-                isTypingEffect: true,
                 properties: payload.properties || [],
-                allProperties: payload.all_properties || [], // Store the buffer
+                allProperties: payload.all_properties || [],
                 builders: payload.builders || [],
-                allBuilders: payload.all_builders || [], // Store the buffer
+                allBuilders: payload.all_builders || [],
                 hasMore: payload.has_more || false,
                 totalResults: payload.total_results || {},
                 currentPage: payload.current_page || 0,
-                // Generate next set of suggestions based on this new data
                 suggestions: generateSuggestions({ 
                     response: payload.response, 
                     properties: payload.properties, 
                     builders: payload.builders,
-                    buffered_responses: [] // Use client-side fallback for next step
+                    buffered_responses: []
                 }),
                 stats: payload.stats
-            };
-
-            setMessages((prev) => [
-                ...prev,
-                { id: messages.length + 2, text: "", sender: "bot", timestamp: new Date(), isTypingEffect: true }
-            ]);
-
-            setTimeout(() => {
-                 setMessages((prev) => {
-                  const updatedMessages = prev.map((msg) =>
-                    msg.id === messages.length + 2
-                      ? { ...botResponse, isTypingEffect: false }
-                      : msg,
-                  );
-                  return updatedMessages;
-                });
-                setIsTyping(false);
-            }, 1000);
-            
+            });
+            setIsWaitingForResponse(false);
         }, 500); 
         
         return;
@@ -546,7 +718,7 @@ const ChatBot = () => {
             <div className="chatbot-header-info">
               <h3 className="chatbot-title">HnS Assistant</h3>
               <p className="chatbot-status">
-                {isTyping ? "Typing..." : "Online"}
+                {isWaitingForResponse ? "Looking up live matches..." : isTyping ? "Writing the reply..." : "Online"}
               </p>
             </div>
           </div>
@@ -585,9 +757,23 @@ const ChatBot = () => {
               <div
                 className={`chatbot-message-content ${message.properties?.length > 0 || message.builders?.length > 0 ? "chatbot-message-full-width" : ""}`}
               >
-                {message.sender === "bot" && message.isTypingEffect ? (
+                {message.sender === "bot" && message.isLoading ? (
+                  <div className="chatbot-message-loading">
+                    <span className="chatbot-loading-text">{message.loadingLabel || "Thinking through it"}</span>
+                    <div className="chatbot-typing">
+                      <span className="chatbot-typing-dot"></span>
+                      <span className="chatbot-typing-dot"></span>
+                      <span className="chatbot-typing-dot"></span>
+                    </div>
+                  </div>
+                ) : message.sender === "bot" && message.isTypingEffect ? (
                   <div className="chatbot-typing-effect-text">
-                    <TypingEffect text={message.text} />
+                    <TypingEffect
+                      text={message.text}
+                      shouldStop={stoppedTypingMessageId === message.id}
+                      onStop={(partialText) => stopBotResponse(message.id, partialText)}
+                      onComplete={() => revealBotResponse(message.id)}
+                    />
                   </div>
                 ) : (
                   <div className="chatbot-message-text" style={{ whiteSpace: 'pre-wrap' }}>{message.text}</div>
@@ -695,35 +881,63 @@ const ChatBot = () => {
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder={isSignedIn ? "Ask about properties, builders, locations..." : "Please sign in to chat..."}
             className="chatbot-input"
-            disabled={isTyping || !isSignedIn}
+            disabled={isTyping || isWaitingForResponse || !isSignedIn}
           />
           <button
             type="submit"
             className="chatbot-send"
-            disabled={!inputMessage.trim() || isTyping}
+            disabled={!inputMessage.trim() || isTyping || isWaitingForResponse}
             aria-label="Send message"
           >
             <FiSend className="chatbot-send-icon" />
           </button>
+          {(isWaitingForResponse || isTyping) && (
+            <button
+              type="button"
+              className="chatbot-stop"
+              onClick={handleStopResponse}
+              aria-label="Stop response"
+              title="Stop response"
+            >
+              <FiSquare className="chatbot-stop-icon" />
+            </button>
+          )}
         </form>
       </div>
     </>
   );
 };
 
-const TypingEffect = ({ text }) => {
+const TypingEffect = ({ text, shouldStop, onStop, onComplete }) => {
   const [displayedText, setDisplayedText] = useState("");
   const [currentIndex, setCurrentIndex] = useState(0);
+  const stopHandledRef = useRef(false);
 
   useEffect(() => {
+    setDisplayedText("");
+    setCurrentIndex(0);
+    stopHandledRef.current = false;
+  }, [text]);
+
+  useEffect(() => {
+    if (shouldStop && !stopHandledRef.current) {
+      stopHandledRef.current = true;
+      onStop?.(displayedText);
+      return;
+    }
+
     if (currentIndex < text.length) {
       const timeout = setTimeout(() => {
         setDisplayedText((prevText) => prevText + text[currentIndex]);
         setCurrentIndex((prevIndex) => prevIndex + 1);
-      }, 30);
+      }, text[currentIndex] === "\n" ? 90 : 22);
       return () => clearTimeout(timeout);
     }
-  }, [text, currentIndex]);
+    if (!shouldStop && text && currentIndex >= text.length && !stopHandledRef.current) {
+      stopHandledRef.current = true;
+      onComplete?.();
+    }
+  }, [text, currentIndex, displayedText, shouldStop, onStop, onComplete]);
 
   return <span className="chatbot-message-text">{displayedText}</span>;
 };

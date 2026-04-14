@@ -179,29 +179,29 @@ def classify_intent(user_message):
                         'phone', 'email', 'call', 'speak to']
     if _contains_any(msg_lower, contact_keywords):
         return UserIntent.CONTACT_US
-
-    # Pattern 2: Explicit comparison should win over generic search keywords
-    if _has_compare_intent(msg_lower):
-        return UserIntent.COMPARE_PROPERTIES
     
-    # Pattern 3: Get specific details
-    detail_keywords = ['details', 'tell me more', 'about', 'info', 'specific',
-                       'what is', 'explain']
-    if _contains_any(msg_lower, detail_keywords):
-        return UserIntent.GET_DETAILS
-
-    # Pattern 4: Builder search
+    # Pattern 2: Builder search (PRIORITY CHECK)
     builder_keywords = ['builder', 'builders', 'developer', 'developers', 
                         'construction company', 'who built', 'building company']
     if _contains_any(msg_lower, builder_keywords):
         return UserIntent.SEARCH_BUILDERS
     
-    # Pattern 5: Property search
+    # Pattern 3: Property search
     search_keywords = ['show', 'find', 'looking for', 'need', 'want', 'search', 
                        'available', 'options', 'properties', 'property', 'list', 
                        'display', 'apartment', 'flat', 'house', 'bhk']
     if _contains_any(msg_lower, search_keywords):
         return UserIntent.SEARCH_PROPERTIES
+    
+    # Pattern 4: Comparison
+    if _has_compare_intent(msg_lower):
+        return UserIntent.COMPARE_PROPERTIES
+
+    # Pattern 5: Get specific details
+    detail_keywords = ['details', 'tell me more', 'about', 'info', 'specific',
+                       'what is', 'explain']
+    if _contains_any(msg_lower, detail_keywords):
+        return UserIntent.GET_DETAILS
     
     # Pattern 6: Refine filters (follow-up queries)
     filter_keywords = ['other', 'different', 'else', 'more', 'another',
@@ -1065,16 +1065,146 @@ def summarize_builder_search_results(builders, location=None):
             return f"I couldn't find matching builders in {str(location).title()} for that query. Try another city or area."
         return "I couldn't find matching builders for that query. Try adding a builder name or location."
 
-    scope = "builders"
-    if location:
-        scope += f" in {str(location).title()}"
+    location_label = f" in {str(location).title()}" if location else ""
+    top_names = [
+        getattr(builder, 'company_name', None)
+        for builder in builders[:3]
+        if getattr(builder, 'company_name', None)
+    ]
+    strongest = builders[0]
+    strongest_projects = (
+        f"{getattr(strongest, 'completed_projects', 0) or 0} completed"
+        if getattr(strongest, 'completed_projects', None) is not None
+        else None
+    )
 
-    response = [f"I found {len(builders)} matching {scope}."]
-    top_names = [getattr(builder, 'company_name', None) for builder in builders[:3] if getattr(builder, 'company_name', None)]
+    lines = [f"I found {len(builders)} strong builder matches{location_label}."]
     if top_names:
-        response.append(f"Top results include {', '.join(top_names)}.")
-    response.append("I'm sharing the most relevant builder cards below.")
-    return " ".join(response)
+        lines.append(f"Top names include {', '.join(top_names)}.")
+    if strongest_projects and top_names:
+        lines.append(f"{top_names[0]} stands out with {strongest_projects} projects.")
+    lines.append("I’m loading the most relevant builder cards below, and I can compare any two if you want.")
+    return "\n".join(lines)
+
+
+def _search_builders_from_vector(user_query, location=None, limit=20, search_k=25, fetch_k=50):
+    try:
+        retriever = vectorstore.as_retriever(
+            search_type="mmr",
+            search_kwargs={"k": search_k, "fetch_k": fetch_k, "lambda_mult": 0.7},
+        )
+        docs = retriever.get_relevant_documents(user_query)
+    except Exception as e:
+        print(f"Builder vector search error: {e}")
+        return []
+
+    results = []
+    seen = set()
+    for doc in docs:
+        if doc.metadata.get('type') != 'builder':
+            continue
+
+        builder_id = doc.metadata.get('id')
+        if not builder_id:
+            continue
+
+        builder = Builder.query.get(builder_id)
+        if not builder:
+            continue
+
+        rera_id = getattr(builder, 'rera_id', None)
+        if not rera_id or rera_id in seen:
+            continue
+
+        if location and not _matches_location(
+            [builder.city, builder.location, builder.corporate_address],
+            location,
+        ):
+            continue
+
+        seen.add(rera_id)
+        results.append(builder)
+        if len(results) >= limit:
+            break
+
+    return results
+
+
+def _search_builders_from_db(user_query, location=None, limit=10):
+    query_text = (user_query or "").strip().lower()
+    location_text = (location or "").strip()
+
+    builders = Builder.query.all()
+    if not builders:
+        return []
+
+    query_tokens = [
+        token for token in re.findall(r"[a-z0-9]+", query_text)
+        if len(token) > 2 and token not in {
+            'show', 'find', 'builder', 'builders', 'developer', 'developers',
+            'company', 'companies', 'realty', 'projects', 'project', 'best',
+            'top', 'me', 'in', 'at', 'near', 'for'
+        }
+    ]
+
+    scored = []
+    for builder in builders:
+        haystacks = [
+            getattr(builder, 'company_name', ''),
+            getattr(builder, 'brand_name', ''),
+            getattr(builder, 'city', ''),
+            getattr(builder, 'location', ''),
+            getattr(builder, 'corporate_address', ''),
+            getattr(builder, 'short_description', ''),
+            getattr(builder, 'detailed_description', ''),
+        ]
+        normalized = " ".join(_normalize_for_match(value) for value in haystacks if value)
+
+        score = 0
+        if location_text and _matches_location(
+            [builder.city, builder.location, builder.corporate_address],
+            location_text,
+        ):
+            score += 6
+
+        if query_tokens:
+            for token in query_tokens:
+                if token in normalized:
+                    score += 4
+
+        if not query_tokens and not location_text:
+            score += 2
+
+        score += min(int(getattr(builder, 'completed_projects', 0) or 0), 100) / 20
+        score += min(int(getattr(builder, 'ongoing_projects', 0) or 0), 50) / 25
+        if getattr(builder, 'verified', False):
+            score += 1.5
+        if getattr(builder, 'rera_registered', False):
+            score += 1
+
+        if score > 0:
+            scored.append((score, builder))
+
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            -(getattr(item[1], 'completed_projects', 0) or 0),
+            getattr(item[1], 'company_name', '') or '',
+        )
+    )
+
+    results = []
+    seen = set()
+    for _, builder in scored:
+        bid = getattr(builder, 'rera_id', None)
+        if not bid or bid in seen:
+            continue
+        seen.add(bid)
+        results.append(builder)
+        if len(results) >= limit:
+            break
+
+    return results
 
 
 def _get_memory_property_candidates(conversation_memory, limit=5):
@@ -1128,11 +1258,6 @@ def get_chatbot_response(user_query, user_id=None, chat_history=[], session_show
     # CLASSIFY INTENT FIRST
     intent = classify_intent(user_query)
     
-    # Keep compare mode only for genuine follow-up refinements, not every later search.
-    if last_intent == UserIntent.COMPARE_PROPERTIES.value:
-         if _is_refinement_only_message(user_query, params):
-             intent = UserIntent.COMPARE_PROPERTIES
-
     print(f"Detected intent: {intent.value}")
     
     # Handle contact intent immediately
@@ -1290,17 +1415,7 @@ Our team is available to assist you with any questions or schedule property visi
                     session_shown_ids.add(str(p.id))
                 return comparison, session_shown_ids, specific_props, [], intent.value, []
 
-            # 2. Compare the currently shown cards if user is referring to recent results
-            memory_props = _get_memory_property_candidates(conversation_memory, limit=5)
-            if len(memory_props) >= 2:
-                comparison = compare_properties(memory_props)
-                for p in memory_props:
-                    session_shown_ids.add(str(p.id))
-                if user_id:
-                    extract_and_save_preferences(user_query, user_id)
-                return comparison, session_shown_ids, memory_props, [], intent.value, []
-
-            # 3. General / Location-Based Comparison
+            # 2. General / Location-Based Comparison
             params = sync_extract_params(user_query)
             
             # Merge with memory
@@ -1310,9 +1425,12 @@ Our team is available to assist you with any questions or schedule property visi
             budget = params.get('budget') or mem_prefs.get('budget')
             bhk = params.get('bhk') or mem_prefs.get('bhk')
 
-            # Location is still the main anchor when we are not comparing the currently shown cards.
+            # Force follow-up if ANY key preference is missing (Location is mandatory, plus budget OR bhk)
             if not loc:
                  return "To compare the best properties, I need to know the Location. Which area are you interested in?", session_shown_ids, [], [], intent.value, []
+
+            if not budget and not bhk:
+                 return f"I can find properties in {loc}, but to give you a meaningful comparison, could you tell me your Budget range or preferred BHK?", session_shown_ids, [], [], intent.value, []
             
             # Search DB with filters
             candidates = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
@@ -1339,17 +1457,19 @@ Our team is available to assist you with any questions or schedule property visi
             top_5 = filtered[:5]
             
             if top_5:
-                comparison = compare_properties(top_5)
+                search_summary = summarize_property_search_results(
+                    top_5,
+                    location=loc,
+                    budget=budget,
+                    bhk=bhk,
+                )
                 for p in top_5:
                     session_shown_ids.add(str(p.id))
                 
                 if user_id: extract_and_save_preferences(user_query, user_id)
-                # FORCE RETURN text here to bypass LLM
-                return comparison, session_shown_ids, top_5, [], intent.value, []
+                return search_summary, session_shown_ids, top_5, [], intent.value, []
             else:
-                if budget or bhk:
-                    return f"I found properties in {loc}, but none matched your exact Budget/BHK criteria. Would you like to throw a wider net?", session_shown_ids, [], [], intent.value, []
-                return f"I couldn't find enough properties in {loc} to compare right now. Try another area or refine the search.", session_shown_ids, [], [], intent.value, []
+                return f"I found properties in {loc}, but none matched your exact Budget/BHK criteria. Would you like to throw a wider net?", session_shown_ids, [], [], intent.value, []
 
         except Exception as e:
             print(f"COMPARE handler error: {e}")
@@ -1359,6 +1479,54 @@ Our team is available to assist you with any questions or schedule property visi
         search_k = 25
         fetch_k = 50
         filter_type = "builder"
+        try:
+            mem_prefs = conversation_memory.get_current_preferences() if conversation_memory else {}
+            loc = params.get('location') or mem_prefs.get('location')
+            builders_from_vector = _search_builders_from_vector(
+                user_query,
+                location=loc,
+                limit=20,
+                search_k=search_k,
+                fetch_k=fetch_k,
+            )
+
+            if builders_from_vector:
+                for builder in builders_from_vector[:10]:
+                    if getattr(builder, 'rera_id', None):
+                        session_shown_ids.add(str(builder.rera_id))
+
+                if user_id:
+                    extract_and_save_preferences(user_query, user_id)
+
+                return (
+                    summarize_builder_search_results(builders_from_vector, location=loc),
+                    session_shown_ids,
+                    [],
+                    builders_from_vector,
+                    intent.value,
+                    generate_buffered_responses([], builders_from_vector, intent.value),
+                )
+
+            builders_from_db = _search_builders_from_db(user_query, location=loc, limit=20)
+
+            if builders_from_db:
+                for builder in builders_from_db[:10]:
+                    if getattr(builder, 'rera_id', None):
+                        session_shown_ids.add(str(builder.rera_id))
+
+                if user_id:
+                    extract_and_save_preferences(user_query, user_id)
+
+                return (
+                    summarize_builder_search_results(builders_from_db, location=loc),
+                    session_shown_ids,
+                    [],
+                    builders_from_db,
+                    intent.value,
+                    generate_buffered_responses([], builders_from_db, intent.value),
+                )
+        except Exception as e:
+            print(f"Builder DB fallback error: {e}")
     elif intent == UserIntent.SEARCH_PROPERTIES:
         search_k = 25
         fetch_k = 50
@@ -1668,27 +1836,6 @@ Response (4-6 lines, no formatting):"""
             if _matches_location([b.city, b.location, b.corporate_address], query_location)
         ]
 
-    # Keep text response deterministic for search flows so normal searches do not
-    # accidentally sound like comparisons.
-    if intent in {UserIntent.SEARCH_PROPERTIES, UserIntent.FILTER_REFINE} and all_properties:
-        ai_answer = summarize_property_search_results(
-            all_properties,
-            location=query_location,
-            budget=user_budget,
-            bhk=user_bhk,
-        )
-    elif intent == UserIntent.SEARCH_PROPERTIES and not all_properties:
-        ai_answer = summarize_property_search_results(
-            [],
-            location=query_location,
-            budget=user_budget,
-            bhk=user_bhk,
-        )
-    elif intent in {UserIntent.SEARCH_BUILDERS, UserIntent.FILTER_REFINE} and all_builders and not all_properties:
-        ai_answer = summarize_builder_search_results(all_builders, location=query_location)
-    elif intent == UserIntent.SEARCH_BUILDERS and not all_builders:
-        ai_answer = summarize_builder_search_results([], location=query_location)
-
     print(f"Retrieved {len(all_properties)} properties, {len(all_builders)} builders")
     print(f"Will show 10 initially, {max(0, len(all_properties) - 10)} available for 'load more'")
     
@@ -1782,8 +1929,8 @@ def generate_buffered_responses(current_properties, current_builders, current_in
 
     # 2. Logic for Builders
     if current_builders:
-         # Offer compare only after a builder-focused result set.
-         if current_intent == UserIntent.SEARCH_BUILDERS.value and len(current_builders) >= 2:
+         # Suggest comparing top 2 if available
+         if len(current_builders) >= 2:
              top_2 = current_builders[:2]
              names = [getattr(b, 'company_name', 'Builder') for b in top_2]
              label = f"Compare {names[0]} vs {names[1]}"
