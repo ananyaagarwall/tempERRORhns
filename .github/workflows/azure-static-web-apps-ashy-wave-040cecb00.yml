@@ -34,7 +34,7 @@ jobs:
           output_location: "dist"
           app_build_command: "npm ci --legacy-peer-deps && npm run build"
         env:
-          VITE_URL: ${{ secrets.VITE_URL }}
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
 
   close_pull_request_job:
