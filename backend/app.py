@@ -351,21 +351,6 @@ def _ensure_schema_compatibility():
 with app.app_context():
     try:
         _ensure_schema_compatibility()
-       
-        
-        # Check if admin exists
-        admin = User.query.filter_by(email=PRIMARY_ADMIN_EMAIL).first()
-        if not admin:
-            # Create admin user
-            admin = User()
-            admin.username = 'admin'
-            admin.email = PRIMARY_ADMIN_EMAIL
-            admin.password = 'admin'  # Plain text password
-            admin.role = 'admin'
-            admin.is_active = True
-            db.session.add(admin)
-            db.session.commit()
-            print("Admin created successfully!")
     except Exception as e:
         print(f"Error during database initialization: {str(e)}")
         db.session.rollback()
@@ -2462,4 +2447,3 @@ def promote_to_admin():
 
 if __name__ == '__main__':
     app.run(debug=True)
-
