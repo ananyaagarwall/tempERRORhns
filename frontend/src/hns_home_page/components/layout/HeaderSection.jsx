@@ -44,14 +44,18 @@ const HeaderSection = () => {
     { id: '4plus', label: '4+ BHK' }
   ];
 
-  const formatCr = (val) => {
-    if (val >= 50) return '₹50Cr+';
-    if (val === 0) return '₹0';
-    return `₹${val}Cr`;  // Fixed template literal syntax
+  const formatPrice = (lakhs) => {
+    if (lakhs === 0) return 'All Range';
+    if (lakhs < 100) return `Up to ${lakhs} Lakhs`;
+    const cr = lakhs / 100;
+    // Show 2 decimal places for increments of 0.25 (e.g., 1.25, 1.50, 1.75)
+    return `Up to ${cr % 1 === 0 ? cr.toFixed(0) : cr.toFixed(2)} Cr`;
   };
 
   const handlePriceRangeChange = (e) => {
-    const value = parseInt(e.target.value, 10);
+    let value = parseInt(e.target.value, 10);
+    // User wants range from 50L, so if they move past 0, snap to 50
+    if (value > 0 && value < 50) value = 50;
     setPriceRange(value);
     console.log('Price range changed to:', value); // Debug log
   };
@@ -417,7 +421,7 @@ const HeaderSection = () => {
               flexWrap: 'nowrap',
               overflow: 'hidden'
             }}>
-              <Link to="/builder" className="nav-link" style={{
+              <Link to="/builders-page" className="nav-link" style={{
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>Builders</Link>
               <Link to="/properties" className="nav-link" style={{
@@ -680,10 +684,8 @@ const HeaderSection = () => {
               <span className="action-card-icon icon-contact">✉</span>
             </Link>
           </div>
-          {/* Animation styles moved to HeaderSection.css */}
         </div>
       )}
-      {/* We've removed the full search dropdown to only keep the price range dropdown */}
       {/* Main Section */}
       <main
         className={`relative z-10 flex items-center justify-between max-w-[1400px] mx-auto px-8 header-main ${isMobile ? 'mobile' : ''}`}
@@ -912,6 +914,7 @@ const HeaderSection = () => {
         </div>
       )}
       {/* Search Bar (hide on mobile) */}
+      {/* Search Bar (hide on mobile) */}
       {!isMobile && (
         <div
           style={{
@@ -925,240 +928,126 @@ const HeaderSection = () => {
             transformOrigin: 'top center',
           }}
         >
-          <div
-            className="searchbar-responsive"
-            style={{
-              position: 'relative',
-              width: '100%',
-              minHeight: isSearchbarExpanded ? '140px' : (isMobile ? 'auto' : '64px'),
-              background: '#fff',
-              border: '2px solid #e5e7eb',
-              borderRadius: windowWidth <= 350 ? '10px' : isMobile ? '18px' : '30px',
-              boxShadow: windowWidth <= 350 ? '0 2px 8px 0 rgba(34, 58, 95, 0.10)' : '0 4px 16px 0 rgba(34, 58, 95, 0.13)',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'stretch',
-              justifyContent: 'flex-start',
-              padding: isMobile ? '6px 2px' : isTablet ? '12px 16px' : isLaptop ? '12px 20px' : '14px 28px',
-              gap: '16px',
-              overflow: 'visible', // Ensure dropdowns are not clipped
-              whiteSpace: 'normal',
-              flexWrap: 'nowrap',
-              boxSizing: 'border-box',
-              transition: 'all 0.3s ease',
-            }}
-          >
-            {/* Row wrapper for non-expanded state */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'row',
-              alignItems: 'center',
-              width: '100%',
-              gap: isMobile ? '4px' : isTablet ? '10px' : isLaptop ? '12px' : '18px',
-            }}>
-              {/* Location Input Group */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                flex: 2,
-                maxWidth: isTablet ? 170 : isLaptop ? 200 : 220,
-                minWidth: isMobile ? 160 : isTablet ? 130 : isLaptop ? 150 : 140,
-                justifyContent: 'center',
-                width: 'auto',
-              }}>
-                <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Enter Location</label>
-                <div className="searchbar-input-wrap" style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  height: isMobile ? '36px' : 32,
-                  paddingLeft: 0,
-                  paddingRight: 0,
-                  width: '100%',
-                }}>
+          <div className={`searchbar-responsive ${isSearchbarExpanded ? 'expanded' : ''}`}>
+            {/* Main row */}
+            <div className="searchbar-main-row">
+              {/* Location Field */}
+              <div className="searchbar-field-box">
+                <span className="searchbar-field-label">Location</span>
+                <div className="searchbar-field-inner">
+                  <FaSearch className="searchbar-icon" />
                   <input
                     type="text"
-                    placeholder="Enter Location"
-                    style={{
-                      border: 'none',
-                      outline: 'none',
-                      fontSize: windowWidth <= 350 ? '0.75rem' :
-                        isMobile ? '0.95rem' :
-                          isTablet ? '1rem' : '1.08rem',
-                      color: '#1A1A1A',
-                      background: 'transparent',
-                      width: '100%',
-                      padding: '0',
-                      textAlign: 'left',
-                      height: windowWidth <= 350 ? '26px' : undefined,
-                    }}
+                    placeholder="Enter location"
                     className="searchbar-input enter-location-input"
                     value={location}
                     onChange={e => setLocation(e.target.value)}
                   />
-                  <FaSearch style={{ color: '#888', fontSize: isMobile ? '1rem' : '1.08rem', marginLeft: 0, cursor: 'pointer' }} />
                 </div>
               </div>
-              {/* Divider */}
-              <div style={{ width: 1, height: isMobile ? 18 : 32, background: '#bdbdbd', margin: isMobile ? '8px 0' : '0 10px' }} />
-              {/* Price Range Group */}
-              <div style={{
-                minWidth: isMobile ? 120 : isTablet ? 130 : isLaptop ? 140 : 160,
-                flex: 1,
-                width: 'auto',
-                marginTop: 0,
-                position: 'relative',
-              }}>
+
+              <div className="searchbar-vdivider" />
+
+              {/* Price Range Field */}
+              <div className="searchbar-field-box">
+                <span className="searchbar-field-label">Price Range</span>
                 <div
+                  className="searchbar-field-inner price-range-trigger"
                   onClick={togglePriceRangeSlider}
-                  className="price-range-trigger"
-                  style={{
-                    cursor: 'pointer',
-                    position: 'relative',
-                    zIndex: 50,
-                  }}
                 >
-                  <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Price Range</label>
-                  <div style={{
-                    position: 'relative',
-                    height: isMobile ? 36 : 32,
-                    border: 'none',
-                    paddingLeft: 0,
-                    paddingRight: 0,
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}>
-                    <span style={{ fontSize: windowWidth <= 350 ? '0.75rem' : isMobile ? '0.95rem' : '1.08rem', fontWeight: 600, color: '#222' }}>
-                      {priceRange === 0 ? 'All Range' : `Up to ${formatCr(priceRange)}`}
-                    </span>
-                    <span style={{ marginLeft: 'auto', fontSize: '14px', color: '#888' }}>▼</span>
-                  </div>
+                  <span className={`searchbar-field-value ${priceRange === 0 ? 'placeholder' : ''}`}>
+                    {formatPrice(priceRange)}
+                  </span>
+                  <svg
+                    className={`searchbar-chevron ${showPriceRangeSlider ? 'open' : ''}`}
+                    width="14" height="14" viewBox="0 0 14 14" fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M2.5 5L7 9.5L11.5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
               </div>
-              {/* Divider - hidden on mobile */}
-              {!isMobile && <div style={{ width: 1, height: 32, background: '#ececec', margin: '0 10px' }} />}
-              {/* BHK Type Group */}
-              <div style={{
-                minWidth: isMobile ? 120 : isTablet ? 130 : isLaptop ? 140 : 160,
-                flex: 1,
-                width: 'auto',
-                marginTop: 0,
-                position: 'relative',
-              }}>
-                <label style={{ fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem', color: '#969696', fontWeight: 500, marginBottom: 2, marginLeft: 0, textAlign: 'left', display: 'block' }}>Type</label>
+
+              <div className="searchbar-vdivider" />
+
+              {/* BHK Type Field */}
+              <div className="searchbar-field-box">
+                <span className="searchbar-field-label">BHK Type</span>
                 <div
-                  onClick={toggleBhkDropdown}
-                  className="bhk-dropdown-trigger"
+                  className="searchbar-field-inner bhk-dropdown-trigger"
                   ref={bhkTriggerRef}
-                  style={{
-                    position: 'relative',
-                    height: isMobile ? 36 : 32,
-                    background: '#fff',
-                    borderRadius: '16px',
-                    border: 'none',
-                    paddingLeft: 0,
-                    paddingRight: 8,
-                    width: '100%',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                  }}
+                  onClick={toggleBhkDropdown}
                 >
-                  <span style={{
-                    fontSize: windowWidth <= 350 ? '0.75rem' :
-                      isMobile ? '0.95rem' :
-                        isTablet ? '1rem' : '1.08rem',
-                    fontWeight: 600,
-                    color: '#222',
-                    textAlign: 'left',
-                    flex: 1,
-                  }}>
+                  <span className={`searchbar-field-value ${selectedBhkTypes.length === 0 ? 'placeholder' : ''}`}>
                     {getBhkDisplayText()}
                   </span>
-                  <span style={{
-                    position: 'absolute',
-                    right: 6,
-                    pointerEvents: 'none',
-                    color: '#888',
-                    fontSize: isMobile ? '1rem' : '1.08rem',
-                    transform: showBhkDropdown ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.2s ease'
-                  }}>▼</span>
+                  <svg
+                    className={`searchbar-chevron ${showBhkDropdown ? 'open' : ''}`}
+                    width="14" height="14" viewBox="0 0 14 14" fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path d="M2.5 5L7 9.5L11.5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
                 </div>
-
               </div>
 
               {/* Search Button */}
               <button
-                className="searchbar-btn"
-                style={{
-                  background: '#F1D97A',
-                  color: '#222',
-                  fontWeight: 600,
-                  fontSize: windowWidth <= 350 ? '0.75rem' :
-                    isMobile ? '0.85rem' :
-                      isTablet ? '0.95rem' : isLaptop ? '0.98rem' : '1.08rem',
-                  border: 'none',
-                  borderRadius: isMobile ? '10px' : '24px',
-                  padding: windowWidth <= 350 ? '0 4px' :
-                    isMobile ? '0 8px' : isTablet ? '0 16px' : isLaptop ? '0 18px' : '0 28px',
-                  height: windowWidth <= 350 ? '26px' :
-                    isMobile ? '28px' : isTablet ? '44px' : isLaptop ? '44px' : '56px',
-                  lineHeight: windowWidth <= 350 ? '26px' :
-                    isMobile ? '28px' : isTablet ? '44px' : isLaptop ? '44px' : '56px',
-                  marginLeft: '10px',
-                  boxShadow: '0 2px 8px rgba(241,217,122,0.18)',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'background 0.18s, box-shadow 0.18s, transform 0.18s',
-                  width: 'auto',
-                  marginTop: 0,
-                  flexShrink: 0,
-                }}
+                className="searchbar-btn-pro"
                 onClick={() => {
                   const correctedLocation = autocorrectLocation(location);
                   window.dispatchEvent(new CustomEvent('filterLandingPage', {
-                    detail: {
-                      location: correctedLocation,
-                      priceRange,
-                      bhkTypes: selectedBhkTypes
-                    }
+                    detail: { location: correctedLocation, priceRange, bhkTypes: selectedBhkTypes }
                   }));
                 }}
               >
+                <FaSearch style={{ fontSize: '13px' }} />
                 Search
               </button>
             </div>
 
-            {/* Expanded Price Range Content - Simple working slider */}
+            {/* Expanded Price Range Slider */}
             {isSearchbarExpanded && (
-              <div className="expanded-price-content" style={{ width: '100%', paddingTop: '10px', borderTop: '1px solid #e5e7eb' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
-                  <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>Min: ₹0</span>
-                  <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: 500 }}>Max: {formatCr(priceRange || 50)}</span>
+              <div className="expanded-price-content">
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                  <span style={{ fontSize: '13px', color: '#8a9bbf', fontWeight: 600 }}>₹0</span>
+                  <span style={{ fontSize: '13px', color: '#8a9bbf', fontWeight: 600 }}>₹10Cr</span>
                 </div>
-
-                {/* Simple working slider */}
-                <input
-                  type="range"
-                  min="0"
-                  max="50"
-                  step="1"
-                  value={priceRange}
-                  onChange={handlePriceRangeChange}
-                  style={{
-                    width: '100%',
-                    height: '6px',
-                    appearance: 'none',
-                    background: `linear-gradient(to right, #F1D97A 0%, #F1D97A ${(priceRange / 50) * 100}%, #e5e7eb ${(priceRange / 50) * 100}%, #e5e7eb 100%)`,
-                    borderRadius: '10px',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                  className="simple-price-range-slider"
-                />
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1000"
+                    step="25"
+                    value={priceRange}
+                    onChange={handlePriceRangeChange}
+                    style={{
+                      width: '100%',
+                      background: `linear-gradient(to right, #4a7fd4 0%, #4a7fd4 ${(priceRange / 1000) * 100}%, #e0e7f0 ${(priceRange / 1000) * 100}%, #e0e7f0 100%)`,
+                    }}
+                    className="simple-price-range-slider"
+                  />
+                  {/* Floating label that follows the thumb */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '-28px',
+                      left: `calc(${(priceRange / 1000) * 100}% - ${(priceRange / 1000) * 28}px)`,
+                      transform: 'translateX(-50%)',
+                      background: '#1a2a4a',
+                      color: '#fff',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      padding: '3px 7px',
+                      borderRadius: '6px',
+                      whiteSpace: 'nowrap',
+                      pointerEvents: 'none',
+                      transition: 'left 0.05s',
+                    }}
+                  >
+                    {formatPrice(priceRange).replace('Up to ', '')}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1192,7 +1081,7 @@ const HeaderSection = () => {
                 alignItems: 'center',
                 fontSize: '14px',
                 fontWeight: 500,
-                color: selectedBhkTypes.includes(option.id) ? '#F1D97A' : '#333',
+                color: selectedBhkTypes.includes(option.id) ? '#1a1a1a' : '#333',
                 backgroundColor: selectedBhkTypes.includes(option.id) ? '#fff9e6' : 'transparent',
                 transition: 'all 0.2s ease',
               }}

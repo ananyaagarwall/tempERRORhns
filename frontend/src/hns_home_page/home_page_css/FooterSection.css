@@ -24,9 +24,13 @@
 
 .footer-logo {
   height: 60px;
-  width: 160px;
+  width: auto;
+  max-width: 180px;
   object-fit: contain;
   margin-bottom: 16px;
+  /* If the image has built-in white space on the left, 
+     use a small margin-left instead: */
+  margin-left: -5px;
 }
 
 .footer-description {
@@ -171,7 +175,7 @@
   }
 
   .footer-social .social-icon,
-  .footer-social > a > svg {
+  .footer-social>a>svg {
     height: 32px !important;
     width: 32px !important;
   }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import FooterNavBar from "../../hns_home_page/components/layout/FooterNavBar";
 import FooterSection from '../../hns_home_page/components/layout/FooterSection';
@@ -10,22 +10,9 @@ import FamousSection from '../components/ui/FamousSection';
 import MobileFooter from '../../components/ui/MobileFooter';
 import '../blog_page_css/BlogPage.css';
 
-import { fetchBlogs } from '../../services/api';
+import { latestBlogs } from '../data/blogData';
 
 const BlogLanding = () => {
-  const [blogs, setBlogs] = useState([]);
-  const [category, setCategory] = useState('All');
-
-  useEffect(() => {
-    fetchBlogs()
-      .then(setBlogs)
-      .catch(console.error);
-  }, []);
-
-  const filteredBlogs = category === "All"
-    ? blogs
-    : blogs.filter(blog => blog.title && blog.title.toLowerCase().includes(category.toLowerCase()));
-
   return (
     <div className="blog-page-container">
       <FooterNavBar />
@@ -34,10 +21,10 @@ const BlogLanding = () => {
         <DynamicBreadcrumb />
       </div>
 
-     <div className="max-w-[1320px] mx-auto px-4 pt-6 pb-8">
-  <KnowBeforeYouBuySection />
-  <LatestBlog filteredBlogs={filteredBlogs} />
-    </div>
+      <div className="max-w-[1320px] mx-auto px-4 pt-6 pb-8">
+        <KnowBeforeYouBuySection />
+        <LatestBlog filteredBlogs={latestBlogs} />
+      </div>
 
       <div className="max-w-6xl mx-auto px-4 pb-2">
         <TrendingNow />
@@ -45,7 +32,7 @@ const BlogLanding = () => {
       </div>
 
       <FooterSection />
-      <MobileFooter />  {/* Kept from the first version — important for mobile view */}
+      <MobileFooter />
     </div>
   );
 };

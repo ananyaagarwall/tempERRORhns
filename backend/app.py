@@ -52,6 +52,7 @@ logging.basicConfig(
 security_logger = logging.getLogger('security')
 
 app = Flask(__name__)
+
 LOCAL_DEV_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:5173",
@@ -61,6 +62,15 @@ LOCAL_DEV_ORIGINS = [
     "http://127.0.0.1:5174",
 ]
 
+PRODUCTION_ORIGINS = [
+    "https://ashy-wave-040cecb00.4.azurestaticapps.net",
+]
+
+
+allowed_origins = LOCAL_DEV_ORIGINS if os.environ.get("FLASK_ENV") == "development" else LOCAL_DEV_ORIGINS + PRODUCTION_ORIGINS
+
+CORS(app, origins=allowed_origins)
+
 # Allow localhost/127.0.0.1 on any port for development.
 LOCAL_ORIGIN_REGEX = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
@@ -68,10 +78,10 @@ CORS(
     app,
     supports_credentials=True,
     resources={
-        r"/api/*": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
-        r"/query": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
-        r"/build_index": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
-        r"/health": {"origins": LOCAL_DEV_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/api/*": {"origins": LOCAL_DEV_ORIGINS + PRODUCTION_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/query": {"origins": LOCAL_DEV_ORIGINS + PRODUCTION_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/build_index": {"origins": LOCAL_DEV_ORIGINS + PRODUCTION_ORIGINS + [LOCAL_ORIGIN_REGEX]},
+        r"/health": {"origins": LOCAL_DEV_ORIGINS + PRODUCTION_ORIGINS + [LOCAL_ORIGIN_REGEX]},
     },
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Guest-ID", "x-guest-id"],
@@ -79,14 +89,12 @@ CORS(
 
 
 @app.after_request
+@app.after_request
 def add_local_dev_cors_headers(response):
-    """
-    Safety net for local development: ensure CORS headers are present even on
-    framework-generated error/redirect responses.
-    """
     origin = request.headers.get("Origin")
     if origin and (
         origin in LOCAL_DEV_ORIGINS
+        or origin in PRODUCTION_ORIGINS  # ✅ Add this
         or origin.startswith("http://localhost:")
         or origin.startswith("http://127.0.0.1:")
     ):

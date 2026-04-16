@@ -1,46 +1,17 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import "../../blog_page_css/FamousSection.css";
+import { famousBlogs } from '../../data/blogData';
 
 const FamousSection = () => {
-  const famous = [
-    {
-      id: 1,
-      featured_image: '/capsule.jpeg',
-      featured_image_alt: 'Capsule Residences',
-      title: 'Capsule Residences',
-      slug: 'capsule-residences',
-      created_at: '2022-11-15T00:00:00Z',
-      intro_paragraph: 'Discover modern living at Capsule Residences, where innovative design meets comfort and convenience in every detail.'
-    },
-    {
-      id: 2,
-      featured_image: '/famous.jpg',
-      featured_image_alt: 'Famous Heights',
-      title: 'Famous Heights',
-      slug: 'famous-heights',
-      created_at: '2023-02-10T00:00:00Z',
-      intro_paragraph: 'Famous Heights offers premium apartments with breathtaking views, top-notch amenities, and a vibrant community atmosphere.'
-    },
-    {
-      id: 3,
-      featured_image: '/hanging.webp',
-      featured_image_alt: 'Hanging Gardens Towers',
-      title: 'Hanging Gardens Towers',
-      slug: 'hanging-gardens-towers',
-      created_at: '2023-05-20T00:00:00Z',
-      intro_paragraph: 'Experience luxury at Hanging Gardens Towers, featuring lush green spaces, modern architecture, and a prime city location.'
-    },
-  ];
-
   return (
     <div className="famous-section">
       <h2 className="famous-heading">
-      Curated Picks Just for You
+        Curated Picks Just for You
       </h2>
 
       <div className="famous-cards">
-        {famous.map((blog) => (
+        {famousBlogs.map((blog) => (
           <div key={blog.id} className="famous-card group">
             <div className="famous-img-container">
               <img
