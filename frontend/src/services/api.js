@@ -1,6 +1,4 @@
-import API_BASE_URL from '../config';
-
-const API_URL = `${API_BASE_URL}/api`;
+import { API_API_URL as API_URL } from "../config";
 
 export const fetchBuilderProjectById = async (id) => {
     try {
