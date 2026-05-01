@@ -64,6 +64,8 @@ LOCAL_DEV_ORIGINS = [
 
 PRODUCTION_ORIGINS = [
     "https://ashy-wave-040cecb00.4.azurestaticapps.net",
+    "https://www.housenseek.com",
+    "https://housenseek.com",
 ]
 
 ALL_ORIGINS = LOCAL_DEV_ORIGINS + PRODUCTION_ORIGINS
