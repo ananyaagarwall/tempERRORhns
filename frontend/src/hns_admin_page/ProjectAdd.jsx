@@ -3,6 +3,7 @@ import Select from 'react-select';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { FaArrowLeft, FaArrowRight, FaCheck, FaUpload, FaMapMarkerAlt, FaHome, FaTools, FaStar, FaImages, FaFileAlt } from 'react-icons/fa';
+import LocationPicker from '../components/maps/LocationPicker';
 
 const ProjectAdd = () => {
   const [currentStep, setCurrentStep] = useState(1);
@@ -35,8 +36,9 @@ const ProjectAdd = () => {
     locality: '',
     city: '',
     state: '',
-    // latitude: '',
-    // longitude: '',
+    latitude: '',
+    longitude: '',
+    location_source: '',
     // Construction Details
     towers: '',
     floorsPerTower: '',
@@ -303,6 +305,13 @@ const ProjectAdd = () => {
             landmark: form.landmark,
             form_status: 'in_progress'
           };
+          const lat = form.latitude === '' ? null : Number(form.latitude);
+          const lng = form.longitude === '' ? null : Number(form.longitude);
+          if (Number.isFinite(lat) && Number.isFinite(lng)) {
+            patchData.latitude = lat;
+            patchData.longitude = lng;
+            patchData.location_source = form.location_source || 'manual';
+          }
         } else if (currentStep === 4) {
           const missing = getMissingFields();
           if (missing.length > 0) {
@@ -1116,26 +1125,47 @@ const renderStepContent = () => {
                   }}
                 />
               </div>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>State *</label>
-                <Select
-                  options={stateOptions}
-                  value={stateOptions.find(opt => opt.value === form.state) || null}
-                  onChange={opt => setForm({ ...form, state: opt ? opt.value : '' })}
-                  placeholder="Select State"
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      border: '1px solid #ddd',
-                      borderRadius: '8px',
-                      minHeight: '44px',
-                    }),
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        );
+	              <div style={{ flex: 1 }}>
+	                <label style={labelStyle}>State *</label>
+	                <Select
+	                  options={stateOptions}
+	                  value={stateOptions.find(opt => opt.value === form.state) || null}
+	                  onChange={opt => setForm({ ...form, state: opt ? opt.value : '' })}
+	                  placeholder="Select State"
+	                  styles={{
+	                    control: (base) => ({
+	                      ...base,
+	                      border: '1px solid #ddd',
+	                      borderRadius: '8px',
+	                      minHeight: '44px',
+	                    }),
+	                  }}
+	                />
+	              </div>
+	            </div>
+
+	            <div style={{ marginTop: 10 }}>
+	              <label style={labelStyle}>Coordinates (Pin Drop Recommended)</label>
+	              <div style={{ fontSize: 13, color: '#666', marginBottom: 10 }}>
+	                Search to prefill, then click on the map to place the exact pin.
+	              </div>
+	              <LocationPicker
+	                apiBaseUrl={API_URL}
+	                latitude={form.latitude === '' ? undefined : Number(form.latitude)}
+	                longitude={form.longitude === '' ? undefined : Number(form.longitude)}
+	                defaultQuery={[form.full_address, form.locality, form.city, form.state].filter(Boolean).join(', ')}
+	                onChange={({ latitude, longitude, location_source }) => {
+	                  setForm(prev => ({
+	                    ...prev,
+	                    latitude: typeof latitude === 'number' ? latitude : prev.latitude,
+	                    longitude: typeof longitude === 'number' ? longitude : prev.longitude,
+	                    location_source: location_source || prev.location_source,
+	                  }));
+	                }}
+	              />
+	            </div>
+	          </div>
+	        );
 
       case 4:
         return (

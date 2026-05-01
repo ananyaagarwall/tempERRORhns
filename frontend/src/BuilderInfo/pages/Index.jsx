@@ -20,7 +20,8 @@ import ResourceHub from '../components/sections/ResourceHub';
 import PropertyComparison from '../components/sections/PropertyComparison';
 import ScheduleVistSection from '../components/sections/ScheduleVisit';
 
-import { fetchBuilderByName } from '../../services/api';
+import { fetchBuilderByName, fetchBuilderByReraId } from '../../services/api';
+import { resolveBuilderFromRouteToken } from '../../utils/entityRouting';
 
 import '../../hns_home_page/home_page_css/TrustedBuildersSection.css';
 import '../../hns_home_page/home_page_css/FooterSection.css';
@@ -31,27 +32,48 @@ function BuilderInfoIndex() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const { builderName } = useParams();
+  const { builderToken, builderName } = useParams();
+  const builderRouteToken = builderName || builderToken;
 
   useEffect(() => {
     const fetchBuilderData = async () => {
       try {
         setLoading(true);
 
-        if (!builderName) {
+        if (!builderRouteToken) {
           setError('No builder specified. Please select a builder from the search results.');
           setLoading(false);
           return;
         }
 
         try {
-          const builderData = await fetchBuilderByName(builderName);
+          let builderData = null;
+
+          try {
+            const resolved = await resolveBuilderFromRouteToken(builderRouteToken);
+            if (resolved?.builder?.rera_id) {
+              builderData = await fetchBuilderByReraId(resolved.builder.rera_id);
+            } else if (resolved?.builder) {
+              builderData = resolved.builder;
+            }
+          } catch (resolveError) {
+            // Continue with direct fetch fallbacks.
+          }
+
+          if (!builderData) {
+            try {
+              builderData = await fetchBuilderByReraId(builderRouteToken);
+            } catch (byIdError) {
+              builderData = await fetchBuilderByName(builderRouteToken);
+            }
+          }
+
           setBuilder(builderData);
           setError(null);
         } catch (fetchError) {
-          console.log(`Builder "${builderName}" not found in database`);
+          console.log(`Builder "${builderRouteToken}" not found in database`);
           setError(
-            `Builder "${builderName.replace(/-/g, ' ')}" information is not available. This might be because the builder profile hasn't been added yet.`
+            `Builder "${String(builderRouteToken).replace(/-/g, ' ')}" information is not available. This might be because the builder profile hasn't been added yet.`
           );
         }
       } catch (err) {
@@ -63,7 +85,7 @@ function BuilderInfoIndex() {
     };
 
     fetchBuilderData();
-  }, [builderName]);
+  }, [builderRouteToken]);
 
   if (loading) {
     return (
@@ -93,7 +115,7 @@ function BuilderInfoIndex() {
     <div className="min-h-screen" style={{ background: '#ffff' }}>
       <FooterNavBar sticky={true} />
       <DynamicBreadcrumb
-        customLabels={{ [`/builder/${builderName}`]: builder?.company_name || 'Builder' }}
+        customLabels={{ [`/builder/${builderRouteToken}`]: builder?.company_name || 'Builder' }}
       />
 
       {/* Hero Strip */}

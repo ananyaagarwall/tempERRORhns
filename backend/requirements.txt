@@ -20,14 +20,15 @@ langchain>=0.3.17
 langchain-core>=0.3.33
 langchain-community>=0.3.16
 langchain-huggingface>=0.1.2
+langchain-openai>=0.2.14
 langchain-postgres>=0.0.12
-langchain-google-genai>=2.0.8
 langchain-classic>=0.0.22      # only if you still use old ConversationalRetrievalChain
 
 # === Embeddings & Models ===
 sentence-transformers>=3.3.1
 transformers>=4.47.1
 huggingface-hub>=0.27.0
+openai>=1.58.1
 
 # === Vector Store ===
 psycopg2-binary>=2.9.9             # PostgreSQL adapter (includes pgvector support via langchain-postgres)

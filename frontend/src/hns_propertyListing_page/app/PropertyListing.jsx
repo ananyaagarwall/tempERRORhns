@@ -26,6 +26,9 @@ const PropertyListing = () => {
     location: initNodes.length > 0 ? initNodes[0] : "",
     priceRange: initPriceCr, // in Crores
     bhkTypes: [],
+    propertyStatus: [],
+    amenities: [],
+    societyTypes: [],
   });
   const [city, setCity] = useState(initCity);
   const [budgetNodes] = useState(initNodes);
@@ -65,6 +68,15 @@ const PropertyListing = () => {
     setSearchFilters((prev) => ({ ...prev, priceRange: priceCr }));
   };
 
+  const handleSidebarFiltersChange = (filters) => {
+    setSearchFilters((prev) => ({
+      ...prev,
+      propertyStatus: filters.propertyStatus || [],
+      amenities: filters.amenities || [],
+      societyTypes: filters.societyType || [],
+    }));
+  };
+
   const handleCityRemove = () => {
     setCity("");
   };
@@ -84,9 +96,11 @@ const PropertyListing = () => {
           ref={sidebarRef}
           onTagsChange={handleTagsChange}
           city={city}
+          filterLocation={searchFilters.location || city}
           onCityRemove={handleCityRemove}
           initialPriceCr={initPriceCr}
           onPriceChange={handlePriceChange}
+          onFiltersChange={handleSidebarFiltersChange}
         />
 
         {/* Main Property Listings */}

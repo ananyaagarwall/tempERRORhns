@@ -10,11 +10,15 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_postgres import PGVector
 from langchain_core.documents import Document
 from langchain_core.prompts import PromptTemplate
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_classic.chains import ConversationalRetrievalChain
 from models import Property, Blog, BuilderProject, UserPreference, Builder, UserInteraction, ChatSession, User, db
 from flask import current_app
 import threading
+
+try:
+    from langchain_openai import AzureChatOpenAI
+except ImportError:
+    AzureChatOpenAI = None
 
 # --- 1. SETUP ---
 BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,7 +30,69 @@ print("Vector store: PostgreSQL (pgvector)")
 HF_MODEL_NAME = os.getenv("HF_EMBED_MODEL", "all-MiniLM-L6-v2")
 HF_LOCAL_ONLY = os.getenv("HF_LOCAL_FILES_ONLY", "true").lower() in ("1", "true", "yes", "on")
 FALLBACK_EMBED_DIM = int(os.getenv("FALLBACK_EMBED_DIM", "384"))
-GEMINI_TEXT_MODEL = os.getenv("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
+AZURE_OPENAI_KEY = (os.getenv("AZURE_OPENAI_KEY") or os.getenv("AZURE_OPENAI_API_KEY") or "").strip()
+AZURE_OPENAI_ENDPOINT = (
+    os.getenv("AZURE_OPENAI_ENDPOINT")
+    or os.getenv("AZURE_OPENAI_BASE_URL")
+    or os.getenv("OPENAI_API_BASE")
+    or ""
+).strip()
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
+AZURE_OPENAI_CHAT_DEPLOYMENT = (
+    os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT")
+    or os.getenv("AZURE_OPENAI_DEPLOYMENT")
+    or os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+    or ""
+).strip()
+AZURE_OPENAI_MODEL = (os.getenv("AZURE_OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
+
+
+def get_azure_openai_health():
+    missing = []
+    if not AZURE_OPENAI_KEY:
+        missing.append("AZURE_OPENAI_KEY")
+    if not AZURE_OPENAI_ENDPOINT:
+        missing.append("AZURE_OPENAI_ENDPOINT")
+    if not AZURE_OPENAI_CHAT_DEPLOYMENT:
+        missing.append("AZURE_OPENAI_CHAT_DEPLOYMENT")
+
+    return {
+        "provider": "azure_openai",
+        "configured": not missing and AzureChatOpenAI is not None,
+        "sdk_installed": AzureChatOpenAI is not None,
+        "missing": missing,
+        "endpoint_configured": bool(AZURE_OPENAI_ENDPOINT),
+        "deployment": AZURE_OPENAI_CHAT_DEPLOYMENT or None,
+        "model": AZURE_OPENAI_MODEL or None,
+        "api_version": AZURE_OPENAI_API_VERSION or None,
+    }
+
+
+def _create_chat_llm(*, temperature, max_output_tokens):
+    """
+    Create the Azure OpenAI chat model used by the chatbot.
+    """
+    health = get_azure_openai_health()
+    if not health["sdk_installed"]:
+        raise RuntimeError(
+            "Azure OpenAI is configured for chatbot responses, but langchain-openai is not installed."
+        )
+
+    if health["missing"]:
+        raise RuntimeError(
+            "Azure OpenAI chatbot configuration is incomplete. Missing: "
+            + ", ".join(health["missing"])
+        )
+
+    return AzureChatOpenAI(
+        azure_endpoint=AZURE_OPENAI_ENDPOINT,
+        api_key=AZURE_OPENAI_KEY,
+        api_version=AZURE_OPENAI_API_VERSION,
+        azure_deployment=AZURE_OPENAI_CHAT_DEPLOYMENT,
+        model=AZURE_OPENAI_MODEL,
+        temperature=temperature,
+        max_tokens=max_output_tokens,
+    )
 
 
 class LocalFallbackEmbeddings:
@@ -63,8 +129,6 @@ class LocalFallbackEmbeddings:
         return self._embed(text)
 
 
-embeddings = None
-
 # --- 3. PGVECTOR STORE SETUP ---
 # Requires the 'vector' extension in your Postgres DB:
 #   CREATE EXTENSION IF NOT EXISTS vector;
@@ -90,7 +154,7 @@ def _create_embeddings():
 
 def get_vectorstore():
     """Lazy PGVector initialization to prevent import-time startup failures."""
-    global _vectorstore, embeddings
+    global _vectorstore
     if _vectorstore is None:
         with _vectorstore_lock:
             if _vectorstore is None:
@@ -180,22 +244,23 @@ def classify_intent(user_message):
     if _contains_any(msg_lower, contact_keywords):
         return UserIntent.CONTACT_US
     
-    # Pattern 2: Builder search (PRIORITY CHECK)
+    # Pattern 2: Comparison should win over search language like
+    # "compare builders" or "compare properties in thane".
+    if _has_compare_intent(msg_lower):
+        return UserIntent.COMPARE_PROPERTIES
+
+    # Pattern 3: Builder search
     builder_keywords = ['builder', 'builders', 'developer', 'developers', 
                         'construction company', 'who built', 'building company']
     if _contains_any(msg_lower, builder_keywords):
         return UserIntent.SEARCH_BUILDERS
     
-    # Pattern 3: Property search
+    # Pattern 4: Property search
     search_keywords = ['show', 'find', 'looking for', 'need', 'want', 'search', 
                        'available', 'options', 'properties', 'property', 'list', 
-                       'display', 'apartment', 'flat', 'house', 'bhk']
+                       'display', 'apartment', 'flat', 'house', 'bhk', 'prop', 'props']
     if _contains_any(msg_lower, search_keywords):
         return UserIntent.SEARCH_PROPERTIES
-    
-    # Pattern 4: Comparison
-    if _has_compare_intent(msg_lower):
-        return UserIntent.COMPARE_PROPERTIES
 
     # Pattern 5: Get specific details
     detail_keywords = ['details', 'tell me more', 'about', 'info', 'specific',
@@ -620,6 +685,45 @@ def create_unified_document(record):
     content = ""
     unique_id = ""
 
+    def _project_unit_labels(project):
+        rows = list(getattr(project, 'unit_configs', []) or [])
+        if rows:
+            labels = []
+            seen = set()
+            for row in rows:
+                label = getattr(row, 'bhk_type', None)
+                if not label or label in seen:
+                    continue
+                seen.add(label)
+                labels.append(label)
+            return labels
+
+        configs = clean_json_field(getattr(project, 'configuration', ''))
+        if isinstance(configs, list):
+            labels = []
+            seen = set()
+            for item in configs:
+                if isinstance(item, dict):
+                    label = item.get('type') or item.get('bhk_type')
+                else:
+                    label = item
+                if not label or label in seen:
+                    continue
+                seen.add(label)
+                labels.append(str(label))
+            return labels
+        return [str(configs)] if configs else []
+
+    def _project_amenity_names(project):
+        rows = list(getattr(project, 'project_amenities', []) or [])
+        if rows:
+            return [row.name for row in rows if getattr(row, 'name', None)]
+
+        amenities = clean_json_field(getattr(project, 'amenities', ''))
+        if isinstance(amenities, list):
+            return [str(item) for item in amenities if item]
+        return [str(amenities)] if amenities else []
+
     if isinstance(record, Property):
         unique_id = f"prop_{record.id}"
         metadata = {
@@ -655,6 +759,8 @@ Summary: {record.intro_paragraph}
 Content: {record.content1} {record.content2}"""
 
     elif isinstance(record, BuilderProject):
+        configuration_labels = _project_unit_labels(record)
+        amenity_names = _project_amenity_names(record)
         unique_id = f"proj_{record.id}"
         metadata = {
             "id": str(record.id),
@@ -663,17 +769,16 @@ Content: {record.content1} {record.content2}"""
             "builder": record.builder_name,
             "city": record.city,
             "location": record.location,
-            "configuration": record.configuration,
+            "configuration": configuration_labels or record.configuration,
             "price": record.price_range
         }
-        amenities = clean_json_field(record.amenities)
         content = f"""Type: New Project Launch
 Name: {record.title} by {record.builder_name}
 Location: {record.location}, {record.city}
 Status: {record.status}
 Price Range: {record.price_range}
-Configuration: {record.configuration}
-Amenities: {amenities}
+Configuration: {", ".join(configuration_labels) if configuration_labels else record.configuration}
+Amenities: {", ".join(amenity_names) if amenity_names else clean_json_field(record.amenities)}
 Description: {record.description}"""
 
     elif isinstance(record, Builder):
@@ -795,11 +900,7 @@ def _extract_preferences_logic(user_message, user_id):
     if sync_prefs:
         update_user_preferences_db(user_id, sync_prefs)
 
-    llm = ChatGoogleGenerativeAI(
-        model=GEMINI_TEXT_MODEL,
-        temperature=0.0,
-        google_api_key=os.getenv("GOOGLE_API_KEY")
-    )
+    llm = _create_chat_llm(temperature=0.0, max_output_tokens=300)
     prompt = """Analyze the message for Real Estate preferences.
 Extract ONLY: location, budget, bhk, possession.
 Return valid JSON.
@@ -936,75 +1037,6 @@ def format_builder_details(builder):
     return "\n".join([p for p in parts if p])
 
 
-def compare_builders(builders):
-    """
-    Return a detailed comparison of up to 5 builders.
-    """
-    if not builders:
-        return "I need builders to compare. Could you specify which ones?"
-
-    lines = [f"Here is a detailed comparison of the top {len(builders)} builders matching your criteria:\n"]
-    
-    for i, b in enumerate(builders, 1):
-        name = getattr(b, 'company_name', getattr(b, 'brand_name', 'Unknown'))
-        est = getattr(b, 'established_year', 'N/A')
-        city = getattr(b, 'city', 'Unknown')
-        completed = getattr(b, 'completed_projects', 0)
-        ongoing = getattr(b, 'ongoing_projects', 0)
-        rera = getattr(b, 'rera_id', 'N/A')
-        desc = getattr(b, 'short_description', '') or 'No description available.'
-        
-        lines.append(f"{i}. {name}")
-        lines.append(f"   - 🏢 Established: {est}")
-        lines.append(f"   - 📍 Headquarters: {city}")
-        lines.append(f"   - 🏗 Projects: {completed} Completed | {ongoing} Ongoing")
-        lines.append(f"   - 📜 RERA ID: {rera}")
-        lines.append(f"   - 📝 Overview: {desc}")
-        lines.append("")
-
-    lines.append("Which of these builders would you like to explore further? I can show their active projects.")
-    return "\n".join(lines)
-
-
-def compare_properties(props):
-    """
-    Return a detailed comparison of up to 5 properties.
-    """
-    if not props:
-        return "I need properties to compare. Could you specify which ones?"
-
-    lines = [f"Here is a detailed comparison of the top {len(props)} properties matching your criteria:\n"]
-    
-    for i, p in enumerate(props, 1):
-        name = getattr(p, 'Property_Name', 'Unknown')
-        builder = getattr(p, 'Builder_Name', 'Unknown')
-        loc = getattr(p, 'Location', 'Unknown')
-        price = getattr(p, 'Price_Starting_From', 'Ask for Price')
-        bhk = clean_json_field(getattr(p, 'Existing_Configurations', 'Not specified'))
-        status = getattr(p, 'Project_Status', 'Not specified')
-        poss = getattr(p, 'Possession_Date', 'Not specified')
-        carpet = getattr(p, 'Carpet_Area', 'Not specified')
-        rera = getattr(p, 'RERA_ID', 'Not specified')
-        
-        # Parse amenities to show top 3
-        amenities = clean_json_field(getattr(p, 'Key_Highlights', ''))
-        top_amenities = amenities.split(',')[:3] if amenities else ["Not specified"]
-        amenities_str = ", ".join(top_amenities) + ("..." if len(top_amenities) < len(amenities.split(',')) else "")
-
-        lines.append(f"{i}. {name} by {builder}")
-        lines.append(f"   - 📍 Location: {loc}")
-        lines.append(f"   - 💰 Price: {price}")
-        lines.append(f"   - 🏠 Config: {bhk}")
-        lines.append(f"   - 🏗 Status: {status} (Possession: {poss})")
-        lines.append(f"   - 📏 Carpet Area: {carpet}")
-        lines.append(f"   - ✨ Highlights: {amenities_str}")
-        lines.append(f"   - 📜 RERA: {rera}")
-        lines.append("")
-
-    lines.append("Which of these would you like to explore further? I can schedule a visit or provide brochure details.")
-    return "\n".join(lines)
-
-
 def _format_budget_label(user_budget):
     if user_budget in (None, ""):
         return None
@@ -1018,7 +1050,34 @@ def _format_budget_label(user_budget):
     return f"{round(value * 100):g} L"
 
 
-def summarize_property_search_results(props, location=None, budget=None, bhk=None):
+def _is_direct_listing_query(user_query, target="property"):
+    text = _normalize_for_match(user_query)
+    if not text:
+        return False
+
+    tokens = [token for token in text.split() if token]
+    if len(tokens) > 6:
+        return False
+
+    common_tokens = {
+        'show', 'find', 'list', 'search', 'in', 'at', 'near', 'me', 'all',
+        'available', 'with', 'under', 'below', 'upto'
+    }
+    property_tokens = {'prop', 'props', 'property', 'properties', 'project', 'projects', 'flat', 'flats', 'home', 'homes', 'apartment', 'apartments', 'bhk'}
+    builder_tokens = {'builder', 'builders', 'developer', 'developers'}
+
+    target_tokens = property_tokens if target == "property" else builder_tokens
+    if not any(token in target_tokens for token in tokens):
+        return False
+
+    question_tokens = {'why', 'how', 'which', 'better', 'best', 'compare', 'difference', 'details', 'about', 'tell', 'explain'}
+    if any(token in question_tokens for token in tokens):
+        return False
+
+    return True
+
+
+def summarize_property_search_results(props, location=None, budget=None, bhk=None, user_query=None):
     if not props:
         filters = []
         if bhk:
@@ -1028,6 +1087,11 @@ def summarize_property_search_results(props, location=None, budget=None, bhk=Non
         if budget:
             filters.append(f"within {_format_budget_label(budget)}")
 
+        if _is_direct_listing_query(user_query, target="property"):
+            if filters:
+                return "No properties found " + " ".join(filters) + "."
+            return "No matching properties found."
+
         if filters:
             return (
                 "I couldn't find matching properties "
@@ -1035,6 +1099,17 @@ def summarize_property_search_results(props, location=None, budget=None, bhk=Non
                 + ". Try relaxing the budget, BHK, or location filters."
             )
         return "I couldn't find matching properties for that query. Try adding a location, budget, or BHK."
+
+    if _is_direct_listing_query(user_query, target="property"):
+        parts = [f"Showing {len(props)}"]
+        if bhk:
+            parts.append(f"{bhk} BHK")
+        parts.append("properties")
+        if location:
+            parts.append(f"in {str(location).title()}")
+        if budget:
+            parts.append(f"within {_format_budget_label(budget)}")
+        return " ".join(parts) + "."
 
     scope = []
     if bhk:
@@ -1059,11 +1134,21 @@ def summarize_property_search_results(props, location=None, budget=None, bhk=Non
     return " ".join(response)
 
 
-def summarize_builder_search_results(builders, location=None):
+def summarize_builder_search_results(builders, location=None, user_query=None):
     if not builders:
+        if _is_direct_listing_query(user_query, target="builder"):
+            if location:
+                return f"No builders found in {str(location).title()}."
+            return "No matching builders found."
+
         if location:
             return f"I couldn't find matching builders in {str(location).title()} for that query. Try another city or area."
         return "I couldn't find matching builders for that query. Try adding a builder name or location."
+
+    if _is_direct_listing_query(user_query, target="builder"):
+        if location:
+            return f"Showing {len(builders)} builders in {str(location).title()}."
+        return f"Showing {len(builders)} builders."
 
     location_label = f" in {str(location).title()}" if location else ""
     top_names = [
@@ -1085,6 +1170,302 @@ def summarize_builder_search_results(builders, location=None):
         lines.append(f"{top_names[0]} stands out with {strongest_projects} projects.")
     lines.append("I’m loading the most relevant builder cards below, and I can compare any two if you want.")
     return "\n".join(lines)
+
+
+def compare_builders(builders):
+    """
+    Return a concise comparison intro for up to 5 builders.
+    The frontend renders the point-wise comparison table.
+    """
+    builders = [b for b in (builders or []) if b][:5]
+    if not builders:
+        return "I need builders to compare. Could you specify which ones?"
+    if len(builders) < 2:
+        return "I found only one builder to compare. Share another builder name or ask for builders in a city."
+
+    if len(builders) >= 5:
+        return (
+            "I compared the top 5 best-fit builders point by point. "
+            "The table below lines up their experience, location coverage, project counts, "
+            "RERA status, and verification."
+        )
+
+    return (
+        f"I compared {len(builders)} builders point by point. "
+        "The table below highlights their experience, footprint, project counts, "
+        "RERA status, and verification."
+    )
+
+
+def compare_properties(props):
+    """
+    Return a concise comparison intro for up to 5 properties.
+    The frontend renders the point-wise comparison table.
+    """
+    props = [p for p in (props or []) if p][:5]
+    if not props:
+        return "I need properties to compare. Could you specify which ones?"
+    if len(props) < 2:
+        return "I found only one property to compare. Share another property name or refine the query."
+
+    if len(props) >= 5:
+        return (
+            "I compared the top 5 best-fit properties point by point. "
+            "The table below covers builder, location, starting price, configuration, "
+            "status, possession, carpet area, highlights, and RERA."
+        )
+
+    return (
+        f"I compared {len(props)} properties point by point. "
+        "The table below covers builder, location, starting price, configuration, "
+        "status, possession, carpet area, highlights, and RERA."
+    )
+
+
+def _property_matches_filters(prop, location=None, bhk=None, budget=None):
+    if not prop:
+        return False
+
+    if location and not _matches_location([prop.Location, prop.Address], location):
+        return False
+
+    if bhk:
+        config_text = _normalize_for_match(clean_json_field(getattr(prop, 'Existing_Configurations', '')))
+        target = _normalize_for_match(str(bhk).replace('BHK', '').strip())
+        if target and target not in config_text and f"{target} bhk" not in config_text:
+            return False
+
+    if budget:
+        try:
+            price_value = SmartFilter.parse_price(getattr(prop, 'Price_Starting_From', None))
+            if price_value and price_value > float(budget) * 1.25:
+                return False
+        except Exception:
+            pass
+
+    return True
+
+
+def _merge_unique_records(primary_records, secondary_records=None, key_func=None, limit=20):
+    secondary_records = secondary_records or []
+    key_func = key_func or (lambda item: getattr(item, 'id', None))
+
+    merged = []
+    seen = set()
+    for record in list(primary_records or []) + list(secondary_records or []):
+        if not record:
+            continue
+        key = key_func(record)
+        if key in (None, "") or key in seen:
+            continue
+        seen.add(key)
+        merged.append(record)
+        if len(merged) >= limit:
+            break
+    return merged
+
+
+def _clean_compare_segment(segment, location=None, bhk=None):
+    text = _normalize_for_match(segment)
+    if not text:
+        return ""
+
+    text = re.sub(
+        r"\b(compare|comparing|comparison|between|versus|vs|with|please|show|tell|me|which|one|is|better|best)\b",
+        " ",
+        text,
+    )
+    text = re.sub(
+        r"\b(property|properties|project|projects|builder|builders|developer|developers)\b",
+        " ",
+        text,
+    )
+
+    if location:
+        loc = _normalize_for_match(location)
+        if loc:
+            text = re.sub(rf"\b(?:in|at|near)\s+{re.escape(loc)}\b", " ", text)
+            text = re.sub(rf"\b{re.escape(loc)}\b", " ", text)
+
+    if bhk:
+        bhk_text = _normalize_for_match(str(bhk))
+        if bhk_text:
+            text = re.sub(rf"\b{re.escape(bhk_text)}\s*bhk\b", " ", text)
+            text = re.sub(rf"\b{re.escape(bhk_text)}\b", " ", text)
+
+    text = re.sub(
+        r"\b(?:under|below|max|upto)\s+\d+(?:\.\d+)?\s*(?:cr|crore|lakh|lac|l|k)\b",
+        " ",
+        text,
+    )
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _extract_compare_segments(user_query, location=None, bhk=None):
+    original = str(user_query or "")
+    if not original.strip():
+        return []
+
+    quoted_segments = [
+        _clean_compare_segment(match[0] or match[1], location=location, bhk=bhk)
+        for match in re.findall(r'"([^"]+)"|\'([^\']+)\'', original)
+    ]
+    quoted_segments = [segment for segment in quoted_segments if segment]
+    if len(quoted_segments) >= 2:
+        return quoted_segments[:5]
+
+    working = _normalize_for_match(original)
+    if " between " in working:
+        working = working.split(" between ", 1)[1]
+        working = re.sub(r"\band\b", "|", working)
+    elif " compare " in f" {working} ":
+        working = re.split(r"\bcompare\b", working, maxsplit=1)[-1]
+
+    working = re.sub(r"\bversus\b|\bvs\b|&", "|", working)
+    working = re.sub(r"\s*,\s*", "|", working)
+    if "|" not in working and " and " in working:
+        working = working.replace(" and ", "|")
+
+    segments = []
+    seen = set()
+    for part in working.split("|"):
+        cleaned = _clean_compare_segment(part, location=location, bhk=bhk)
+        if not cleaned or cleaned in seen:
+            continue
+        seen.add(cleaned)
+        segments.append(cleaned)
+
+    return segments[:5]
+
+
+def _score_phrase_against_aliases(phrase, aliases):
+    phrase_norm = _normalize_for_match(phrase)
+    if not phrase_norm:
+        return 0
+
+    phrase_tokens = [token for token in phrase_norm.split() if len(token) > 1]
+    best_score = 0
+
+    for alias in aliases:
+        alias_norm = _normalize_for_match(alias)
+        if not alias_norm:
+            continue
+
+        alias_tokens = [token for token in alias_norm.split() if len(token) > 1]
+        token_overlap = sum(1 for token in phrase_tokens if token in alias_tokens)
+        score = 0
+
+        if phrase_norm == alias_norm:
+            score = 150 + len(alias_tokens)
+        elif phrase_norm in alias_norm or alias_norm in phrase_norm:
+            score = 120 + min(len(alias_norm), len(phrase_norm))
+        elif phrase_tokens and all(token in alias_tokens for token in phrase_tokens):
+            score = 95 + (token_overlap * 8)
+        elif token_overlap >= 2:
+            score = 70 + (token_overlap * 8)
+        elif token_overlap == 1 and len(phrase_tokens) == 1 and len(phrase_norm) >= 5:
+            score = 55 + len(phrase_norm)
+
+        if score > best_score:
+            best_score = score
+
+    return best_score
+
+
+def _resolve_specific_builder_candidates(user_query, location=None, limit=5):
+    builders = Builder.query.all()
+    if not builders:
+        return [], []
+
+    segments = _extract_compare_segments(user_query, location=location)
+    if not segments:
+        return [], []
+
+    resolved = []
+    used_ids = set()
+
+    for segment in segments:
+        best_builder = None
+        best_score = 0
+        for builder in builders:
+            builder_id = getattr(builder, 'rera_id', None)
+            if not builder_id or builder_id in used_ids:
+                continue
+
+            aliases = [
+                getattr(builder, 'company_name', ''),
+                getattr(builder, 'brand_name', ''),
+            ]
+            score = _score_phrase_against_aliases(segment, aliases)
+            if score > best_score:
+                best_score = score
+                best_builder = builder
+
+        if best_builder and best_score >= 60:
+            used_ids.add(best_builder.rera_id)
+            resolved.append(best_builder)
+            if len(resolved) >= limit:
+                break
+
+    return segments, resolved
+
+
+def _resolve_specific_property_candidates(user_query, location=None, bhk=None, limit=5):
+    properties = Property.query.all()
+    if not properties:
+        return [], []
+
+    segments = _extract_compare_segments(user_query, location=location, bhk=bhk)
+    if not segments:
+        return [], []
+
+    resolved = []
+    used_ids = set()
+
+    for segment in segments:
+        best_property = None
+        best_score = 0
+        for prop in properties:
+            prop_id = getattr(prop, 'id', None)
+            if not prop_id or prop_id in used_ids:
+                continue
+
+            aliases = [
+                getattr(prop, 'Property_Name', ''),
+                f"{getattr(prop, 'Property_Name', '')} {getattr(prop, 'Builder_Name', '')}".strip(),
+            ]
+            score = _score_phrase_against_aliases(segment, aliases)
+            if score > best_score:
+                best_score = score
+                best_property = prop
+
+        if best_property and best_score >= 60:
+            used_ids.add(best_property.id)
+            resolved.append(best_property)
+            if len(resolved) >= limit:
+                break
+
+    return segments, resolved
+
+
+def _infer_compare_target(user_query, last_intent=None, last_result_type=None):
+    msg_lower = (user_query or "").lower()
+
+    if any(token in msg_lower for token in ['builder', 'builders', 'developer', 'developers', 'construction']):
+        return 'builder'
+    if any(token in msg_lower for token in ['property', 'properties', 'project', 'projects', 'apartment', 'flat', 'home', 'homes']):
+        return 'property'
+
+    if last_result_type in ['builder', 'property']:
+        return last_result_type
+
+    if last_intent == UserIntent.SEARCH_BUILDERS.value:
+        return 'builder'
+    if last_intent in [UserIntent.SEARCH_PROPERTIES.value, UserIntent.COMPARE_PROPERTIES.value]:
+        return 'property'
+
+    return 'property'
 
 
 def _search_builders_from_vector(user_query, location=None, limit=20, search_k=25, fetch_k=50):
@@ -1161,19 +1542,25 @@ def _search_builders_from_db(user_query, location=None, limit=10):
         normalized = " ".join(_normalize_for_match(value) for value in haystacks if value)
 
         score = 0
+        matched_location = False
+        matched_query = False
         if location_text and _matches_location(
             [builder.city, builder.location, builder.corporate_address],
             location_text,
         ):
             score += 6
+            matched_location = True
 
         if query_tokens:
             for token in query_tokens:
                 if token in normalized:
                     score += 4
+                    matched_query = True
 
         if not query_tokens and not location_text:
             score += 2
+        elif not matched_query and not matched_location:
+            continue
 
         score += min(int(getattr(builder, 'completed_projects', 0) or 0), 100) / 20
         score += min(int(getattr(builder, 'ongoing_projects', 0) or 0), 50) / 25
@@ -1201,6 +1588,138 @@ def _search_builders_from_db(user_query, location=None, limit=10):
             continue
         seen.add(bid)
         results.append(builder)
+        if len(results) >= limit:
+            break
+
+    return results
+
+
+def _search_properties_from_vector(user_query, location=None, bhk=None, budget=None, limit=20, search_k=25, fetch_k=50):
+    try:
+        retriever = vectorstore.as_retriever(
+            search_type="mmr",
+            search_kwargs={"k": search_k, "fetch_k": fetch_k, "lambda_mult": 0.7},
+        )
+        docs = retriever.get_relevant_documents(user_query)
+    except Exception as e:
+        print(f"Property vector search error: {e}")
+        return []
+
+    results = []
+    seen = set()
+    for doc in docs:
+        if doc.metadata.get('type') != 'property':
+            continue
+
+        prop_id = doc.metadata.get('id')
+        if not prop_id:
+            continue
+
+        try:
+            prop = Property.query.get(int(prop_id))
+        except (TypeError, ValueError):
+            prop = None
+
+        if not prop or prop.id in seen:
+            continue
+        if not _property_matches_filters(prop, location=location, bhk=bhk, budget=budget):
+            continue
+
+        seen.add(prop.id)
+        results.append(prop)
+        if len(results) >= limit:
+            break
+
+    return results
+
+
+def _search_properties_from_db(user_query, location=None, bhk=None, budget=None, limit=20):
+    query_text = (user_query or "").strip().lower()
+    location_text = (location or "").strip()
+
+    properties = Property.query.all()
+    if not properties:
+        return []
+
+    query_tokens = [
+        token for token in re.findall(r"[a-z0-9]+", query_text)
+        if len(token) > 2 and not token.isdigit() and token not in {
+            'show', 'find', 'property', 'properties', 'project', 'projects', 'compare',
+            'difference', 'versus', 'better', 'between', 'builder', 'builders',
+            'developer', 'developers', 'flat', 'flats', 'home', 'homes',
+            'apartment', 'apartments', 'bhk', 'under', 'below', 'near', 'best',
+            'top', 'available', 'options', 'list', 'display', 'me', 'in', 'at', 'for'
+        }
+    ]
+
+    scored = []
+    for prop in properties:
+        if not _property_matches_filters(prop, location=location, bhk=bhk, budget=budget):
+            continue
+
+        haystacks = [
+            getattr(prop, 'Property_Name', ''),
+            getattr(prop, 'Builder_Name', ''),
+            getattr(prop, 'Location', ''),
+            getattr(prop, 'Address', ''),
+            clean_json_field(getattr(prop, 'Highlights', '')),
+            clean_json_field(getattr(prop, 'Key_Highlights', '')),
+            clean_json_field(getattr(prop, 'Existing_Configurations', '')),
+            getattr(prop, 'Project_Status', ''),
+        ]
+        normalized = " ".join(_normalize_for_match(value) for value in haystacks if value)
+
+        score = 0
+        matched_location = False
+        matched_query = False
+
+        if location_text and _matches_location([prop.Location, prop.Address], location_text):
+            score += 6
+            matched_location = True
+
+        if bhk:
+            score += 4
+
+        if budget:
+            try:
+                price_value = SmartFilter.parse_price(getattr(prop, 'Price_Starting_From', None))
+                if price_value:
+                    if price_value <= float(budget):
+                        score += 4
+                    else:
+                        score += 1
+            except Exception:
+                pass
+
+        if query_tokens:
+            for token in query_tokens:
+                if token in normalized:
+                    score += 3
+                    matched_query = True
+
+        if not query_tokens and not location_text and not bhk and not budget:
+            score += 1
+        elif not matched_query and not matched_location and not bhk and not budget:
+            continue
+
+        scored.append((score, prop))
+
+    scored.sort(
+        key=lambda item: (
+            -item[0],
+            SmartFilter.parse_price(getattr(item[1], 'Price_Starting_From', None)) or float('inf'),
+            getattr(item[1], 'Property_Name', '') or '',
+        )
+    )
+
+    results = []
+    seen = set()
+    for _, prop in scored:
+        pid = getattr(prop, 'id', None)
+        if pid in seen or pid is None:
+            continue
+        seen.add(pid)
+        results.append(prop)
         if len(results) >= limit:
             break
 
@@ -1239,7 +1758,7 @@ def _get_memory_property_candidates(conversation_memory, limit=5):
 # ENHANCED MAIN CHATBOT RESPONSE
 # ============================================
 
-def get_chatbot_response(user_query, user_id=None, chat_history=[], session_shown_ids=None, conversation_memory=None, last_intent=None):
+def get_chatbot_response(user_query, user_id=None, chat_history=[], session_shown_ids=None, conversation_memory=None, last_intent=None, last_result_type=None):
     """
     Enhanced chatbot with intent-based responses
     Returns: (response_text, shown_ids, all_properties, all_builders, intent, buffered_responses)
@@ -1284,7 +1803,7 @@ Our team is available to assist you with any questions or schedule property visi
                 small_docs = small_retriever.get_relevant_documents(user_query)
             except Exception:
                 # Fall back to calling retriever via the QA chain if direct method isn't available
-                llm_tmp = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, max_output_tokens=500, google_api_key=os.getenv("GOOGLE_API_KEY"), convert_system_message_to_human=True)
+                llm_tmp = _create_chat_llm(temperature=0.2, max_output_tokens=500)
                 tmp_retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 8, "fetch_k": 40, "lambda_mult": 0.7})
                 tmp_chain = ConversationalRetrievalChain.from_llm(llm=llm_tmp, retriever=tmp_retriever, condense_question_prompt=PromptTemplate.from_template("Q:{question}\nStandalone:"), combine_docs_chain_kwargs={"prompt": PromptTemplate.from_template("Context: {context}\nQuestion: {question}\n" )}, return_source_documents=True)
                 tmp_res = tmp_chain.invoke({"question": user_query, "chat_history": chat_history})
@@ -1320,7 +1839,7 @@ Our team is available to assist you with any questions or schedule property visi
             # If we didn't find a direct DB item, ask the LLM for a detailed answer using retrieved context
             try:
                 small_ctx = "\n\n---\n\n".join([d.page_content for d in small_docs[:6]])
-                llm_detailed = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2, max_output_tokens=800, google_api_key=os.getenv("GOOGLE_API_KEY"), convert_system_message_to_human=True)
+                llm_detailed = _create_chat_llm(temperature=0.2, max_output_tokens=800)
                 detailed_prompt = f"You are an expert real estate assistant. Using ONLY the context provided, answer the question in a detailed, factual manner (5-8 sentences). Do not invent facts.\n\nContext:\n{small_ctx}\n\nQuestion: {user_query}\n\nDetailed answer:"
                 res = llm_detailed.invoke(detailed_prompt)
                 answer = getattr(res, 'content', '')
@@ -1336,140 +1855,169 @@ Our team is available to assist you with any questions or schedule property visi
     # Enhanced Comparison Handler
     if intent == UserIntent.COMPARE_PROPERTIES:
         try:
-            # Detect if user wants to compare BUILDERS
-            is_builder_compare = any(k in user_query.lower() for k in ['builder', 'developer', 'construction'])
-            
-            if is_builder_compare:
-                # 1. Try to fetch specific builders first
-                comp_retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 5, "fetch_k": 20})
-                try:
-                    comp_docs = comp_retriever.get_relevant_documents(user_query)
-                except Exception:
-                    comp_docs = []
-                
-                specific_builders = []
-                for d in comp_docs:
-                    if d.metadata.get('type') == 'builder':
-                        bid = d.metadata.get('id')
-                        if bid:
-                            b = Builder.query.get(bid)
-                            if b and b.rera_id not in [sb.rera_id for sb in specific_builders]:
-                                specific_builders.append(b)
-                
-                if len(specific_builders) >= 2:
-                    comparison = compare_builders(specific_builders)
-                    for b in specific_builders:
-                        session_shown_ids.add(str(b.rera_id))
-                    return comparison, session_shown_ids, [], specific_builders, intent.value, []
-
-                # 2. General / City-Based Builder Comparison
-                prefs = conversation_memory.get_current_preferences() if conversation_memory else {}
-                city_pref = prefs.get('location')  # Utilizing location as city for builders
-                
-                if not city_pref:
-                    return "Which city's builders would you like to compare? (e.g. 'Compare builders in Mumbai')", session_shown_ids, [], [], intent.value, []
-
-                # Search builders in DB
-                candidates = Builder.query.filter(
-                    (Builder.city.ilike(f'%{city_pref}%')) | 
-                    (Builder.location.ilike(f'%{city_pref}%'))
-                ).all()
-                
-                # Sort by reputation (completed projects desc)
-                candidates.sort(key=lambda x: (x.completed_projects or 0), reverse=True)
-                top_5 = candidates[:5]
-                
-                if top_5:
-                    comparison = compare_builders(top_5)
-                    for b in top_5:
-                        session_shown_ids.add(str(b.rera_id))
-                    if user_id: extract_and_save_preferences(user_query, user_id)
-                    return comparison, session_shown_ids, [], top_5, intent.value, []
-                else:
-                     return f"I couldn't find any top builders in {city_pref}. Would you like to search in another city?", session_shown_ids, [], [], intent.value, []
-
-            # PROPERTY COMPARISON LOGIC (Default)
-            
-            # 1. specific properties check...
-            comp_retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 5, "fetch_k": 20})
-            try:
-                comp_docs = comp_retriever.get_relevant_documents(user_query)
-            except Exception:
-                comp_docs = []
-
-            specific_props = []
-            for d in comp_docs:
-                if d.metadata.get('type') == 'property':
-                    p_name = d.metadata.get('name', '').lower()
-                    # Naively check if property name is part of the query
-                    if p_name and p_name in user_query.lower():
-                        pid = d.metadata.get('id')
-                        if pid:
-                            p = Property.query.get(int(pid))
-                            if p and p.id not in [x.id for x in specific_props]:
-                                specific_props.append(p)
-
-            if len(specific_props) >= 2:
-                comparison = compare_properties(specific_props)
-                for p in specific_props:
-                    session_shown_ids.add(str(p.id))
-                return comparison, session_shown_ids, specific_props, [], intent.value, []
-
-            # 2. General / Location-Based Comparison
-            params = sync_extract_params(user_query)
-            
-            # Merge with memory
             mem_prefs = conversation_memory.get_current_preferences() if conversation_memory else {}
-            
             loc = params.get('location') or mem_prefs.get('location')
             budget = params.get('budget') or mem_prefs.get('budget')
             bhk = params.get('bhk') or mem_prefs.get('bhk')
+            compare_target = _infer_compare_target(
+                user_query,
+                last_intent=last_intent,
+                last_result_type=last_result_type,
+            )
+            explicit_builder_segments, explicit_builder_matches = _resolve_specific_builder_candidates(
+                user_query,
+                location=loc,
+                limit=5,
+            )
+            explicit_property_segments, explicit_property_matches = _resolve_specific_property_candidates(
+                user_query,
+                location=loc,
+                bhk=bhk,
+                limit=5,
+            )
 
-            # Force follow-up if ANY key preference is missing (Location is mandatory, plus budget OR bhk)
-            if not loc:
-                 return "To compare the best properties, I need to know the Location. Which area are you interested in?", session_shown_ids, [], [], intent.value, []
+            if compare_target == 'property' and len(explicit_builder_matches) >= 2 and len(explicit_property_matches) < 2:
+                compare_target = 'builder'
+            elif compare_target == 'builder' and len(explicit_property_matches) >= 2 and len(explicit_builder_matches) < 2:
+                compare_target = 'property'
 
-            if not budget and not bhk:
-                 return f"I can find properties in {loc}, but to give you a meaningful comparison, could you tell me your Budget range or preferred BHK?", session_shown_ids, [], [], intent.value, []
-            
-            # Search DB with filters
-            candidates = Property.query.filter(Property.Location.ilike(f'%{loc}%')).all()
-            
-            filtered = []
-            for p in candidates:
-                # Budget filter (Heavy check: Only show if strictly within or close to budget)
-                if budget:
-                    p_price = SmartFilter.parse_price(p.Price_Starting_From)
-                    if p_price > float(budget) * 1.25: # 25% buffer
-                         continue
-                
-                # BHK filter (Strict check)
-                if bhk:
-                    target = str(bhk).strip()
-                    if target not in str(p.Existing_Configurations):
-                        continue
-                
-                filtered.append(p)
-            
-            # Sort by price ascending
-            filtered.sort(key=lambda x: SmartFilter.parse_price(x.Price_Starting_From))
-            
-            top_5 = filtered[:5]
-            
-            if top_5:
-                search_summary = summarize_property_search_results(
-                    top_5,
-                    location=loc,
-                    budget=budget,
-                    bhk=bhk,
+            if compare_target == 'builder':
+                explicit_builder_mode = len(explicit_builder_segments) >= 2 and len(explicit_builder_matches) > 0
+                if len(explicit_builder_matches) >= 2:
+                    comparison = compare_builders(explicit_builder_matches)
+                    for builder in explicit_builder_matches:
+                        session_shown_ids.add(str(builder.rera_id))
+                    if user_id:
+                        extract_and_save_preferences(user_query, user_id)
+                    return comparison, session_shown_ids, [], explicit_builder_matches, intent.value, []
+
+                if explicit_builder_mode:
+                    return (
+                        "I matched only one of the builder names you asked to compare. Please share the exact second builder name and I'll compare only those builders.",
+                        session_shown_ids,
+                        [],
+                        explicit_builder_matches,
+                        intent.value,
+                        [],
+                    )
+
+                builder_candidates = _merge_unique_records(
+                    _search_builders_from_db(user_query, location=loc, limit=10),
+                    _search_builders_from_vector(user_query, location=loc, limit=10, search_k=10, fetch_k=30),
+                    key_func=lambda builder: getattr(builder, 'rera_id', None),
+                    limit=5,
                 )
-                for p in top_5:
-                    session_shown_ids.add(str(p.id))
-                
-                if user_id: extract_and_save_preferences(user_query, user_id)
-                return search_summary, session_shown_ids, top_5, [], intent.value, []
-            else:
-                return f"I found properties in {loc}, but none matched your exact Budget/BHK criteria. Would you like to throw a wider net?", session_shown_ids, [], [], intent.value, []
+
+                if len(builder_candidates) >= 2:
+                    comparison = compare_builders(builder_candidates)
+                    for builder in builder_candidates:
+                        session_shown_ids.add(str(builder.rera_id))
+                    if user_id:
+                        extract_and_save_preferences(user_query, user_id)
+                    return comparison, session_shown_ids, [], builder_candidates, intent.value, []
+
+                if len(builder_candidates) == 1:
+                    return (
+                        "I found only one clear builder match. Add another builder name or city and I'll compare them side by side.",
+                        session_shown_ids,
+                        [],
+                        builder_candidates,
+                        intent.value,
+                        [],
+                    )
+
+                if loc:
+                    return (
+                        f"I couldn't find enough builders to compare in {str(loc).title()}. Try another city or mention builder names.",
+                        session_shown_ids,
+                        [],
+                        [],
+                        intent.value,
+                        [],
+                    )
+
+                return (
+                    "Tell me which builders or city you want compared, and I'll line up the top 5 best fits.",
+                    session_shown_ids,
+                    [],
+                    [],
+                    intent.value,
+                    [],
+                )
+
+            explicit_property_mode = len(explicit_property_segments) >= 2 and len(explicit_property_matches) > 0
+            if len(explicit_property_matches) >= 2:
+                comparison = compare_properties(explicit_property_matches)
+                for prop in explicit_property_matches:
+                    session_shown_ids.add(str(prop.id))
+                if user_id:
+                    extract_and_save_preferences(user_query, user_id)
+                return comparison, session_shown_ids, explicit_property_matches, [], intent.value, []
+
+            if explicit_property_mode:
+                return (
+                    "I matched only one of the property names you asked to compare. Please share the exact second property name and I'll compare only those properties.",
+                    session_shown_ids,
+                    explicit_property_matches,
+                    [],
+                    intent.value,
+                    [],
+                )
+
+            strict_candidates = _merge_unique_records(
+                _search_properties_from_db(user_query, location=loc, bhk=bhk, budget=budget, limit=10),
+                _search_properties_from_vector(user_query, location=loc, bhk=bhk, budget=budget, limit=10, search_k=10, fetch_k=30),
+                key_func=lambda prop: getattr(prop, 'id', None),
+                limit=5,
+            )
+
+            relaxed_candidates = []
+            if len(strict_candidates) < 2:
+                relaxed_candidates = _merge_unique_records(
+                    _search_properties_from_db(user_query, location=loc, bhk=bhk, budget=None, limit=10),
+                    _search_properties_from_vector(user_query, location=loc, bhk=bhk, budget=None, limit=10, search_k=10, fetch_k=30),
+                    key_func=lambda prop: getattr(prop, 'id', None),
+                    limit=5,
+                )
+
+            top_5 = strict_candidates if len(strict_candidates) >= 2 else relaxed_candidates
+
+            if len(top_5) >= 2:
+                comparison = compare_properties(top_5)
+                for prop in top_5:
+                    session_shown_ids.add(str(prop.id))
+                if user_id:
+                    extract_and_save_preferences(user_query, user_id)
+                return comparison, session_shown_ids, top_5, [], intent.value, []
+
+            if len(top_5) == 1:
+                return (
+                    "I found only one clear property match. Share another property name, location, budget, or BHK and I'll compare them properly.",
+                    session_shown_ids,
+                    top_5,
+                    [],
+                    intent.value,
+                    [],
+                )
+
+            if loc:
+                return (
+                    f"I couldn't find enough properties to compare in {str(loc).title()}. Try widening the budget, BHK, or area.",
+                    session_shown_ids,
+                    [],
+                    [],
+                    intent.value,
+                    [],
+                )
+
+            return (
+                "Tell me which properties or area you want compared, and I'll bring back the top 5 best fits.",
+                session_shown_ids,
+                [],
+                [],
+                intent.value,
+                [],
+            )
 
         except Exception as e:
             print(f"COMPARE handler error: {e}")
@@ -1479,6 +2027,7 @@ Our team is available to assist you with any questions or schedule property visi
         search_k = 25
         fetch_k = 50
         filter_type = "builder"
+        loc = None
         try:
             mem_prefs = conversation_memory.get_current_preferences() if conversation_memory else {}
             loc = params.get('location') or mem_prefs.get('location')
@@ -1499,7 +2048,7 @@ Our team is available to assist you with any questions or schedule property visi
                     extract_and_save_preferences(user_query, user_id)
 
                 return (
-                    summarize_builder_search_results(builders_from_vector, location=loc),
+                    summarize_builder_search_results(builders_from_vector, location=loc, user_query=user_query),
                     session_shown_ids,
                     [],
                     builders_from_vector,
@@ -1518,67 +2067,108 @@ Our team is available to assist you with any questions or schedule property visi
                     extract_and_save_preferences(user_query, user_id)
 
                 return (
-                    summarize_builder_search_results(builders_from_db, location=loc),
+                    summarize_builder_search_results(builders_from_db, location=loc, user_query=user_query),
                     session_shown_ids,
                     [],
                     builders_from_db,
                     intent.value,
                     generate_buffered_responses([], builders_from_db, intent.value),
                 )
+
+            return (
+                summarize_builder_search_results([], location=loc, user_query=user_query),
+                session_shown_ids,
+                [],
+                [],
+                intent.value,
+                [],
+            )
         except Exception as e:
             print(f"Builder DB fallback error: {e}")
+            return (
+                summarize_builder_search_results([], location=loc, user_query=user_query),
+                session_shown_ids,
+                [],
+                [],
+                intent.value,
+                [],
+            )
     elif intent == UserIntent.SEARCH_PROPERTIES:
         search_k = 25
         fetch_k = 50
         filter_type = "property"
-        
-        # EXPERIMENTAL: If search properties AND we have location/criteria, try DB fetch and detailed text response
-        # This handles user request for "text response with details" even for search
+        loc = None
+        bhk = None
+        budget = None
+
+        # Fast path: direct search + deterministic summary so common property
+        # lookups do not need an LLM round-trip.
         try:
-             # Use current params OR memory
              mem_prefs = conversation_memory.get_current_preferences() if conversation_memory else {}
              loc = params.get('location') or mem_prefs.get('location')
              bhk = params.get('bhk') or mem_prefs.get('bhk')
              budget = params.get('budget') or mem_prefs.get('budget')
-             
-             # If we have ANY specific filter (Loc, BHK, Budget), try to do a detailed search
-             if loc or bhk or budget:
-                 # Start query
-                 query = Property.query
-                 if loc:
-                     query = query.filter(Property.Location.ilike(f'%{loc}%'))
-                     
-                 candidates = query.all()
-                 
-                 # Apply filters
-                 filtered = []
-                 for p in candidates:
-                    if budget:
-                        p_price = SmartFilter.parse_price(p.Price_Starting_From)
-                        if p_price > float(budget) * 1.25: 
-                             continue
-                    if bhk:
-                        target = str(bhk).strip()
-                        if target not in str(p.Existing_Configurations):
-                            continue
-                    filtered.append(p)
-                 
-                 candidates = filtered[:6] # Top 6
-                 
-                 if candidates:
-                     search_summary = summarize_property_search_results(
-                         candidates,
-                         location=loc,
-                         budget=budget,
-                         bhk=bhk,
-                     )
-                     for p in candidates:
-                         session_shown_ids.add(str(p.id))
-                     
-                     if user_id: extract_and_save_preferences(user_query, user_id)
-                     return search_summary, session_shown_ids, candidates, [], intent.value, []
+
+             candidates = _merge_unique_records(
+                 _search_properties_from_db(user_query, location=loc, bhk=bhk, budget=budget, limit=20),
+                 _search_properties_from_vector(user_query, location=loc, bhk=bhk, budget=budget, limit=20, search_k=search_k, fetch_k=fetch_k),
+                 key_func=lambda prop: getattr(prop, 'id', None),
+                 limit=20,
+             )
+
+             if candidates:
+                 search_summary = summarize_property_search_results(
+                     candidates,
+                     location=loc,
+                     budget=budget,
+                     bhk=bhk,
+                     user_query=user_query,
+                 )
+                 for prop in candidates[:10]:
+                     session_shown_ids.add(str(prop.id))
+
+                 if user_id:
+                     extract_and_save_preferences(user_query, user_id)
+
+                 return (
+                     search_summary,
+                     session_shown_ids,
+                     candidates,
+                     [],
+                     intent.value,
+                     generate_buffered_responses(candidates, [], intent.value),
+                 )
+
+             return (
+                 summarize_property_search_results(
+                     [],
+                     location=loc,
+                     budget=budget,
+                     bhk=bhk,
+                     user_query=user_query,
+                 ),
+                 session_shown_ids,
+                 [],
+                 [],
+                 intent.value,
+                 [],
+             )
         except Exception as e:
              print(f"Search fallback error: {e}")
+             return (
+                 summarize_property_search_results(
+                     [],
+                     location=loc,
+                     budget=budget,
+                     bhk=bhk,
+                     user_query=user_query,
+                 ),
+                 session_shown_ids,
+                 [],
+                 [],
+                 intent.value,
+                 [],
+             )
 
     elif intent == UserIntent.COMPARE_PROPERTIES:
         # Fallback if DB logic fails
@@ -1727,13 +2317,7 @@ Response (4-6 lines, no formatting):"""
     ANSWER_PROMPT = PromptTemplate(template=answer_template, input_variables=["context", "question"])
 
     # --- SETUP LLM ---
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        temperature=0.4,
-        max_output_tokens=700,
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
-        convert_system_message_to_human=True
-    )
+    llm = _create_chat_llm(temperature=0.4, max_output_tokens=700)
     
     retriever = vectorstore.as_retriever(
         search_type="mmr",

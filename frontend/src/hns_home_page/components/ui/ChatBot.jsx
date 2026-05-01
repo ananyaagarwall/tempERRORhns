@@ -140,13 +140,13 @@ const ChatBot = () => {
                         text: `Here is the builder I found for "${builderName}":`,
                         sender: 'bot',
                         timestamp: new Date(),
-                        builders: [fetchedBuilder],
-                        suggestions: [
-                            { text: "Search more builders", action: "find_builders" },
-                            { text: "View builder projects", action: `view_builder_projects_${fetchedBuilder['rer-id']}` }
-                        ],
-                        isTypingEffect: true
-                    };
+	                        builders: [fetchedBuilder],
+	                        suggestions: [
+	                            { text: "Search more builders", action: "find_builders" },
+	                            { text: "View builder projects", action: "view_builder_projects", payload: fetchedBuilder.rera_id }
+	                        ],
+	                        isTypingEffect: true
+	                    };
                 } else {
                     botResponse = {
                         id: messages.length + 2,
@@ -258,12 +258,11 @@ const ChatBot = () => {
         // Logic to re-run the last search. For now, just a message.
         simulatedInput = "Can you try searching again?";
         break;
-      case "view_builder_projects":
-        // Example payload: `view_builder_projects_RERA123`
-        const reraId = payload.split('_').pop();
-        navigate(`/builder/${reraId}/projects`);
-        setIsOpen(false);
-        return;
+	      case "view_builder_projects":
+	        const reraId = String(payload || '').trim();
+	        navigate(reraId ? `/builder/${reraId}` : '/builders-page');
+	        setIsOpen(false);
+	        return;
       case "help":
         simulatedInput = "What can you do?";
         break;
@@ -343,12 +342,12 @@ const ChatBot = () => {
                   </div>
                 )}
                 {message.builders && message.builders.length > 0 && (
-                  <div className="chatbot-properties-carousel">
-                    {message.builders.map(builder => (
-                      <ChatbotBuilderCard key={builder.rer-id || builder.company_name} builder={builder} />
-                    ))}
-                  </div>
-                )}
+	                  <div className="chatbot-properties-carousel">
+	                    {message.builders.map(builder => (
+	                      <ChatbotBuilderCard key={builder.rera_id || builder.company_name} builder={builder} />
+	                    ))}
+	                  </div>
+	                )}
                 {message.suggestions && message.suggestions.length > 0 && (
                   <div className="chatbot-suggestions">
                     {message.suggestions.map((suggestion, index) => (

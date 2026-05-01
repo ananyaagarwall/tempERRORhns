@@ -64,6 +64,8 @@
     "react-select": "^5.8.0",
     "react-social-icons": "^6.25.0",
     "recharts": "^2.8.0",
+    "leaflet": "^1.9.4",
+    "react-leaflet": "^4.2.1",
     "sonner": "^1.2.4",
     "tailwind-merge": "^2.0.0",
     "vaul": "^0.7.9",

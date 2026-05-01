@@ -44,7 +44,7 @@ function parsePriceInCr(priceStr) {
   }
 }
 
-const PropertiesSection = ({ searchFilters }) => {
+const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minBudget: null, maxBudget: null, bhkTypes: [] } }) => {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,14 +53,28 @@ const PropertiesSection = ({ searchFilters }) => {
   const navigate = useNavigate();
   const { addToCart, removeFromCart, isInCart } = useCart();
 
+  // Resize listener — mount/unmount only
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 700);
     window.addEventListener('resize', handleResize);
     initPropertyCardHandlers();
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
-    const getProperties = async () => {
-      try {
-        const data = await fetchProperties({ location: searchFilters.location });
+  // Re-fetch whenever any search filter changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    fetchProperties({
+      location: searchFilters.location || undefined,
+      priceRange: searchFilters.priceRange || undefined,
+      minBudget: searchFilters.minBudget ?? undefined,
+      maxBudget: searchFilters.maxBudget ?? undefined,
+      bhkTypes: searchFilters.bhkTypes?.length ? searchFilters.bhkTypes : undefined,
+    })
+      .then(data => {
+        if (cancelled) return;
         const mapped = Array.isArray(data) ? data.map(p => ({
           id: p._id || p.id || '',
           name: p.Property_Name || '',
@@ -73,17 +87,25 @@ const PropertiesSection = ({ searchFilters }) => {
         })) : [];
         setProperties(mapped);
         setError(null);
-      } catch (err) {
+      })
+      .catch(() => {
+        if (cancelled) return;
         setError('Failed to fetch properties');
         setProperties([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    getProperties();
-
-    return () => window.removeEventListener('resize', handleResize);
-  }, [searchFilters.location]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  // JSON.stringify makes array dep safe without causing infinite re-renders
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    searchFilters.location, 
+    searchFilters.priceRange, 
+    searchFilters.minBudget, 
+    searchFilters.maxBudget, 
+    JSON.stringify(searchFilters.bhkTypes)
+  ]);
 
   const scrollCards = (direction) => {
     if (!cardsRowRef.current) return;
@@ -183,14 +205,14 @@ const PropertiesSection = ({ searchFilters }) => {
         {!isMobile && (
           <>
             <button
-              className="scroll-btn left"
+              className="prop-scroll-btn left"
               onClick={() => scrollCards('left')}
               aria-label="Scroll left"
             >
               <FaChevronLeft />
             </button>
             <button
-              className="scroll-btn right"
+              className="prop-scroll-btn right"
               onClick={() => scrollCards('right')}
               aria-label="Scroll right"
             >
@@ -206,26 +228,52 @@ const PropertiesSection = ({ searchFilters }) => {
           ) : properties.length === 0 ? (
             renderPropertyCard(sampleProperty, 0)
           ) : (
-            properties
-              .filter(prop => {
-                const priceValue = parsePriceInCr(prop.price);
-                const priceMatch = !searchFilters.priceRange || (priceValue && priceValue <= searchFilters.priceRange);
-                let bhkMatch = true;
-                if (searchFilters.bhkTypes && searchFilters.bhkTypes.length > 0) {
-                  if (prop.Existing_Configurations && Array.isArray(prop.Existing_Configurations)) {
-                    bhkMatch = searchFilters.bhkTypes.some(type =>
-                      prop.Existing_Configurations.some(cfg => cfg.type && cfg.type.toLowerCase().includes(type.replace('bhk', ' bhk')))
-                    );
-                  } else {
-                    bhkMatch = false;
-                  }
-                }
-                return priceMatch && bhkMatch;
-              })
-              .map((prop, idx) => renderPropertyCard(prop, idx))
+            properties.map((prop, idx) => renderPropertyCard(prop, idx))
           )}
         </div>
       </div>
+
+      <style>{`
+        .property-cards-row-wrapper:hover .prop-scroll-btn {
+          opacity: 1;
+        }
+        .prop-scroll-btn {
+          position: absolute;
+          top: 50%;
+          transform: translateY(-50%);
+          z-index: 100;
+          background: rgba(250, 248, 245, 0.65);
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          border: 1px solid rgba(255, 255, 255, 0.6);
+          color: #223A5F;
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 8px 24px rgba(34,58,95,0.15);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          opacity: 0;
+        }
+        .prop-scroll-btn:hover {
+          background: rgba(241, 217, 122, 0.9);
+          border: 1px solid rgba(255, 255, 255, 0.8);
+          transform: translateY(-50%) scale(1.08);
+          box-shadow: 0 10px 28px rgba(34,58,95,0.22);
+        }
+        .prop-scroll-btn.left {
+          left: 20px;
+        }
+        .prop-scroll-btn.right {
+          right: 20px;
+        }
+        .prop-scroll-btn svg {
+          font-size: 20px;
+        }
+      `}</style>
 
     </section>
   );

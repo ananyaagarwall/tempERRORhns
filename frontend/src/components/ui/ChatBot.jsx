@@ -35,6 +35,110 @@ const buildLoadingLabel = (queryText = "") => {
 };
 
 
+const formatComparisonValue = (value, fallback = "Not specified") => {
+  if (value === null || value === undefined || value === "") return fallback;
+  if (Array.isArray(value)) {
+    const filtered = value
+      .filter(Boolean)
+      .map((item) => {
+        if (typeof item === "object") {
+          return Object.values(item).filter(Boolean).join(" ");
+        }
+        return String(item).trim();
+      })
+      .filter(Boolean);
+    return filtered.length ? filtered.join(", ") : fallback;
+  }
+  if (typeof value === "object") {
+    return Object.values(value).filter(Boolean).join(", ") || fallback;
+  }
+  return String(value).trim() || fallback;
+};
+
+const pickHighlights = (value, limit = 3) => {
+  if (!value) return "Not specified";
+  let items = value;
+  if (typeof value === "string") {
+    try {
+      items = JSON.parse(value);
+    } catch {
+      items = value.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(items)) {
+    return formatComparisonValue(items);
+  }
+  const selected = items.filter(Boolean).slice(0, limit).map((item) => String(item).trim());
+  return selected.length ? selected.join(", ") : "Not specified";
+};
+
+const buildPropertyComparisonRows = (properties = []) => [
+  { label: "Builder", values: properties.map((item) => formatComparisonValue(item.Builder_Name)) },
+  { label: "Location", values: properties.map((item) => formatComparisonValue(item.Location)) },
+  { label: "Starting Price", values: properties.map((item) => formatComparisonValue(item.Price_Starting_From || item.Pricing || "Price on request")) },
+  { label: "Configuration", values: properties.map((item) => formatComparisonValue(item.Existing_Configurations)) },
+  { label: "Status", values: properties.map((item) => formatComparisonValue(item.Project_Status)) },
+  { label: "Possession", values: properties.map((item) => formatComparisonValue(item.Possession_Date)) },
+  { label: "Carpet Area", values: properties.map((item) => formatComparisonValue(item.Carpet_Area)) },
+  { label: "Highlights", values: properties.map((item) => pickHighlights(item.Key_Highlights || item.Highlights, 2)) },
+  { label: "RERA", values: properties.map((item) => formatComparisonValue(item.RERA_ID)) },
+];
+
+const buildBuilderComparisonRows = (builders = []) => [
+  { label: "Company", values: builders.map((item) => formatComparisonValue(item.company_name || item.brand_name)) },
+  { label: "Established", values: builders.map((item) => formatComparisonValue(item.established_year)) },
+  { label: "City", values: builders.map((item) => formatComparisonValue(item.city || item.location)) },
+  { label: "Builder Type", values: builders.map((item) => formatComparisonValue(item.builder_type)) },
+  { label: "Completed Projects", values: builders.map((item) => formatComparisonValue(item.completed_projects, "0")) },
+  { label: "Ongoing Projects", values: builders.map((item) => formatComparisonValue(item.ongoing_projects, "0")) },
+  { label: "RERA ID", values: builders.map((item) => formatComparisonValue(item.rera_id || item.id)) },
+  { label: "RERA Registered", values: builders.map((item) => item.rera_registered ? "Yes" : "No") },
+  { label: "Verified", values: builders.map((item) => item.verified ? "Yes" : "No") },
+];
+
+const ComparisonTable = ({ kind, items }) => {
+  const safeItems = Array.isArray(items) ? items.slice(0, 5) : [];
+  if (safeItems.length < 2) return null;
+
+  const rows = kind === "builder"
+    ? buildBuilderComparisonRows(safeItems)
+    : buildPropertyComparisonRows(safeItems);
+
+  const headers = safeItems.map((item) =>
+    kind === "builder"
+      ? (item.company_name || item.brand_name || item.rera_id || "Builder")
+      : (item.Property_Name || `Property ${item.id || ""}`.trim())
+  );
+
+  return (
+    <div className="chatbot-comparison-table-wrap">
+      <div className="chatbot-comparison-table-scroll">
+        <table className="chatbot-comparison-table">
+          <thead>
+            <tr>
+              <th>Criteria</th>
+              {headers.map((header, index) => (
+                <th key={`${header}-${index}`}>{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.label}>
+                <td>{row.label}</td>
+                {row.values.map((value, index) => (
+                  <td key={`${row.label}-${index}`}>{value}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+
 
 const GENERAL_RESPONSES = {
   search_property: {
@@ -218,6 +322,7 @@ const ChatBot = () => {
         return {
           ...msg,
           isTypingEffect: false,
+          lastIntent: msg.pendingLastIntent,
           properties: msg.pendingProperties || [],
           builders: msg.pendingBuilders || [],
           allProperties: msg.pendingAllProperties || [],
@@ -235,6 +340,7 @@ const ChatBot = () => {
           pendingTotalResults: {},
           pendingCurrentPage: 0,
           pendingSuggestions: [],
+          pendingLastIntent: undefined,
           pendingStats: undefined,
         };
       }),
@@ -256,6 +362,7 @@ const ChatBot = () => {
           text: payload.text || "",
           isLoading: false,
           isTypingEffect: true,
+          lastIntent: undefined,
           properties: [],
           builders: [],
           allProperties: [],
@@ -273,6 +380,7 @@ const ChatBot = () => {
           pendingTotalResults: payload.totalResults || {},
           pendingCurrentPage: payload.currentPage || 0,
           pendingSuggestions: payload.suggestions || [],
+          pendingLastIntent: payload.lastIntent,
           pendingStats: payload.stats,
         };
       }),
@@ -297,6 +405,7 @@ const ChatBot = () => {
           isTypingEffect: false,
           properties: [],
           builders: [],
+          lastIntent: undefined,
           allProperties: [],
           allBuilders: [],
           hasMore: false,
@@ -311,6 +420,7 @@ const ChatBot = () => {
           pendingTotalResults: {},
           pendingCurrentPage: 0,
           pendingSuggestions: [],
+          pendingLastIntent: undefined,
           pendingStats: undefined,
         };
       }),
@@ -412,6 +522,7 @@ const ChatBot = () => {
       activeRequestControllerRef.current = null;
       stageBotResponse(loadingMessageId, {
         text: data.response,
+        lastIntent: data.last_intent,
         properties: data.properties || [],
         allProperties: data.all_properties || [],
         builders: data.builders || [],
@@ -633,6 +744,7 @@ const ChatBot = () => {
              }
              stageBotResponse(loadingMessageId, {
                 text: payload.response,
+                lastIntent: payload.last_intent,
                 properties: payload.properties || [],
                 allProperties: payload.all_properties || [],
                 builders: payload.builders || [],
@@ -777,6 +889,14 @@ const ChatBot = () => {
                   </div>
                 ) : (
                   <div className="chatbot-message-text" style={{ whiteSpace: 'pre-wrap' }}>{message.text}</div>
+                )}
+
+                {message.lastIntent === "compare" && message.properties?.length > 1 && (
+                  <ComparisonTable kind="property" items={message.properties} />
+                )}
+
+                {message.lastIntent === "compare" && message.builders?.length > 1 && (
+                  <ComparisonTable kind="builder" items={message.builders} />
                 )}
 
                 {/* Property Cards */}
@@ -1055,8 +1175,8 @@ const LegacyChatbotBuilderCard = ({ builder, navigate }) => {
   .replace(/[^a-z0-9-]/g, '');
 
     navigate(`/builder/${slug}`);
-    } else if (builder.company_name) {
-      navigate(`/builders?name=${encodeURIComponent(builder.company_name)}`);
+    } else {
+      navigate('/builders-page');
     }
   };
 

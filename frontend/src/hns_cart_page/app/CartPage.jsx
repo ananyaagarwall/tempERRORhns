@@ -171,7 +171,7 @@ const CartPage = () => {
   const EMICalculatorContent = () => (
     <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-24">
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-bold text-gray-900">EMI Calculator</h3>
+        <h3 className="text-xl font-bold  text-white">EMI Calculator</h3>
         <button 
           onClick={() => setShowCalculator(false)} 
           className="text-gray-500 hover:text-gray-700"
@@ -314,7 +314,7 @@ const CartPage = () => {
               )}
               <button 
                 onClick={handleCalculatorClick}
-                className="bg-gradient-to-r from-blue-600 to-blue-700  text-gray-800 px-4 sm:px-5 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 transition shadow-md font-medium flex items-center gap-2 text-sm whitespace-nowrap"
+                className="bg-gradient-to-r from-blue-600 to-blue-700   text-white px-4 sm:px-5 py-2.5 rounded-lg hover:from-blue-700 hover:to-blue-800 transition shadow-md font-medium flex items-center gap-2 text-sm whitespace-nowrap"
               >
                 <Calculator size={18} />
                 <span className="hidden sm:inline">EMI Calculator</span>
@@ -331,7 +331,7 @@ const CartPage = () => {
           <div className="lg:col-span-2 space-y-4">
             {displayedItems.length === 0 ? (
               <div className="bg-white rounded-2xl shadow-lg p-12 sm:p-16 text-center">
-                <Heart size={64} className="mx-auto text-gray-300 mb-4" />
+                <Heart size={64} className="mx-auto  mb-4" />
                 <h3 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-2">
                   {activeTab === 'all' ? 'No saved items yet' :
                    activeTab === 'properties' ? 'No properties saved' :

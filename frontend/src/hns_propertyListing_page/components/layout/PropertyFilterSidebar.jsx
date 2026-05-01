@@ -2,6 +2,45 @@ import { useState, forwardRef, useImperativeHandle, useEffect } from "react";
 import { X, Filter } from "lucide-react";
 import "../../hns_propertylisting_css/PropertyFilterSidebar.css";
 import React from "react";
+import { fetchPropertyFilters } from "../../../services/api";
+
+const DEFAULT_PROPERTY_STATUS_OPTIONS = [
+  "Ready-to-Move",
+  "Under Construction",
+  "New Launch",
+];
+
+const DEFAULT_AMENITY_OPTIONS = [
+  "Balcony",
+  "Fitness Center",
+  "Parking Area",
+  "Free Wifi",
+];
+
+const DEFAULT_SOCIETY_TYPE_OPTIONS = [
+  "Gated",
+  "Advanced Security",
+  "Lounge",
+  "Senior Citizen",
+];
+
+const mergeFilterOptions = (...groups) => {
+  const merged = [];
+  const seen = new Set();
+
+  groups.forEach((group) => {
+    (group || []).forEach((item) => {
+      const label = String(item || "").trim();
+      if (!label) return;
+      const marker = label.toLowerCase();
+      if (seen.has(marker)) return;
+      seen.add(marker);
+      merged.push(label);
+    });
+  });
+
+  return merged;
+};
 
 // -----------------------------
 // Reusable Components
@@ -15,6 +54,7 @@ const Tag = ({ label, onRemove, className = "" }) => (
 
 const FilterPill = ({ label, isActive, onClick }) => (
   <button
+    type="button"
     onClick={onClick}
     className={`filter-pill ${isActive ? "active" : "inactive"}`}
   >
@@ -86,7 +126,7 @@ const formatPriceCr = (val) => {
 // Main Sidebar Component
 // -----------------------------
 const PropertyFilterSidebar = forwardRef((props, ref) => {
-  const { onTagsChange, city = "", onCityRemove, initialPriceCr = 0, onPriceChange } = props;
+  const { onTagsChange, onFiltersChange, city = "", filterLocation = "", onCityRemove, initialPriceCr = 0, onPriceChange } = props;
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const [toggles, setToggles] = useState({
@@ -99,16 +139,16 @@ const PropertyFilterSidebar = forwardRef((props, ref) => {
   // Budget slider: in Crores, 0 = any, max 5 Cr
   const [budgetCr, setBudgetCr] = useState(initialPriceCr);
 
-  const [propertyStatus, setPropertyStatus] = useState(["Ready-to-Move"]);
-  const [amenities, setAmenities] = useState([
-    "Balcony",
-    "Fitness Center",
-    "Parking Area",
-  ]);
-  const [societyType, setSocietyType] = useState([
-    "Gated",
-    "Advanced Security",
-  ]);
+  const [propertyStatus, setPropertyStatus] = useState([]);
+  const [amenities, setAmenities] = useState([]);
+  const [societyType, setSocietyType] = useState([]);
+  const [filterOptions, setFilterOptions] = useState({
+    amenities: DEFAULT_AMENITY_OPTIONS,
+    propertyStatus: DEFAULT_PROPERTY_STATUS_OPTIONS,
+    societyTypes: DEFAULT_SOCIETY_TYPE_OPTIONS,
+  });
+  const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const [showAllSocietyTypes, setShowAllSocietyTypes] = useState(false);
 
   // Sync budget slider with incoming prop changes
   useEffect(() => {
@@ -123,6 +163,32 @@ const PropertyFilterSidebar = forwardRef((props, ref) => {
       onPriceChange(budgetCr);
     }
   }, [budgetCr]);
+
+  useEffect(() => {
+    let active = true;
+    const loadFilterOptions = async () => {
+      try {
+        const data = await fetchPropertyFilters(filterLocation || city || "");
+        if (!active) return;
+        setFilterOptions({
+          amenities: mergeFilterOptions(DEFAULT_AMENITY_OPTIONS, data?.amenities),
+          propertyStatus: mergeFilterOptions(DEFAULT_PROPERTY_STATUS_OPTIONS, data?.propertyStatus),
+          societyTypes: mergeFilterOptions(DEFAULT_SOCIETY_TYPE_OPTIONS, data?.societyTypes),
+        });
+      } catch (error) {
+        if (!active) return;
+        setFilterOptions({
+          amenities: DEFAULT_AMENITY_OPTIONS,
+          propertyStatus: DEFAULT_PROPERTY_STATUS_OPTIONS,
+          societyTypes: DEFAULT_SOCIETY_TYPE_OPTIONS,
+        });
+      }
+    };
+    loadFilterOptions();
+    return () => {
+      active = false;
+    };
+  }, [filterLocation, city]);
 
   const allTags = [...propertyStatus, ...amenities, ...societyType];
 
@@ -146,6 +212,13 @@ const PropertyFilterSidebar = forwardRef((props, ref) => {
   React.useEffect(() => {
     if (typeof onTagsChange === "function") {
       onTagsChange(allTags);
+    }
+    if (typeof onFiltersChange === "function") {
+      onFiltersChange({
+        propertyStatus,
+        amenities,
+        societyType,
+      });
     }
   }, [propertyStatus, amenities, societyType]);
 
@@ -256,7 +329,7 @@ const PropertyFilterSidebar = forwardRef((props, ref) => {
       <div className="filter-section">
         <h3 className="filter-title">Property Status</h3>
         <div className="filter-pills">
-          {["Ready-to-Move", "Under Construction", "New Launch"].map((s) => (
+          {filterOptions.propertyStatus.map((s) => (
             <FilterPill
               key={s}
               label={s}
@@ -271,7 +344,10 @@ const PropertyFilterSidebar = forwardRef((props, ref) => {
       <div className="filter-section">
         <h3 className="filter-title">Amenities</h3>
         <div className="filter-pills">
-          {["Balcony", "Fitness Center", "Parking Area", "Free Wifi"].map((a) => (
+          {(showAllAmenities
+            ? filterOptions.amenities
+            : filterOptions.amenities.slice(0, 6)
+          ).map((a) => (
             <FilterPill
               key={a}
               label={a}
@@ -279,7 +355,17 @@ const PropertyFilterSidebar = forwardRef((props, ref) => {
               onClick={() => toggleFilter("amenities", a)}
             />
           ))}
-          <button className="more-options-btn">+ 12 More &gt;</button>
+          {filterOptions.amenities.length > 6 && (
+            <button
+              type="button"
+              className="more-options-btn"
+              onClick={() => setShowAllAmenities((prev) => !prev)}
+            >
+              {showAllAmenities
+                ? "Show Less >"
+                : `+ ${filterOptions.amenities.length - 6} More >`}
+            </button>
+          )}
         </div>
       </div>
 
@@ -287,7 +373,10 @@ const PropertyFilterSidebar = forwardRef((props, ref) => {
       <div className="filter-section">
         <h3 className="filter-title">Society Type</h3>
         <div className="filter-pills">
-          {["Gated", "Advanced Security", "Lounge", "Senior Citizen"].map((t) => (
+          {(showAllSocietyTypes
+            ? filterOptions.societyTypes
+            : filterOptions.societyTypes.slice(0, 6)
+          ).map((t) => (
             <FilterPill
               key={t}
               label={t}
@@ -295,7 +384,17 @@ const PropertyFilterSidebar = forwardRef((props, ref) => {
               onClick={() => toggleFilter("societyType", t)}
             />
           ))}
-          <button className="more-options-btn">+ 6 More &gt;</button>
+          {filterOptions.societyTypes.length > 6 && (
+            <button
+              type="button"
+              className="more-options-btn"
+              onClick={() => setShowAllSocietyTypes((prev) => !prev)}
+            >
+              {showAllSocietyTypes
+                ? "Show Less >"
+                : `+ ${filterOptions.societyTypes.length - 6} More >`}
+            </button>
+          )}
         </div>
       </div>
     </>
