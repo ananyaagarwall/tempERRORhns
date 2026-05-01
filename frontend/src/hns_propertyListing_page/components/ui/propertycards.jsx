@@ -1,5 +1,6 @@
 // src/hns_propertyListing_page/components/ui/propertycards.jsx
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../../hns_cart_page/js/CartContent';
 import { fetchProperties } from '../../../services/api';
 import '../../hns_propertylisting_css/propertycards.css';
@@ -38,6 +39,8 @@ const HeartIcon = ({ filled }) => (
 
 const PropertyCard = ({ property }) => {
   const [currentThumbnail, setCurrentThumbnail] = useState(0);
+  const [showAllHighlights, setShowAllHighlights] = useState(false);
+  const navigate = useNavigate();
   const { addToCart, removeFromCart, isInCart } = useCart();
 
   const thumbnailImages = [
@@ -77,14 +80,44 @@ const PropertyCard = ({ property }) => {
     }
   };
 
+  const handleCardClick = () => {
+    if (!property?.id) return;
+    navigate(`/property/${property.id}`);
+  };
+
+  const handleCardKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      handleCardClick();
+    }
+  };
+
+  const stopCardNavigation = (event) => {
+    event.stopPropagation();
+  };
+
+  const visibleHighlights = showAllHighlights
+    ? property.highlights
+    : property.highlights.slice(0, property.maxBadges);
+
   return (
-    <div className="property-card">
+    <div
+      className="property-card"
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+      role="link"
+      tabIndex={0}
+      aria-label={property?.name ? `Open ${property.name}` : 'Open property'}
+    >
       <div className="property-images">
         <div className="main-image" style={{ position: 'relative' }}>
           {/* Heart Button - TOP RIGHT */}
           <button
             className={`property-heart-button ${isInCart(property.id) ? 'in-cart' : ''}`}
-            onClick={handleHeartClick}
+            onClick={(event) => {
+              stopCardNavigation(event);
+              handleHeartClick();
+            }}
             aria-label={isInCart(property.id) ? 'Remove from cart' : 'Add to cart'}
             style={{
               position: 'absolute',
@@ -129,7 +162,10 @@ const PropertyCard = ({ property }) => {
           </div>
           <div className="thumbnail-controls">
             <button
-              onClick={prevThumbnail}
+              onClick={(event) => {
+                stopCardNavigation(event);
+                prevThumbnail();
+              }}
               className="thumbnail-btn thumbnail-btn-prev"
               aria-label="Previous image"
             >
@@ -139,14 +175,20 @@ const PropertyCard = ({ property }) => {
               {Array.from({ length: Math.max(1, thumbnailImages.length - 1) }).map((_, index) => (
                 <button
                   key={index}
-                  onClick={() => setCurrentThumbnail(index)}
+                  onClick={(event) => {
+                    stopCardNavigation(event);
+                    setCurrentThumbnail(index);
+                  }}
                   className={`thumbnail-dot ${index === currentThumbnail ? 'active' : ''}`}
                   aria-label={`Go to image ${index + 1}`}
                 />
               ))}
             </div>
             <button
-              onClick={nextThumbnail}
+              onClick={(event) => {
+                stopCardNavigation(event);
+                nextThumbnail();
+              }}
               className="thumbnail-btn thumbnail-btn-next"
               aria-label="Next image"
             >
@@ -192,15 +234,24 @@ const PropertyCard = ({ property }) => {
         <div className="highlights-section">
           <span className="highlights-label">Highlights:</span>
           <div className="highlights-list">
-            {property.highlights.slice(0, property.maxBadges).map((highlight, index) => (
+            {visibleHighlights.map((highlight, index) => (
               <Badge key={index} className="highlight-badge">
                 {highlight}
               </Badge>
             ))}
             {property.highlights.length > property.maxBadges && (
-              <Badge className="highlight-badge more-highlights">
-                +{property.highlights.length - property.maxBadges} More
-              </Badge>
+              <button
+                type="button"
+                className="highlight-badge more-highlights"
+                onClick={(event) => {
+                  stopCardNavigation(event);
+                  setShowAllHighlights((prev) => !prev);
+                }}
+              >
+                {showAllHighlights
+                  ? "Show Less"
+                  : `+${property.highlights.length - property.maxBadges} More`}
+              </button>
             )}
           </div>
         </div>
@@ -209,7 +260,10 @@ const PropertyCard = ({ property }) => {
           <Button
             variant="outline"
             className="add-to-list-btn"
-            onClick={handleAddToList}
+            onClick={(event) => {
+              stopCardNavigation(event);
+              handleAddToList();
+            }}
           >
             {isInCart(property.id) ? '✓ Added to List' : 'Add to My List'}
           </Button>
@@ -231,11 +285,15 @@ const SearchResults = ({
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
       try {
         const data = await fetchProperties({
           location: searchFilters.location,
           priceRange: searchFilters.priceRange,
-          bhkTypes: searchFilters.bhkTypes
+          bhkTypes: searchFilters.bhkTypes,
+          amenities: searchFilters.amenities,
+          propertyStatus: searchFilters.propertyStatus,
+          societyTypes: searchFilters.societyTypes,
         });
 
         const mapped = (Array.isArray(data) ? data : []).map((p) => {
@@ -243,6 +301,13 @@ const SearchResults = ({
           if (Array.isArray(p.Highlights)) highlights.push(...p.Highlights);
           if (Array.isArray(p.Key_Highlights)) highlights.push(...p.Key_Highlights);
           if (Array.isArray(p.Connectivity)) highlights.push(...p.Connectivity);
+          const dedupedHighlights = Array.from(
+            new Set(
+              highlights
+                .map((item) => String(item || "").trim())
+                .filter(Boolean)
+            )
+          );
           return {
             id: p.id || p._id,
             name: p.Property_Name || '',
@@ -255,7 +320,7 @@ const SearchResults = ({
             parking: p.Parking || '',
             security: p.Security || '',
             connectivity: Array.isArray(p.Connectivity) ? p.Connectivity : [],
-            highlights,
+            highlights: dedupedHighlights,
             maxBadges: 6,
           };
         });
@@ -268,7 +333,14 @@ const SearchResults = ({
       }
     };
     load();
-  }, [searchFilters.location, searchFilters.priceRange, JSON.stringify(searchFilters.bhkTypes)]);
+  }, [
+    searchFilters.location,
+    searchFilters.priceRange,
+    JSON.stringify(searchFilters.bhkTypes),
+    JSON.stringify(searchFilters.amenities),
+    JSON.stringify(searchFilters.propertyStatus),
+    JSON.stringify(searchFilters.societyTypes),
+  ]);
 
   return (
     <div className="search-results-wrapper">

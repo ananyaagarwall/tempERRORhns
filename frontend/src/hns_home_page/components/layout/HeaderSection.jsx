@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FaSearch, FaBars, FaTimes, FaHome, FaBuilding, FaRegFileAlt, FaEnvelope, FaUser, FaUserCircle, FaRegUserCircle } from 'react-icons/fa';
-import headerBg from '../../../assets/Header.img1.gradient1.png'; 
+import headerBg from '../../../assets/Header.img1.gradient1.png';
 import { Link, useNavigate } from 'react-router-dom';
-import { SignedIn, SignedOut, UserButton, useUser } from '@clerk/clerk-react';
-import '../../home_page_css/HeaderSection.css'; 
+import '../../home_page_css/HeaderSection.css';
 
 const HeaderSection = () => {
+  const [activeIndex, setActiveIndex] = useState(0);
   const [showMenu, setShowMenu] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
-  const { user } = useUser();
+  const navigate = useNavigate();
+  // const [activeMenu, setActiveMenu] = useState('Projects');
+  const [user, setUser] = useState(null);
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   // Price slider state (single slider for max price)
   const [priceRange, setPriceRange] = useState(0); // 0 means "All Range"
@@ -33,9 +35,9 @@ const HeaderSection = () => {
   const [showBhkMobile, setShowBhkMobile] = useState(false);
   const bhkTriggerRef = useRef(null);
 
-  const navigate = useNavigate();
   // Search type state (properties or builders)
   const [searchType, setSearchType] = useState('properties'); // 'properties' or 'builders'
+
   const bhkOptions = [
     { id: '1bhk', label: '1 BHK' },
     { id: '2bhk', label: '2 BHK' },
@@ -140,6 +142,9 @@ const HeaderSection = () => {
     setShowPriceRangeSlider(false);
     setIsSearchbarExpanded(false);
   };
+
+  const handleLogin = () => {/* your login logic here */ };
+  const handleSignup = () => {/* your signup logic here */ };
 
   // Updated toggle function with scroll prevention
   const toggleMenu = () => {
@@ -266,10 +271,22 @@ const HeaderSection = () => {
   const bgRepeat = 'no-repeat';
   const bgPosition = 'center';
 
+  const propertyData = [
+    { name: "Lodha", location: "Lodha World Towers, Mumbai", score: "98%", img: "/lodha.jpg" },
+    { name: "Kalpataru", location: "Kalpataru Residency, Pune", score: "95%", img: "/kalpa.jpg" },
+    { name: "Rustomjee", location: "Rustomjee Seasons, Mumbai", score: "97%", img: "/rustomujee.jpg" },
+    { name: "Presidential", location: "Presidential Towers, Bangalore", score: "96%", img: "/presidental.jpeg" },
+  ];
+
+  const handleCardClick = () => {
+    setActiveIndex((prevIndex) => (prevIndex + 1) % propertyData.length);
+  };
+
   const isMobile = windowWidth <= 768;
   const isSmallMobile = windowWidth <= 350;
   const isTablet = windowWidth > 768 && windowWidth <= 1024;
   const isLaptop = windowWidth > 1024 && windowWidth <= 1440;
+  const isDesktop = windowWidth > 1440;
 
   // Responsive navbar positioning and sizing
   const getNavbarStyles = () => {
@@ -355,17 +372,19 @@ const HeaderSection = () => {
   }
 
   return (
-    <div 
+    <div
       className="header-section relative w-full text-white overflow-hidden"
       style={{
-        backgroundImage: `url(${bgImg})`,
-        backgroundSize: bgSize,
-        backgroundPosition: bgPosition,
-        backgroundRepeat: bgRepeat,
-        height: isMobile ? '60vh' : '100vh',           
-        minHeight: isMobile ? '60dvh' : '100dvh',       
+        backgroundImage: `url(${headerBg})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        // CHANGED: If mobile, use 60vh, otherwise 100vh
+        height: isMobile ? '60vh' : '100vh',
+        minHeight: isMobile ? '60dvh' : '100dvh',
       }}
     >
+
       {/* Overlay */}
       <div
         className="absolute bg-gradient-to-r from-[#16386d] to-[rgba(0,0,0,0.1)] z-0"
@@ -378,6 +397,7 @@ const HeaderSection = () => {
           inset: 0,
         }}
       />
+
       {/* Main Navbar */}
       {!(isMobile && showMenu) && (
         <nav
@@ -436,25 +456,10 @@ const HeaderSection = () => {
               <Link to="/about" className="nav-link" style={{
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>About Us</Link>
-              <SignedOut>
-                <Link to="/login" className="nav-link" style={{ 
-                  fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
-                }}><FaRegUserCircle size={22} /></Link>
-              </SignedOut>
-              <SignedIn>
-                <div style={{ marginLeft: '4px', display: 'flex' }}>
-                  <UserButton 
-                    afterSignOutUrl="/" 
-                    appearance={{
-                      elements: {
-                        userButtonPopoverFooter: "hidden", 
-                        footer: "hidden"
-                      }
-                    }}
-                  />
-                </div>
-              </SignedIn>
-              </div>
+              <Link to="/login" className="nav-link" style={{
+                fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
+              }}><FaRegUserCircle size={22} /></Link>
+            </div>
           )}
 
           {/* Mobile Hamburger Menu */}
@@ -553,34 +558,19 @@ const HeaderSection = () => {
               &times;
             </button>
             <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, marginTop: 2 }}>
-              <SignedIn>
-                <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
-                  <UserButton 
-                    afterSignOutUrl="/" 
-                    appearance={{
-                      elements: {
-                        userButtonPopoverFooter: "hidden", 
-                        footer: "hidden"
-                      }
-                    }}
-                  />
-                </div>
-              </SignedIn>
-              <SignedOut>
-                <FaUserCircle size={36} color="#fff" className="user-avatar" style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%' }} />
-              </SignedOut>
+              <FaUserCircle size={36} color="#fff" className="user-avatar" style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%' }} />
               <div>
                 <div className="user-name" style={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', marginBottom: 1 }}>
-                  {user ? `Hi, ${user.firstName || user.username || 'User'}` : 'Welcome Guest'}
+                  {user ? `Hi, ${user.name}` : 'Welcome Guest'}
                 </div>
                 <div className="user-status" style={{ color: '#eaf1ff', fontWeight: 500, fontSize: '0.92rem' }}>
                   {user ? <span>Profile &bull; <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>Manage Profile</span></span> : 'Guest Profile'}
                 </div>
               </div>
             </div>
-            <SignedOut>
-              <Link 
-                to="/login" 
+            {!user && (
+              <Link
+                to="/login"
                 onClick={toggleMenu}
                 className="login-signup-btn"
                 style={{
@@ -605,7 +595,7 @@ const HeaderSection = () => {
               >
                 Login / Signup
               </Link>
-            </SignedOut>
+            )}
           </div>
 
           {/* Action cards */}
@@ -763,6 +753,8 @@ const HeaderSection = () => {
                         detail: {
                           location: correctedLocation,
                           priceRange,
+                          minBudget,
+                          maxBudget,
                           bhkTypes: selectedBhkTypes
                         }
                       }));
@@ -790,9 +782,18 @@ const HeaderSection = () => {
                       detail: {
                         location: correctedLocation,
                         priceRange,
+                        minBudget,
+                        maxBudget,
                         bhkTypes: selectedBhkTypes
                       }
                     }));
+                    setTimeout(() => {
+                      const el = document.querySelector('.property-section-custom');
+                      if (el) {
+                        const y = el.getBoundingClientRect().top + window.scrollY - 100;
+                        window.scrollTo({ top: y, behavior: 'smooth' });
+                      }
+                    }, 100);
                     setShowMobileSearch(false);
                   }}
                 >
@@ -896,9 +897,18 @@ const HeaderSection = () => {
                   detail: {
                     location: correctedLocation,
                     priceRange,
+                    minBudget,
+                    maxBudget,
                     bhkTypes: selectedBhkTypes
                   }
                 }));
+                setTimeout(() => {
+                  const el = document.querySelector('.property-section-custom');
+                  if (el) {
+                    const y = el.getBoundingClientRect().top + window.scrollY - 100;
+                    window.scrollTo({ top: y, behavior: 'smooth' });
+                  }
+                }, 100);
                 setShowMobileSearch(false);
               }}>
               <FaSearch style={{ marginRight: '10px', fontSize: '14px' }} />
@@ -999,6 +1009,13 @@ const HeaderSection = () => {
                   window.dispatchEvent(new CustomEvent('filterLandingPage', {
                     detail: { location: correctedLocation, priceRange, bhkTypes: selectedBhkTypes }
                   }));
+                  setTimeout(() => {
+                    const el = document.querySelector('.property-section-custom');
+                    if (el) {
+                      const y = el.getBoundingClientRect().top + window.scrollY - 100;
+                      window.scrollTo({ top: y, behavior: 'smooth' });
+                    }
+                  }, 100);
                 }}
               >
                 <FaSearch style={{ fontSize: '13px' }} />

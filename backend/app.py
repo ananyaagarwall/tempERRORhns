@@ -3,13 +3,17 @@ os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 import requests
+import re
 from models import (
     User,
     Property,
+    PropertyPoiCache,
     Enquiry,
     Review,
     Builder,
     BuilderProject,
+    UnitConfig,
+    ProjectAmenity,
     Blog,
     Slug,
     UserInteraction,
@@ -55,9 +59,11 @@ app = Flask(__name__)
 
 LOCAL_DEV_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://localhost:5173",
     "http://localhost:5174",
     "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
     "http://127.0.0.1:5173",
     "http://127.0.0.1:5174",
 ]
@@ -291,23 +297,710 @@ def _dedupe_favorite_rows():
     return total_removed
 
 
+def _safe_json_load(value, default=None):
+    if value in (None, ""):
+        return [] if default is None else default
+    if isinstance(value, (list, dict)):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        return [] if default is None else default
+
+
+def _coerce_list(value):
+    if value in (None, ""):
+        return []
+    parsed = _safe_json_load(value, default=None)
+    if parsed is None:
+        if isinstance(value, str):
+            parts = [part.strip() for part in re.split(r"[\r\n,;|]+", value) if part.strip()]
+            return parts or [value.strip()]
+        return [value]
+    if isinstance(parsed, list):
+        return parsed
+    if isinstance(parsed, dict):
+        return [parsed]
+    return [parsed]
+
+
+def _json_list_or_none(value):
+    items = _coerce_list(value)
+    return json.dumps(items) if items else None
+
+
+def _parse_float(value):
+    if value in (None, ""):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+    match = re.search(r"-?\d+(?:\.\d+)?", text_value.replace(",", ""))
+    if not match:
+        return None
+    try:
+        return float(match.group(0))
+    except Exception:
+        return None
+
+
+def _format_number(value):
+    if value is None:
+        return None
+    try:
+        return f"{float(value):.2f}".rstrip("0").rstrip(".")
+    except Exception:
+        return str(value)
+
+
+def _parse_price_values_to_crore(value):
+    if value in (None, ""):
+        return []
+    if isinstance(value, (int, float)):
+        return [float(value)]
+
+    values = []
+    text_value = str(value).lower().replace(",", " ")
+    for number, unit in re.findall(r"(\d+(?:\.\d+)?)\s*(cr|crore|l|lac|lakh)?", text_value):
+        try:
+            amount = float(number)
+        except Exception:
+            continue
+        if unit in ("l", "lac", "lakh"):
+            amount /= 100.0
+        values.append(amount)
+    return values
+
+
+def _parse_area_values(value):
+    if value in (None, ""):
+        return []
+    if isinstance(value, (int, float)):
+        return [float(value)]
+
+    values = []
+    text_value = str(value).lower().replace(",", " ")
+    for number in re.findall(r"\d+(?:\.\d+)?", text_value):
+        try:
+            values.append(float(number))
+        except Exception:
+            continue
+    return values
+
+
+def _normalize_bhk_label(value):
+    if value in (None, ""):
+        return None
+
+    if isinstance(value, dict):
+        value = (
+            value.get("bhk_type")
+            or value.get("type")
+            or value.get("label")
+            or value.get("name")
+        )
+
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+
+    compact = re.sub(r"\s+", " ", text_value).strip()
+    compact = compact.replace("bhk", "BHK").replace("Bhk", "BHK")
+
+    combo_match = re.match(r"^(\d+)\s*\+\s*(\d+)(?:\s*BHK)?(?:\s*\(([^)]+)\))?$", compact, re.IGNORECASE)
+    if combo_match:
+        left, right, suffix = combo_match.groups()
+        label = f"{left}+{right} BHK"
+        if suffix:
+            label += f" ({suffix.strip()})"
+        return label
+
+    bare_match = re.match(r"^(\d+)(?:\s*BHK)?$", compact, re.IGNORECASE)
+    if bare_match:
+        return f"{bare_match.group(1)} BHK"
+
+    return compact
+
+
+def _expand_bhk_labels(value):
+    label = _normalize_bhk_label(value)
+    if not label:
+        return []
+
+    combo_match = re.match(r"^\d+\s*\+\s*\d+(?:\s*BHK)?(?:\s*\([^)]+\))?$", label, re.IGNORECASE)
+    if combo_match:
+        return [label]
+
+    if "/" in label and "BHK" in label.upper():
+        numbers = re.findall(r"\d+", label)
+        expanded = []
+        seen = set()
+        for number in numbers:
+            candidate = f"{number} BHK"
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            expanded.append(candidate)
+        if expanded:
+            return expanded
+
+    return [label]
+
+
+def _format_area_range(area_min, area_max, unit="sqft"):
+    if area_min is None and area_max is None:
+        return None
+    if area_min is not None and area_max is not None:
+        if abs(float(area_min) - float(area_max)) < 0.001:
+            return f"{_format_number(area_min)} {unit}"
+        return f"{_format_number(area_min)} to {_format_number(area_max)} {unit}"
+    single = area_min if area_min is not None else area_max
+    return f"{_format_number(single)} {unit}"
+
+
+def _format_price_range_crore(price_min, price_max, price_label=None):
+    if price_min is None and price_max is None:
+        return None
+
+    if price_min is not None and price_max is not None:
+        if abs(float(price_min) - float(price_max)) < 0.001:
+            text_value = f"{_format_number(price_min)} Cr"
+        else:
+            text_value = f"{_format_number(price_min)} - {_format_number(price_max)} Cr"
+    else:
+        single = price_min if price_min is not None else price_max
+        text_value = f"{_format_number(single)} Cr"
+
+    if price_label:
+        return f"{text_value} {price_label}".strip()
+    return text_value
+
+
+def _serialize_unit_configs(rows):
+    serialized = []
+    for row in rows or []:
+        serialized.append({
+            "type": row.bhk_type,
+            "carpet_area_min": row.carpet_area_min,
+            "carpet_area_max": row.carpet_area_max,
+            "rera_carpet_area": row.rera_carpet_area,
+            "deck_area": row.deck_area,
+            "area_unit": row.area_unit,
+            "price_from": row.price_from,
+            "price_to": row.price_to,
+            "price_label": row.price_label,
+        })
+    return serialized
+
+
+def _get_project_configuration_labels(project):
+    rows = list(getattr(project, "unit_configs", []) or [])
+    if rows:
+        labels = []
+        seen = set()
+        for row in rows:
+            label = _normalize_bhk_label(row.bhk_type)
+            if not label or label in seen:
+                continue
+            seen.add(label)
+            labels.append(label)
+        return labels
+
+    configs = _coerce_list(getattr(project, "configuration", None))
+    labels = []
+    seen = set()
+    for item in configs:
+        label = _normalize_bhk_label(item)
+        if not label or label in seen:
+            continue
+        seen.add(label)
+        labels.append(label)
+    return labels
+
+
+def _get_project_amenity_names(project):
+    rows = list(getattr(project, "project_amenities", []) or [])
+    if rows:
+        return [row.name for row in rows if row.name]
+    return [name for name in _coerce_list(getattr(project, "amenities", None)) if str(name).strip()]
+
+
+def _normalize_project_amenity_names(value):
+    raw_items = _coerce_list(value)
+    canonical_map = {
+        "club house": "Clubhouse",
+        "clubhouse": "Clubhouse",
+        "gymnasium": "Gymnasium",
+        "gym": "Gymnasium",
+        "pool": "Swimming Pool",
+        "swimming pool": "Swimming Pool",
+        "kids play area": "Kids Play Area",
+        "children play area": "Kids Play Area",
+        "indoor games": "Indoor Games",
+        "indoor gaming zone": "Indoor Games",
+        "party lawn": "Party Lawn",
+        "community hall": "Community Hall",
+        "multipurpose court": "Multipurpose Court",
+        "intercom": "Intercom",
+        "video door phone": "Video Door Phone",
+        "senior citizen area": "Senior Citizen Area",
+        "garden": "Garden",
+        "jogging track": "Jogging Track",
+    }
+
+    normalized = []
+    seen = set()
+
+    for item in raw_items:
+        if isinstance(item, dict):
+            candidate = item.get("name") or item.get("label") or item.get("title")
+        else:
+            candidate = item
+
+        if candidate in (None, ""):
+            continue
+
+        for part in re.split(r",|\sand\s|\s&\s|/", str(candidate), flags=re.IGNORECASE):
+            cleaned = part.strip().strip("-").strip()
+            if not cleaned:
+                continue
+            low = cleaned.lower()
+            label = canonical_map.get(low, cleaned.title())
+            marker = label.lower()
+            if marker in seen:
+                continue
+            seen.add(marker)
+            normalized.append(label)
+
+    return normalized
+
+
+def _infer_project_amenity_category(name):
+    low = str(name or "").lower()
+    if any(token in low for token in ("pool", "garden", "lawn", "jogging", "kids", "senior", "club", "gym", "games")):
+        return "Lifestyle"
+    if any(token in low for token in ("court", "tennis", "basketball")):
+        return "Sports"
+    if any(token in low for token in ("intercom", "video door", "security")):
+        return "Safety"
+    return "General"
+
+
+def _infer_project_amenity_icon(name):
+    low = str(name or "").lower()
+    mapping = {
+        "pool": "pool",
+        "garden": "garden",
+        "game": "indoor-games",
+        "club": "clubhouse",
+        "hall": "hall",
+        "court": "court",
+        "intercom": "intercom",
+        "video door": "video-door",
+        "senior": "senior",
+        "kids": "kids",
+        "gym": "gym",
+        "lawn": "lawn",
+        "jogging": "track",
+    }
+    for token, icon in mapping.items():
+        if token in low:
+            return icon
+    return None
+
+
+def _build_unit_config_payloads(project, payload=None, related_properties=None):
+    payload = payload or {}
+    related_properties = list(related_properties or [])
+    primary_property = related_properties[0] if related_properties else None
+
+    if "unit_configs" in payload:
+        source_configs = payload.get("unit_configs")
+    elif "configuration" in payload:
+        source_configs = payload.get("configuration")
+    elif getattr(project, "configuration", None):
+        source_configs = project.configuration
+    elif primary_property and primary_property.Existing_Configurations:
+        source_configs = primary_property.Existing_Configurations
+    else:
+        source_configs = []
+
+    config_items = _coerce_list(source_configs)
+    if not config_items:
+        return []
+
+    shared_area_values = []
+    if payload.get("carpetAreaMin") is not None:
+        shared_area_values.append(_parse_float(payload.get("carpetAreaMin")))
+    if payload.get("carpetAreaMax") is not None:
+        shared_area_values.append(_parse_float(payload.get("carpetAreaMax")))
+    if not shared_area_values:
+        shared_area_values = [project.carpet_area_min, project.carpet_area_max]
+    if not any(value is not None for value in shared_area_values) and primary_property:
+        area_values = _parse_area_values(primary_property.Carpet_Area)
+        if area_values:
+            shared_area_values = [min(area_values), max(area_values)]
+
+    shared_price_values = []
+    if payload.get("priceMin") is not None:
+        shared_price_values.append(_parse_float(payload.get("priceMin")))
+    if payload.get("priceMax") is not None:
+        shared_price_values.append(_parse_float(payload.get("priceMax")))
+    if not shared_price_values:
+        shared_price_values = _parse_price_values_to_crore(project.price_range)
+    if not shared_price_values and primary_property:
+        shared_price_values = _parse_price_values_to_crore(primary_property.Price_Starting_From)
+
+    shared_price_label = (
+        payload.get("price_label")
+        or payload.get("priceLabel")
+        or payload.get("Pricing")
+        or (primary_property.Pricing if primary_property else None)
+    )
+
+    prepared_items = []
+    for item in config_items:
+        source = item if isinstance(item, dict) else {"type": item}
+        labels = _expand_bhk_labels(source)
+        if not labels:
+            continue
+        prepared_items.append((source, labels))
+
+    total_labels = sum(len(labels) for _, labels in prepared_items)
+    use_shared_project_values = total_labels == 1
+
+    shared_area_min = next((value for value in shared_area_values if value is not None), None)
+    shared_area_max = next((value for value in reversed(shared_area_values) if value is not None), shared_area_min)
+    shared_price_min = min(shared_price_values) if shared_price_values else None
+    shared_price_max = max(shared_price_values) if shared_price_values else None
+
+    payloads = []
+    seen = set()
+
+    for source, labels in prepared_items:
+        explicit_area_min = _parse_float(
+            source.get("carpet_area_min")
+            or source.get("min_area")
+            or source.get("area_min")
+            or source.get("carpetAreaMin")
+        )
+        explicit_area_max = _parse_float(
+            source.get("carpet_area_max")
+            or source.get("max_area")
+            or source.get("area_max")
+            or source.get("carpetAreaMax")
+        )
+        explicit_price_from = _parse_float(source.get("price_from") or source.get("priceFrom"))
+        explicit_price_to = _parse_float(source.get("price_to") or source.get("priceTo"))
+        explicit_price_label = source.get("price_label") or source.get("priceLabel")
+
+        area_min = explicit_area_min
+        area_max = explicit_area_max
+        price_from = explicit_price_from
+        price_to = explicit_price_to
+        price_label = explicit_price_label
+
+        if use_shared_project_values:
+            if area_min is None:
+                area_min = shared_area_min
+            if area_max is None:
+                area_max = shared_area_max
+            if price_from is None:
+                price_from = shared_price_min
+            if price_to is None:
+                price_to = shared_price_max
+            if not price_label:
+                price_label = shared_price_label
+
+        for bhk_type in labels:
+            if not bhk_type or bhk_type in seen:
+                continue
+            seen.add(bhk_type)
+
+            payloads.append({
+                "bhk_type": bhk_type,
+                "carpet_area_min": area_min,
+                "carpet_area_max": area_max,
+                "rera_carpet_area": _parse_float(source.get("rera_carpet_area") or source.get("reraCarpetArea")),
+                "deck_area": _parse_float(source.get("deck_area") or source.get("deckArea")),
+                "area_unit": source.get("area_unit") or source.get("areaUnit") or "sqft",
+                "price_from": price_from,
+                "price_to": price_to,
+                "price_label": price_label,
+            })
+
+    return payloads
+
+
+def _sync_unit_configs(project, payload=None, related_properties=None, replace=False):
+    payload = payload or {}
+    related_properties = list(related_properties or [])
+
+    if replace:
+        for row in list(project.unit_configs):
+            db.session.delete(row)
+        db.session.flush()
+
+    current_rows = UnitConfig.query.filter_by(project_id=project.id).all()
+    if current_rows and not replace:
+        rows = current_rows
+    else:
+        rows = []
+        for item in _build_unit_config_payloads(project, payload=payload, related_properties=related_properties):
+            row = UnitConfig(project_id=project.id, **item)
+            db.session.add(row)
+            rows.append(row)
+        db.session.flush()
+
+    rows = UnitConfig.query.filter_by(project_id=project.id).order_by(UnitConfig.id.asc()).all()
+
+    if rows:
+        project.configuration = json.dumps(_serialize_unit_configs(rows))
+        carpet_mins = [row.carpet_area_min for row in rows if row.carpet_area_min is not None]
+        carpet_maxs = [row.carpet_area_max for row in rows if row.carpet_area_max is not None]
+        price_mins = [row.price_from for row in rows if row.price_from is not None]
+        price_maxs = [row.price_to for row in rows if row.price_to is not None]
+        if carpet_mins and (replace or project.carpet_area_min is None):
+            project.carpet_area_min = min(carpet_mins)
+        if carpet_maxs and (replace or project.carpet_area_max is None):
+            project.carpet_area_max = max(carpet_maxs)
+        generated_price_range = _format_price_range_crore(
+            min(price_mins) if price_mins else None,
+            max(price_maxs) if price_maxs else (max(price_mins) if price_mins else None),
+            next((row.price_label for row in rows if row.price_label), None),
+        )
+        if generated_price_range and (replace or not project.price_range):
+            project.price_range = generated_price_range
+
+        jodi_labels = [row.bhk_type for row in rows if row.bhk_type and "+" in row.bhk_type]
+        if jodi_labels and not project.jodi_options:
+            project.jodi_options = json.dumps(jodi_labels)
+    elif replace:
+        project.configuration = None
+
+    return rows
+
+
+def _build_project_amenity_payloads(project, payload=None, related_properties=None):
+    payload = payload or {}
+    related_properties = list(related_properties or [])
+    primary_property = related_properties[0] if related_properties else None
+
+    if "project_amenities" in payload:
+        source = payload.get("project_amenities")
+    elif "amenities" in payload:
+        source = payload.get("amenities")
+    elif getattr(project, "amenities", None):
+        source = project.amenities
+    elif primary_property and primary_property.Key_Highlights:
+        source = primary_property.Key_Highlights
+    else:
+        source = []
+
+    raw_items = _coerce_list(source)
+    payloads = []
+    seen = set()
+
+    for item in raw_items:
+        if isinstance(item, dict):
+            name = item.get("name") or item.get("label") or item.get("title")
+            if not name:
+                continue
+            normalized_name = _normalize_project_amenity_names([name])
+            if not normalized_name:
+                continue
+            normalized_name = normalized_name[0]
+            marker = normalized_name.lower()
+            if marker in seen:
+                continue
+            seen.add(marker)
+            payloads.append({
+                "name": normalized_name,
+                "category": item.get("category") or _infer_project_amenity_category(normalized_name),
+                "icon_key": item.get("icon_key") or item.get("iconKey") or _infer_project_amenity_icon(normalized_name),
+            })
+            continue
+
+        for normalized_name in _normalize_project_amenity_names([item]):
+            marker = normalized_name.lower()
+            if marker in seen:
+                continue
+            seen.add(marker)
+            payloads.append({
+                "name": normalized_name,
+                "category": _infer_project_amenity_category(normalized_name),
+                "icon_key": _infer_project_amenity_icon(normalized_name),
+            })
+
+    return payloads
+
+
+def _sync_project_amenities(project, payload=None, related_properties=None, replace=False):
+    payload = payload or {}
+    related_properties = list(related_properties or [])
+
+    if replace:
+        for row in list(project.project_amenities):
+            db.session.delete(row)
+        db.session.flush()
+
+    current_rows = ProjectAmenity.query.filter_by(project_id=project.id).all()
+    if current_rows and not replace:
+        rows = current_rows
+    else:
+        rows = []
+        for item in _build_project_amenity_payloads(project, payload=payload, related_properties=related_properties):
+            row = ProjectAmenity(project_id=project.id, **item)
+            db.session.add(row)
+            rows.append(row)
+        db.session.flush()
+
+    rows = ProjectAmenity.query.filter_by(project_id=project.id).order_by(ProjectAmenity.id.asc()).all()
+    project.amenities = json.dumps([row.name for row in rows]) if rows else None
+    return rows
+
+
+def _sync_project_scalar_fields(project, payload=None, related_properties=None):
+    payload = payload or {}
+    related_properties = list(related_properties or [])
+    builder = Builder.query.filter_by(rera_id=project.builder_id).first() if project.builder_id else None
+    primary_property = related_properties[0] if related_properties else None
+
+    if not project.builder_name and builder:
+        project.builder_name = builder.company_name
+
+    if not project.development_group:
+        project.development_group = project.builder_name or (builder.company_name if builder else None)
+
+    if not project.structure_description:
+        if project.construction_status:
+            project.structure_description = project.construction_status
+        else:
+            pieces = []
+            if project.towers:
+                pieces.append(f"Towers: {project.towers}")
+            if project.floors_per_tower:
+                pieces.append(f"Floors per tower: {project.floors_per_tower}")
+            if pieces:
+                project.structure_description = ", ".join(pieces)
+
+    if not project.elevation and project.floors_per_tower:
+        project.elevation = f"G+{int(project.floors_per_tower)}"
+
+    if not project.highlights and primary_property and primary_property.Highlights:
+        project.highlights = primary_property.Highlights
+
+    if not project.usps:
+        if primary_property and primary_property.Highlights:
+            project.usps = primary_property.Highlights
+        elif project.highlights:
+            project.usps = project.highlights
+
+    if not project.full_address and primary_property and primary_property.Address:
+        project.full_address = primary_property.Address
+
+    if not project.location and primary_property and primary_property.Location:
+        project.location = primary_property.Location
+
+    if not project.property_status and primary_property and primary_property.Project_Status:
+        project.property_status = primary_property.Project_Status
+
+    if not project.status and primary_property and primary_property.Project_Status:
+        project.status = project.property_status or primary_property.Project_Status
+
+    if not project.possession_date and primary_property and primary_property.Possession_Date:
+        try:
+            project.possession_date = datetime.fromisoformat(str(primary_property.Possession_Date)).date()
+        except Exception:
+            pass
+
+
+def _sync_property_from_project(project, prop):
+    config_rows = UnitConfig.query.filter_by(project_id=project.id).order_by(UnitConfig.id.asc()).all()
+    amenity_rows = ProjectAmenity.query.filter_by(project_id=project.id).order_by(ProjectAmenity.id.asc()).all()
+    config_blob = _serialize_unit_configs(config_rows)
+    amenity_names = [row.name for row in amenity_rows if row.name]
+
+    if project.title and not prop.Property_Name:
+        prop.Property_Name = project.title
+    if project.location and not prop.Location:
+        prop.Location = project.location
+    if project.builder_name and not prop.Builder_Name:
+        prop.Builder_Name = project.builder_name
+    if project.full_address and not prop.Address:
+        prop.Address = project.full_address
+    if project.latitude is not None and prop.latitude is None:
+        prop.latitude = project.latitude
+    if project.longitude is not None and prop.longitude is None:
+        prop.longitude = project.longitude
+    if (project.location_source or (project.latitude is not None and project.longitude is not None)) and not prop.location_source:
+        prop.location_source = project.location_source or 'manual'
+    if (project.property_status or project.status) and not prop.Project_Status:
+        prop.Project_Status = project.property_status or project.status
+    if project.possession_date and not prop.Possession_Date:
+        prop.Possession_Date = project.possession_date.isoformat()
+
+    if config_blob:
+        prop.Existing_Configurations = json.dumps(config_blob)
+        if not prop.Carpet_Area:
+            prop.Carpet_Area = _format_area_range(project.carpet_area_min, project.carpet_area_max)
+        if not prop.Price_Starting_From and project.price_range:
+            prop.Price_Starting_From = project.price_range
+
+    if amenity_names:
+        prop.Key_Highlights = json.dumps(amenity_names)
+
+    if not prop.Highlights:
+        project_highlights = _safe_json_load(project.highlights, default=[])
+        project_usps = _safe_json_load(project.usps, default=[])
+        merged = _merge_unique_sequence(project_highlights, project_usps)
+        if merged:
+            prop.Highlights = json.dumps(merged)
+
+
+def _sync_project_related_data(project, payload=None, replace_unit_configs=False, replace_amenities=False, sync_properties=True):
+    related_properties = Property.query.filter_by(project_id=project.id).order_by(Property.id.asc()).all()
+    _sync_project_scalar_fields(project, payload=payload, related_properties=related_properties)
+    _sync_unit_configs(project, payload=payload, related_properties=related_properties, replace=replace_unit_configs)
+    _sync_project_amenities(project, payload=payload, related_properties=related_properties, replace=replace_amenities)
+
+    if sync_properties:
+        for prop in related_properties:
+            _sync_property_from_project(project, prop)
+
+
 def _ensure_schema_compatibility():
     """
-    Repair known additive schema drift for existing PostgreSQL deployments.
-    `db.create_all()` creates tables but does not add columns to existing ones.
+    Best-effort additive schema repair.
+    - Always runs `db.create_all()` to ensure new tables exist.
+    - Adds missing columns for known drift where possible.
     """
-    if db.engine.dialect.name != 'postgresql':
-        return
-
+    dialect = db.engine.dialect.name
     inspector = inspect(db.engine)
+
+    def _add_column_if_missing(table_name, column_name, column_type):
+        if not inspector.has_table(table_name):
+            return
+        existing_columns = {column['name'] for column in inspector.get_columns(table_name)}
+        if column_name in existing_columns:
+            return
+
+        if dialect == 'postgresql':
+            db.session.execute(text(
+                f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {column_name} {column_type}"
+            ))
+        else:
+            db.session.execute(text(
+                f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type}"
+            ))
+        print(f"Applied schema repair: added {table_name}.{column_name}")
 
     if inspector.has_table('user_interaction'):
         existing_columns = {column['name'] for column in inspector.get_columns('user_interaction')}
         if 'guest_id' not in existing_columns:
-            db.session.execute(
-                text("ALTER TABLE user_interaction ADD COLUMN IF NOT EXISTS guest_id VARCHAR(100)")
-            )
-            print("Applied schema repair: added user_interaction.guest_id")
+            _add_column_if_missing('user_interaction', 'guest_id', 'VARCHAR(100)')
             
             # // Add indexes for user_interaction after schema repair
 
@@ -316,7 +1009,7 @@ def _ensure_schema_compatibility():
         db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_property_id ON user_interaction (property_id)"))
         db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_session_id ON user_interaction (session_id)"))
 
-    if inspector.has_table('favorite'):
+    if dialect == 'postgresql' and inspector.has_table('favorite'):
         _dedupe_favorite_rows()
         db.session.flush()
 
@@ -502,6 +1195,64 @@ def get_property(id):
     property = Property.query.get_or_404(id)
     return jsonify(property.to_dict())
 
+@app.route('/api/properties/<int:id>', methods=['PATCH'])
+@admin_only
+def patch_property(id):
+    prop = Property.query.get_or_404(id)
+    data = request.get_json(silent=True) or {}
+
+    has_lat = 'latitude' in data or 'Latitude' in data
+    has_lng = 'longitude' in data or 'Longitude' in data
+    has_source = 'location_source' in data or 'locationSource' in data
+
+    # Allow no-op PATCH (useful for future expansion)
+    if not (has_lat or has_lng or has_source):
+        return jsonify(prop.to_dict()), 200
+
+    lat = _safe_float(data.get('latitude') if 'latitude' in data else data.get('Latitude'))
+    lng = _safe_float(data.get('longitude') if 'longitude' in data else data.get('Longitude'))
+
+    # Allow explicitly clearing coordinates by sending null/empty for both.
+    lat_raw = data.get('latitude') if 'latitude' in data else data.get('Latitude') if 'Latitude' in data else None
+    lng_raw = data.get('longitude') if 'longitude' in data else data.get('Longitude') if 'Longitude' in data else None
+    clearing_coords = (lat_raw in (None, '') and lng_raw in (None, '')) and (has_lat or has_lng)
+
+    if not clearing_coords:
+        if has_lat and lat is None:
+            return jsonify({'error': 'invalid_latitude'}), 400
+        if has_lng and lng is None:
+            return jsonify({'error': 'invalid_longitude'}), 400
+        if (has_lat and not has_lng) or (has_lng and not has_lat):
+            return jsonify({'error': 'latitude_and_longitude_required_together'}), 400
+
+    prev_lat = prop.latitude
+    prev_lng = prop.longitude
+
+    if clearing_coords:
+        prop.latitude = None
+        prop.longitude = None
+        prop.location_source = data.get('location_source') or data.get('locationSource') or prop.location_source
+    else:
+        if has_lat:
+            prop.latitude = lat
+        if has_lng:
+            prop.longitude = lng
+        if has_source:
+            prop.location_source = data.get('location_source') or data.get('locationSource')
+        if not prop.location_source and prop.latitude is not None and prop.longitude is not None:
+            prop.location_source = 'manual'
+
+    # If coordinates changed, clear POI cache so the next fetch recomputes.
+    coords_changed = (prev_lat != prop.latitude) or (prev_lng != prop.longitude)
+    if coords_changed and getattr(prop, 'poi_cache', None):
+        try:
+            db.session.delete(prop.poi_cache)
+        except Exception:
+            pass
+
+    db.session.commit()
+    return jsonify(prop.to_dict()), 200
+
 @app.route('/api/properties', methods=['POST'])
 @admin_only
 def create_property():
@@ -509,6 +1260,9 @@ def create_property():
     new_property = Property(
         Property_Name=data.get('Property_Name'),
         Location=data.get('Location'),
+        latitude=data.get('latitude') if data.get('latitude') is not None else data.get('Latitude'),
+        longitude=data.get('longitude') if data.get('longitude') is not None else data.get('Longitude'),
+        location_source=data.get('location_source') or data.get('locationSource'),
         Carpet_Area=data.get('Carpet_Area'),
         Price_Starting_From=data.get('Price_Starting_From'),
         Pricing=data.get('Pricing'),
@@ -537,9 +1291,286 @@ def create_property():
         user_id=data['user_id'],
         project_id=data.get('project_id')
     )
+    if (
+        not new_property.location_source
+        and new_property.latitude is not None
+        and new_property.longitude is not None
+    ):
+        new_property.location_source = 'manual'
     db.session.add(new_property)
+    db.session.flush()
+    if new_property.project_id:
+        project = BuilderProject.query.get(new_property.project_id)
+        if project:
+            _sync_property_from_project(project, new_property)
+            _sync_project_related_data(project)
     db.session.commit()
     return jsonify(new_property.to_dict()), 201
+
+
+NOMINATIM_SEARCH_URL = os.getenv('NOMINATIM_SEARCH_URL', 'https://nominatim.openstreetmap.org/search')
+OVERPASS_INTERPRETER_URL = os.getenv('OVERPASS_INTERPRETER_URL', 'https://overpass-api.de/api/interpreter')
+POI_CACHE_TTL_SECONDS = int(os.getenv('POI_CACHE_TTL_SECONDS', str(14 * 24 * 60 * 60)))  # 14 days
+
+
+def _safe_float(value):
+    try:
+        if value is None or value == '':
+            return None
+        return float(value)
+    except Exception:
+        return None
+
+
+def _overpass_query(lat, lng, radius_m, poi_types):
+    # Supported types -> tag filters
+    type_filters = {
+        'school': [('amenity', 'school')],
+        'hospital': [('amenity', 'hospital')],
+        'clinic': [('amenity', 'clinic')],
+        'pharmacy': [('amenity', 'pharmacy')],
+        'supermarket': [('shop', 'supermarket')],
+        'park': [('leisure', 'park')],
+        'bus_stop': [('highway', 'bus_stop')],
+    }
+
+    clauses = []
+    for poi_type in poi_types:
+        filters = type_filters.get(poi_type)
+        if not filters:
+            continue
+        for key, value in filters:
+            clauses.append(f'node["{key}"="{value}"](around:{radius_m},{lat},{lng});')
+            clauses.append(f'way["{key}"="{value}"](around:{radius_m},{lat},{lng});')
+            clauses.append(f'relation["{key}"="{value}"](around:{radius_m},{lat},{lng});')
+
+    body = "\n".join(clauses)
+    return f"""
+[out:json][timeout:25];
+(
+{body}
+);
+out center 50;
+""".strip()
+
+
+def _extract_overpass_pois(payload, allowed_types):
+    type_filters = {
+        ('amenity', 'school'): 'school',
+        ('amenity', 'hospital'): 'hospital',
+        ('amenity', 'clinic'): 'clinic',
+        ('amenity', 'pharmacy'): 'pharmacy',
+        ('shop', 'supermarket'): 'supermarket',
+        ('leisure', 'park'): 'park',
+        ('highway', 'bus_stop'): 'bus_stop',
+    }
+
+    results = {t: [] for t in allowed_types}
+    elements = payload.get('elements') if isinstance(payload, dict) else None
+    if not isinstance(elements, list):
+        return results
+
+    seen = set()
+    for element in elements:
+        if not isinstance(element, dict):
+            continue
+        tags = element.get('tags') or {}
+        if not isinstance(tags, dict):
+            tags = {}
+
+        poi_type = None
+        for (k, v), normalized in type_filters.items():
+            if normalized not in allowed_types:
+                continue
+            if tags.get(k) == v:
+                poi_type = normalized
+                break
+
+        if not poi_type:
+            continue
+
+        center = element.get('center') if isinstance(element.get('center'), dict) else None
+        lat = element.get('lat') if element.get('lat') is not None else (center.get('lat') if center else None)
+        lng = element.get('lon') if element.get('lon') is not None else (center.get('lon') if center else None)
+        lat = _safe_float(lat)
+        lng = _safe_float(lng)
+        if lat is None or lng is None:
+            continue
+
+        osm_id = f"{element.get('type')}:{element.get('id')}"
+        if osm_id in seen:
+            continue
+        seen.add(osm_id)
+
+        results[poi_type].append({
+            'id': osm_id,
+            'name': tags.get('name') or 'Unnamed',
+            'lat': lat,
+            'lng': lng,
+            'tags': {k: tags.get(k) for k in ('amenity', 'shop', 'leisure', 'highway') if tags.get(k)},
+        })
+
+    # Keep response small and predictable
+    for poi_type in results:
+        results[poi_type] = results[poi_type][:25]
+    return results
+
+
+@app.route('/api/geocode', methods=['GET'])
+def geocode_address():
+    query = (request.args.get('q') or '').strip()
+    if not query:
+        return jsonify({'error': 'q is required'}), 400
+
+    try:
+        resp = requests.get(
+            NOMINATIM_SEARCH_URL,
+            params={
+                'q': query,
+                'format': 'jsonv2',
+                'limit': 5,
+                'addressdetails': 1,
+            },
+            headers={
+                'User-Agent': 'HouseNseeK/1.0 (geocoding; contact: admin@housenseek.local)',
+            },
+            timeout=12,
+        )
+        if resp.status_code != 200:
+            return jsonify({'error': 'geocoding_failed'}), 502
+        data = resp.json()
+        if not isinstance(data, list):
+            return jsonify([]), 200
+
+        cleaned = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            lat = _safe_float(item.get('lat'))
+            lng = _safe_float(item.get('lon'))
+            if lat is None or lng is None:
+                continue
+            cleaned.append({
+                'display_name': item.get('display_name'),
+                'lat': lat,
+                'lng': lng,
+                'type': item.get('type'),
+                'class': item.get('class'),
+            })
+        return jsonify(cleaned), 200
+    except Exception as e:
+        return jsonify({'error': 'geocoding_error', 'detail': str(e)}), 500
+
+
+@app.route('/api/properties/<int:id>/pois', methods=['GET'])
+def get_property_pois(id):
+    prop = Property.query.get_or_404(id)
+    lat = _safe_float(getattr(prop, 'latitude', None))
+    lng = _safe_float(getattr(prop, 'longitude', None))
+
+    if lat is None or lng is None:
+        return jsonify({'property_id': id, 'latitude': None, 'longitude': None, 'radius_m': None, 'types': [], 'pois': {}}), 200
+
+    radius_m = request.args.get('radius_m')
+    radius_m = int(radius_m) if str(radius_m or '').isdigit() else 2000
+    radius_m = max(250, min(radius_m, 5000))
+
+    requested_types = (request.args.get('types') or 'school,hospital,pharmacy,supermarket').split(',')
+    requested_types = [t.strip().lower() for t in requested_types if t.strip()]
+    allowed = {'school', 'hospital', 'clinic', 'pharmacy', 'supermarket', 'park', 'bus_stop'}
+    poi_types = [t for t in requested_types if t in allowed]
+    if not poi_types:
+        poi_types = ['school', 'hospital']
+
+    now = datetime.utcnow()
+    cache = PropertyPoiCache.query.filter_by(property_id=prop.id).first()
+
+    def _cache_fresh(existing):
+        if not existing or not existing.fetched_at:
+            return False
+        if existing.latitude is None or existing.longitude is None:
+            return False
+        if abs(existing.latitude - lat) > 0.0001 or abs(existing.longitude - lng) > 0.0001:
+            return False
+        if int(existing.radius_m or 0) != int(radius_m):
+            return False
+        try:
+            cached_types = json.loads(existing.poi_types) if existing.poi_types else []
+        except Exception:
+            cached_types = []
+        if sorted(cached_types) != sorted(poi_types):
+            return False
+        return (now - existing.fetched_at).total_seconds() < POI_CACHE_TTL_SECONDS
+
+    if _cache_fresh(cache):
+        try:
+            return jsonify({
+                'property_id': prop.id,
+                'latitude': lat,
+                'longitude': lng,
+                'radius_m': radius_m,
+                'types': poi_types,
+                'cached': True,
+                'fetched_at': cache.fetched_at.isoformat() if cache.fetched_at else None,
+                'pois': json.loads(cache.data) if cache.data else {},
+            }), 200
+        except Exception:
+            pass
+
+    query = _overpass_query(lat, lng, radius_m, poi_types)
+    try:
+        resp = requests.post(
+            OVERPASS_INTERPRETER_URL,
+            data=query.encode('utf-8'),
+            headers={'Content-Type': 'text/plain; charset=utf-8', 'User-Agent': 'HouseNseeK/1.0 (poi fetch)'},
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            raise RuntimeError(f"Overpass status {resp.status_code}")
+        payload = resp.json()
+        pois = _extract_overpass_pois(payload, poi_types)
+    except Exception as e:
+        # If Overpass fails, serve stale cache if present.
+        if cache and cache.data:
+            try:
+                return jsonify({
+                    'property_id': prop.id,
+                    'latitude': lat,
+                    'longitude': lng,
+                    'radius_m': radius_m,
+                    'types': poi_types,
+                    'cached': True,
+                    'stale': True,
+                    'error': str(e),
+                    'fetched_at': cache.fetched_at.isoformat() if cache.fetched_at else None,
+                    'pois': json.loads(cache.data),
+                }), 200
+            except Exception:
+                pass
+        return jsonify({'error': 'poi_fetch_failed', 'detail': str(e)}), 502
+
+    if not cache:
+        cache = PropertyPoiCache(property_id=prop.id)
+        db.session.add(cache)
+
+    cache.latitude = lat
+    cache.longitude = lng
+    cache.radius_m = radius_m
+    cache.poi_types = json.dumps(poi_types)
+    cache.data = json.dumps(pois)
+    cache.fetched_at = now
+    db.session.commit()
+
+    return jsonify({
+        'property_id': prop.id,
+        'latitude': lat,
+        'longitude': lng,
+        'radius_m': radius_m,
+        'types': poi_types,
+        'cached': False,
+        'fetched_at': cache.fetched_at.isoformat() if cache.fetched_at else None,
+        'pois': pois,
+    }), 200
 
 @app.route('/api/builders', methods=['GET'])
 def get_builders():
@@ -763,7 +1794,6 @@ def update_builder(rera_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-import re
 @app.route('/api/builders/<rera_id>', methods=['DELETE'])
 def delete_builder(rera_id):
     try:
@@ -789,28 +1819,39 @@ def get_builder_projects(rera_id):
         return jsonify({'error': str(e)}), 500
 
 def _create_property_for_project(project, user_id, data):
+    config_blob = _serialize_unit_configs(list(project.unit_configs or []))
+    amenity_names = _get_project_amenity_names(project)
+    project_highlights = _merge_unique_sequence(
+        _safe_json_load(project.highlights, default=[]),
+        _safe_json_load(project.usps, default=[]),
+        _coerce_list(data.get('Highlights')),
+    )
+
     new_property = Property(
         Property_Name=project.title,
         Location=project.location,
+        latitude=project.latitude,
+        longitude=project.longitude,
+        location_source=project.location_source or ('manual' if project.latitude is not None and project.longitude is not None else None),
         Builder_Name=project.builder_name,
-        Project_Status=project.status,
+        Project_Status=project.property_status or project.status,
         Possession_Date=project.possession_date.isoformat() if project.possession_date else None,
         user_id=user_id,
         project_id=project.id,
         RERA_ID=data.get('RERA_ID'),
-        Carpet_Area=data.get('Carpet_Area'),
-        Price_Starting_From=data.get('Price_Starting_From'),
+        Carpet_Area=data.get('Carpet_Area') or _format_area_range(project.carpet_area_min, project.carpet_area_max),
+        Price_Starting_From=data.get('Price_Starting_From') or project.price_range,
         Pricing=data.get('Pricing'),
-        Highlights=json.dumps(data.get('Highlights')) if data.get('Highlights') else None,
+        Highlights=json.dumps(project_highlights) if project_highlights else None,
         Extra_Charges=data.get('Extra_Charges'),
         Builder_Details=json.dumps(data.get('Builder_Details')),
-        Existing_Configurations=json.dumps(data.get('Existing_Configurations')),
+        Existing_Configurations=json.dumps(data.get('Existing_Configurations')) if data.get('Existing_Configurations') is not None else (json.dumps(config_blob) if config_blob else None),
         Built_up_Area=data.get('Built_up_Area'),
         Main_Door_Facing=data.get('Main_Door_Facing'),
         Ceiling_Height=data.get('Ceiling_Height'),
         Kitchen=data.get('Kitchen'),
-        Key_Highlights=json.dumps(data.get('Key_Highlights')),
-        Address=data.get('Address'),
+        Key_Highlights=json.dumps(data.get('Key_Highlights')) if data.get('Key_Highlights') is not None else (json.dumps(amenity_names) if amenity_names else None),
+        Address=data.get('Address') or project.full_address,
         Flat_Details=json.dumps(data.get('Flat_Details')),
         Loan_Availability=json.dumps(data.get('Loan_Availability')),
         Approved_by_Authorities=json.dumps(data.get('Approved_by_Authorities')),
@@ -821,7 +1862,9 @@ def _create_property_for_project(project, user_id, data):
         Connectivity=json.dumps(data.get('Connectivity'))
     )
     db.session.add(new_property)
-    db.session.commit()
+    db.session.flush()
+    _sync_property_from_project(project, new_property)
+    return new_property
     
 
 #-----------------STEP 1 ROUTING FETCHING DETAILS FROM FRONTEND AND PUSHING TO DATABASE------------------------
@@ -859,9 +1902,23 @@ def create_project_step1(rera_id):
         landmark=data.get('landmark'),
         towers=data.get('towers'),
         floors_per_tower=data.get('floors_per_tower'),
-        construction_status=data.get('construction_status')
+        construction_status=data.get('construction_status'),
+        development_group=data.get('development_group'),
+        elevation=data.get('elevation'),
+        structure_description=data.get('structure_description'),
+        jodi_options=_json_list_or_none(data.get('jodi_options')),
+        usps=_json_list_or_none(data.get('usps')),
+        highlights=_json_list_or_none(data.get('highlights')),
     )
     db.session.add(new_project)
+    db.session.flush()
+    _sync_project_related_data(
+        new_project,
+        payload=data,
+        replace_unit_configs=("unit_configs" in data or "configuration" in data),
+        replace_amenities=("project_amenities" in data or "amenities" in data),
+        sync_properties=False,
+    )
     db.session.commit()
     return jsonify(new_project.to_dict()), 201
 
@@ -882,6 +1939,12 @@ def create_project_step2(rera_id):
     project.booking_amount = data.get('bookingAmount')
     project.flat_number = data.get('flat_number')
     project.form_status = 'step2_complete'
+    _sync_project_related_data(
+        project,
+        payload=data,
+        replace_unit_configs=True,
+        sync_properties=False,
+    )
     db.session.commit()
     return jsonify(project.to_dict()), 200
 
@@ -937,12 +2000,17 @@ def create_project_step5(rera_id):
     project = BuilderProject.query.filter_by(id=project_id).first_or_404()
     
     # Update fields for step 5
-    project.amenities = json.dumps(data.get('amenities', []))
     project.form_status = 'step5_complete'
-    
-    db.session.commit()
 
     _create_property_for_project(project, user_id, data)
+    _sync_project_related_data(
+        project,
+        payload=data,
+        replace_unit_configs=("unit_configs" in data or "configuration" in data),
+        replace_amenities=("project_amenities" in data or "amenities" in data),
+        sync_properties=True,
+    )
+    db.session.commit()
 
     return jsonify(project.to_dict()), 200
 
@@ -997,8 +2065,12 @@ def update_project_step(rera_id, project_id):
     try:
         data = request.json
         project = BuilderProject.query.filter_by(id=project_id, builder_id=rera_id).first_or_404()
+        replace_unit_configs = 'unit_configs' in data or 'configuration' in data
+        replace_amenities = 'project_amenities' in data or 'amenities' in data
         # Update only provided fields
         for key, value in data.items():
+            if key in {'unit_configs', 'project_amenities'}:
+                continue
             if key == 'floor_plans':
                 # Always save as JSON array
                 if isinstance(value, str):
@@ -1024,8 +2096,27 @@ def update_project_step(rera_id, project_id):
                 elif isinstance(value, list):
                     value = json.dumps(value)
                 setattr(project, key, value)
+            elif key == 'configuration':
+                if isinstance(value, str):
+                    try:
+                        parsed = json.loads(value)
+                        value = json.dumps(parsed)
+                    except Exception:
+                        value = json.dumps(_coerce_list(value))
+                else:
+                    value = json.dumps(_coerce_list(value))
+                setattr(project, key, value)
+            elif key in {'jodi_options', 'usps', 'highlights'}:
+                setattr(project, key, _json_list_or_none(value))
             elif hasattr(project, key):
                 setattr(project, key, value)
+        _sync_project_related_data(
+            project,
+            payload=data,
+            replace_unit_configs=replace_unit_configs,
+            replace_amenities=replace_amenities,
+            sync_properties=True,
+        )
         # Optionally update form_status
         if 'form_status' in data:
             project.form_status = data['form_status']
@@ -1037,11 +2128,8 @@ def update_project_step(rera_id, project_id):
             api_key = os.getenv('PERPLEXITY_API_KEY')
             primary_slug = generate_slug_with_perplexity(project, api_key)
             # Optionally, generate alias slugs using variations (fallback to slugify for aliases)
-            try:
-                config = json.loads(project.configuration) if project.configuration else []
-            except Exception:
-                config = []
-            bhk = str(config[0]) if config else ''
+            config_labels = _get_project_configuration_labels(project)
+            bhk = str(config_labels[0]) if config_labels else ''
             property_type = str(project.property_type or '')
             locality = str(project.locality or '')
             builder = str(project.builder_name or '')
@@ -1921,7 +3009,6 @@ def _canonical_property_status(value: str) -> str:
         return ''
 
 @app.route('/api/properties/filters', methods=['GET'])
-@clerk_required()
 def get_filters():
     """Return unique filter options sourced from BuilderProject and Property tables.
     Includes amenities (normalized), property_status, project status, and derived society types.
@@ -1936,11 +3023,15 @@ def get_filters():
     projects = project_query.all()
 
     amenities_all = []
+    amenity_categories_all = []
     property_status_all = []
     society_types_all = []
 
     for prj in projects:
-        amenities_all.extend(_normalize_amenities(prj.amenities))
+        amenities_all.extend(_normalize_amenities(_get_project_amenity_names(prj)))
+        for row in list(getattr(prj, 'project_amenities', []) or []):
+            if row.category:
+                amenity_categories_all.append(str(row.category).strip())
         # property status is sourced from Property table per requirements
 
     # Collect from Property table for status and society types
@@ -1967,6 +3058,7 @@ def get_filters():
 
     return jsonify({
         'amenities': amen_set,
+        'amenityCategories': sorted(set([c for c in amenity_categories_all if c])),
         'propertyStatus': sorted(set([s for s in property_status_all if s])),
         'societyTypes': society_types,
     })
@@ -1975,9 +3067,12 @@ def get_filters():
 @app.route('/api/properties/search', methods=['GET'])
 def search_properties():
     location = request.args.get('location', '', type=str)
-    price = request.args.get('price', 0, type=float)  # price in Cr
+    price = request.args.get('price', 0, type=float)  # price in Cr (desktop slider)
+    min_price = request.args.get('min_price', 0, type=float)
+    max_price = request.args.get('max_price', 0, type=float)
     bhk_types = request.args.getlist('type')  # e.g., ['1BHK', '2BHK']
     amenities_filter = [a.lower().strip() for a in request.args.getlist('amenities') if a]
+    amenity_category_filter = [c.lower().strip() for c in request.args.getlist('amenity_category') if c]
     property_status_filter = [s.lower().strip() for s in request.args.getlist('property_status') if s]
     # Canonicalize requested property status values
     property_status_filter_canonical = set(_canonical_property_status(s) for s in property_status_filter)
@@ -1992,9 +3087,13 @@ def search_properties():
     # Fetch all rows first (filtered by location)
     results = query.all()
 
+    # Use 'price' param as max_price if max_price is not explicitly provided (desktop compatibility)
+    if not max_price and price > 0:
+        max_price = price
+
     # ---- PRICE FILTER ----
-    if price and price > 0:
-        def price_matches(prop, max_price_cr):
+    if (min_price and min_price > 0) or (max_price and max_price > 0):
+        def price_matches(prop, min_p, max_p):
             val = getattr(prop, "Price_Starting_From", "") or ""
             # Handle ranges like "70 L - 2.5 Cr" - take the starting price
             first_part = val.split('–')[0].split('-')[0].strip()
@@ -2009,11 +3108,20 @@ def search_properties():
                     price_val = float(val_clean.replace('lakh','').replace('l','').strip()) / 100  # Lakh → Cr
                 else:
                     price_val = float(val_clean)
-                return price_val <= max_price_cr
+
+                meets_min = True
+                if min_p > 0:
+                    meets_min = price_val >= (min_p - 0.001)  # Small epsilon for float comparison
+
+                meets_max = True
+                if max_p > 0:
+                    meets_max = price_val <= (max_p + 0.001)
+
+                return meets_min and meets_max
             except Exception:
                 return False
 
-        results = [p for p in results if price_matches(p, price)]
+        results = [p for p in results if price_matches(p, min_price, max_price)]
 
     # ---- BHK FILTER ----
     if bhk_types and any(bhk_types):
@@ -2045,7 +3153,7 @@ def search_properties():
         results = [p for p in results if matches_bhk_type(p)]
 
     # ---- AMENITIES / PROPERTY STATUS / SOCIETY TYPE FILTERS ----
-    if amenities_filter or property_status_filter or society_type_filter:
+    if amenities_filter or amenity_category_filter or property_status_filter or society_type_filter:
         def get_matching_project(prop):
             # Prefer explicit relationship, else best-effort match by builder and title
             if prop.project_id:
@@ -2059,7 +3167,14 @@ def search_properties():
 
         def matches_extra_filters(prop):
             prj = get_matching_project(prop)
-            prj_amenities = _normalize_amenities(prj.amenities) if prj else []
+            prj_amenities = _normalize_amenities(_get_project_amenity_names(prj)) if prj else []
+            prj_amenity_categories = set()
+            if prj:
+                prj_amenity_categories = set([
+                    str(row.category or '').strip().lower()
+                    for row in list(getattr(prj, 'project_amenities', []) or [])
+                    if str(row.category or '').strip()
+                ])
             # Property Status must be from Property.Project_Status
             # Canonicalize property status value for comparison
             prop_status_value = _canonical_property_status(prop.Project_Status) if prop.Project_Status else None
@@ -2068,6 +3183,10 @@ def search_properties():
             if amenities_filter:
                 prj_amen_lower = set([a.lower() for a in prj_amenities])
                 if not all(a in prj_amen_lower for a in amenities_filter):
+                    return False
+
+            if amenity_category_filter:
+                if not all(category in prj_amenity_categories for category in amenity_category_filter):
                     return False
 
             # Property status: match against Property.Project_Status only
@@ -2093,7 +3212,14 @@ def search_properties():
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "ok"}), 200
+    from chatbot.rag_service import get_azure_openai_health
+
+    azure_health = get_azure_openai_health()
+    status = "ok" if azure_health["configured"] else "degraded"
+    return jsonify({
+        "status": status,
+        "chatbot": azure_health,
+    }), 200
 
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")  # Set your actual Google Client ID here
 

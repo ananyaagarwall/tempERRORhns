@@ -316,6 +316,26 @@ html {
   }
 }
 
+/* Keep map layers below the fixed app header */
+#map-location .leaflet-container {
+  z-index: 0 !important;
+}
+
+#map-location .leaflet-top,
+#map-location .leaflet-bottom {
+  z-index: 10 !important;
+}
+
+#map-location .leaflet-control-zoom {
+  display: block !important;
+  z-index: 30 !important;
+}
+
+#map-location .leaflet-control-zoom a {
+  color: #111827 !important;
+  font-weight: 700 !important;
+}
+
 /* Map and Location Section - MOBILE ONLY Optimizations */
 @media (max-width: 640px) {
   #map-location {
@@ -338,7 +358,7 @@ html {
     box-sizing: border-box !important;
   }
   
-  #map-location img {
+  #map-location > div > img {
     max-width: 85% !important;
     width: 85% !important;
     height: auto !important;
@@ -348,6 +368,17 @@ html {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     margin: 0 auto !important;
     display: block !important;
+  }
+
+  #map-location .leaflet-container img {
+    max-width: none !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    object-fit: initial !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
   }
   
   #map-location h2 {

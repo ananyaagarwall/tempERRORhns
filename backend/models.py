@@ -50,6 +50,9 @@ class Property(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     Property_Name = db.Column(db.String(100), nullable=False)
     Location = db.Column(db.String(200), nullable=False)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    location_source = db.Column(db.String(20), nullable=True)  # manual | geocoded | unknown
     Carpet_Area = db.Column(db.String(100))
     Price_Starting_From = db.Column(db.String(50))
     Pricing = db.Column(db.String(100))
@@ -82,6 +85,13 @@ class Property(db.Model):
     project_id = db.Column(db.Integer, db.ForeignKey('builder_project.id'), nullable=True)
     enquiries = db.relationship('Enquiry', backref='property', lazy=True)
     reviews = db.relationship('Review', backref='property', lazy=True)
+    poi_cache = db.relationship(
+        'PropertyPoiCache',
+        backref='property',
+        lazy=True,
+        uselist=False,
+        cascade='all, delete-orphan',
+    )
 
     def to_dict(self):
         # Helper to safely parse JSON fields that might contain
@@ -125,6 +135,9 @@ class Property(db.Model):
             'id': self.id,
             'Property_Name': self.Property_Name,
             'Location': self.Location,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'location_source': self.location_source,
             'Carpet_Area': self.Carpet_Area,
             'Price_Starting_From': self.Price_Starting_From,
             'Pricing': self.Pricing,
@@ -155,6 +168,18 @@ class Property(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'builder_project_image': builder_project_image
         }
+
+
+class PropertyPoiCache(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=False, unique=True)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    radius_m = db.Column(db.Integer, default=2000)
+    poi_types = db.Column(db.Text, nullable=True)  # JSON list
+    data = db.Column(db.Text, nullable=True)  # JSON payload
+    fetched_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Enquiry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -279,6 +304,9 @@ class BuilderProject(db.Model):
     city = db.Column(db.String(100))
     locality = db.Column(db.String(100))
     landmark = db.Column(db.String(200))
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    location_source = db.Column(db.String(20), nullable=True)  # manual | geocoded | unknown
     towers = db.Column(db.Integer)
     floors_per_tower = db.Column(db.Integer)
     construction_status = db.Column(db.Text)
@@ -287,12 +315,28 @@ class BuilderProject(db.Model):
     floor_plans = db.Column(db.Text)  # JSON string of floor plan image URLs
     
     # New fields for step 5 (Amenities)
-    amenities = db.Column(db.Text)  # JSON string of amenities list
-    
+    amenities = db.Column(db.Text)  # JSON string of amenities list (legacy blob; prefer ProjectAmenity rows)
+
     # New field for step 6 (Media)
     project_image = db.Column(db.String(300))  # URL to stored project image
 
-    properties = db.relationship('Property', backref='project', lazy=True)
+    # ── Developer / Branding ─────────────────────────────────────────────────
+    development_group = db.Column(db.String(150))  # e.g. "Maithili Group"
+
+    # ── Structure / Elevation ────────────────────────────────────────────────
+    elevation             = db.Column(db.String(100))  # e.g. "G+25 storey"
+    structure_description = db.Column(db.Text)         # e.g. "Basement + Ground + 4 Podium + 21 Residential floors"
+
+    # ── Combo / Jodi Options ─────────────────────────────────────────────────
+    jodi_options = db.Column(db.Text)  # JSON list e.g. ["2+2 BHK (4BHK)", "2+3 BHK (5BHK)"]
+
+    # ── Marketing Content ────────────────────────────────────────────────────
+    usps       = db.Column(db.Text)  # JSON list of project USP bullet points
+    highlights = db.Column(db.Text)  # JSON list of project highlight bullet points
+
+    properties        = db.relationship('Property', backref='project', lazy=True)
+    unit_configs      = db.relationship('UnitConfig', backref='project', lazy=True, cascade='all, delete-orphan')
+    project_amenities = db.relationship('ProjectAmenity', backref='project', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
@@ -326,13 +370,89 @@ class BuilderProject(db.Model):
             'city': self.city,
             'locality': self.locality,
             'landmark': self.landmark,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'location_source': self.location_source,
             'towers': self.towers,
             'floors_per_tower': self.floors_per_tower,
             'construction_status': self.construction_status,
             'floor_plans': json.loads(self.floor_plans) if self.floor_plans else [],
             'amenities': json.loads(self.amenities) if self.amenities else [],
-            'project_image': self.project_image
+            'project_image': self.project_image,
+            # ── New fields ──────────────────────────────────────────────────
+            'development_group':    self.development_group,
+            'elevation':            self.elevation,
+            'structure_description': self.structure_description,
+            'jodi_options':  json.loads(self.jodi_options) if self.jodi_options else [],
+            'usps':          json.loads(self.usps) if self.usps else [],
+            'highlights':    json.loads(self.highlights) if self.highlights else [],
+            'unit_configs':       [uc.to_dict() for uc in self.unit_configs],
+            'project_amenities':  [pa.to_dict() for pa in self.project_amenities],
         }
+
+# =============================================================================
+# UNIT CONFIG  — one row per BHK type per project
+# Replaces / supplements the old `configuration` JSON blob on BuilderProject.
+# =============================================================================
+
+class UnitConfig(db.Model):
+    """Structured unit configuration for a builder project (one row per BHK type)."""
+    __tablename__ = 'unit_config'
+
+    id         = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('builder_project.id'), nullable=False)
+
+    bhk_type        = db.Column(db.String(20))   # '2 BHK', '3 BHK', etc.
+    carpet_area_min = db.Column(db.Float)         # in area_unit
+    carpet_area_max = db.Column(db.Float)         # in area_unit
+    rera_carpet_area = db.Column(db.Float)        # explicit RERA carpet (may differ from saleable)
+    deck_area       = db.Column(db.Float)         # additional deck/balcony area (e.g. 3 BHK)
+    area_unit       = db.Column(db.String(10), default='sqft')  # 'sqft' | 'sq.mt'
+    price_from      = db.Column(db.Float)         # in Crores or absolute — your convention
+    price_to        = db.Column(db.Float)         # upper bound (None if single price)
+    price_label     = db.Column(db.String(50))   # e.g. 'All Inclusive', 'Base Price'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'project_id': self.project_id,
+            'bhk_type': self.bhk_type,
+            'carpet_area_min': self.carpet_area_min,
+            'carpet_area_max': self.carpet_area_max,
+            'rera_carpet_area': self.rera_carpet_area,
+            'deck_area': self.deck_area,
+            'area_unit': self.area_unit,
+            'price_from': self.price_from,
+            'price_to': self.price_to,
+            'price_label': self.price_label,
+        }
+
+
+# =============================================================================
+# PROJECT AMENITY  — one row per amenity per project
+# Enables filtering: "show all projects with swimming pool".
+# =============================================================================
+
+class ProjectAmenity(db.Model):
+    """Normalised amenity attached to a builder project."""
+    __tablename__ = 'project_amenity'
+
+    id         = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('builder_project.id'), nullable=False)
+
+    name     = db.Column(db.String(150), nullable=False)  # e.g. 'Swimming Pool'
+    category = db.Column(db.String(100))                  # e.g. 'Recreation', 'Sports', 'Safety'
+    icon_key = db.Column(db.String(100))                  # frontend icon identifier e.g. 'pool'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'project_id': self.project_id,
+            'name': self.name,
+            'category': self.category,
+            'icon_key': self.icon_key,
+        }
+
 
 class Blog(db.Model):
     id = db.Column(db.Integer, primary_key=True)

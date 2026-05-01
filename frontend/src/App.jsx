@@ -1,9 +1,8 @@
 /* eslint-disable no-unused-vars */
 import React, { createContext, useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { SignedIn, SignedOut, RedirectToSignIn, useAuth } from '@clerk/clerk-react';
 import { CartProvider } from './hns_cart_page/js/CartContent'; // Import CartProvider
-import Navbar from './hns_admin_page/Navbar';
 import Login from './hns_admin_page/Login';
 import Signup from './hns_admin_page/Signup';
 import AdminSetup from './hns_admin_page/AdminSetup';
@@ -179,6 +178,11 @@ const UserSync = () => {
 
 function App() {
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [location.pathname]);
 
   return (
     <CartProvider>
@@ -283,10 +287,11 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
           <Route path="/properties" element={<PropertyListing />} />
-          <Route path="/property/:id" element={<PropertyListingPage />} />
-          <Route path="/builder" element={<BuilderInfoIndex />} />
-          <Route path="/builder-info" element={<BuilderInfoIndex />} />
-          <Route path="/builder/:builderName" element={<BuilderInfoIndex />} />
+          <Route path="/property/:propertyToken" element={<PropertyListingPage />} />
+          <Route path="/builder" element={<Navigate to="/builders-page" replace />} />
+          <Route path="/builder-info" element={<Navigate to="/builders-page" replace />} />
+          <Route path="/builder/:builderToken" element={<BuilderInfoIndex />} />
+          <Route path="/builder-info/:builderToken" element={<BuilderInfoIndex />} />
           <Route path="/blogs" element={<BlogLanding />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/cart" element={<CartPage />} />

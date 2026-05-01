@@ -3,8 +3,10 @@ from models import Builder, ChatSession, ChatMessage, UserInteraction, Property,
 from extensions import db 
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError
 from sqlalchemy import text, inspect
+import re
 from .rag_service import (
     get_chatbot_response, 
+    get_azure_openai_health,
     sync_properties_to_vectordb, 
     determine_conversation_state,
     update_session_state,
@@ -12,7 +14,9 @@ from .rag_service import (
     classify_intent,
     UserIntent,
     format_property_details,
-    format_builder_details
+    format_builder_details,
+    compare_properties,
+    compare_builders,
 )
 
 chatbot_bp = Blueprint('chatbot', __name__)
@@ -125,6 +129,124 @@ def _save_chat_messages(session_id, user_content=None, assistant_content=None):
         print(f"Failed saving chat messages: {e}")
 
 
+def _extract_reference_positions(user_message):
+    msg_lower = (user_message or "").lower()
+    positions = []
+
+    explicit_matches = re.findall(
+        r"\b(?:prop(?:erty)?|builder|proj(?:ect)?|project|card|result)\b\s*#?\s*(\d+)\b",
+        msg_lower,
+    )
+    positions.extend(int(value) for value in explicit_matches)
+
+    suffix_matches = re.findall(r"\b(\d+)(?:st|nd|rd|th)\b", msg_lower)
+    positions.extend(int(value) for value in suffix_matches)
+
+    ord_map = {
+        'first': 1,
+        'second': 2,
+        'third': 3,
+        'fourth': 4,
+        'fifth': 5,
+    }
+    for word, index in ord_map.items():
+        if re.search(rf"\b{word}\b", msg_lower):
+            positions.append(index)
+
+    ordered = []
+    seen = set()
+    for index in positions:
+        if index < 1 or index in seen:
+            continue
+        seen.add(index)
+        ordered.append(index)
+    return ordered[:5]
+
+
+def _infer_session_result_type(session_data, user_message=None):
+    msg_lower = (user_message or "").lower()
+
+    if any(token in msg_lower for token in ['builder', 'builders', 'developer', 'developers']):
+        return 'builder'
+    if any(token in msg_lower for token in ['property', 'properties', 'project', 'projects', 'flat', 'apartment', 'home']):
+        return 'property'
+
+    last_result_type = session_data.get('last_result_type')
+    if last_result_type in ['property', 'builder']:
+        return last_result_type
+
+    last_intent = session_data.get('last_intent')
+    if last_intent == 'search_builders':
+        return 'builder'
+    if last_intent in ['search_properties', 'compare', 'get_details']:
+        if session_data.get('last_shown_builders') and not session_data.get('last_shown_properties'):
+            return 'builder'
+        return 'property'
+
+    if session_data.get('last_shown_builders') and not session_data.get('last_shown_properties'):
+        return 'builder'
+    if session_data.get('last_shown_properties'):
+        return 'property'
+    return None
+
+
+def _resolve_session_compare_items(session_data, user_message):
+    result_type = _infer_session_result_type(session_data, user_message)
+    if result_type not in ['property', 'builder']:
+        return None, []
+
+    source_ids = (
+        session_data.get('last_shown_properties', [])
+        if result_type == 'property'
+        else session_data.get('last_shown_builders', [])
+    )
+    source_ids = [value for value in source_ids if value not in (None, "")]
+    if len(source_ids) < 2:
+        return result_type, []
+
+    msg_lower = (user_message or "").lower()
+    positions = _extract_reference_positions(user_message)
+
+    if positions:
+        selected_ids = [
+            source_ids[index - 1]
+            for index in positions
+            if 1 <= index <= len(source_ids)
+        ]
+    elif any(token in msg_lower for token in ['them', 'these', 'those', 'both', 'two', 'all', 'vs', 'versus', 'better', 'difference']):
+        limit = 2 if any(token in msg_lower for token in ['both', 'two']) else min(5, len(source_ids))
+        selected_ids = source_ids[:limit]
+    else:
+        selected_ids = []
+
+    deduped_ids = []
+    seen = set()
+    for value in selected_ids:
+        key = str(value)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped_ids.append(value)
+
+    if result_type == 'property':
+        items = []
+        for value in deduped_ids:
+            try:
+                prop = Property.query.get(int(value))
+            except (TypeError, ValueError):
+                prop = None
+            if prop:
+                items.append(prop)
+    else:
+        items = []
+        for value in deduped_ids:
+            builder = Builder.query.get(str(value))
+            if builder:
+                items.append(builder)
+
+    return result_type, items[:5]
+
+
 @chatbot_bp.route('/sync', methods=['POST'])
 def sync_db():
     """Admin endpoint to force sync SQL -> Vector DB"""
@@ -161,6 +283,9 @@ def ask_bot():
             'memory': ConversationMemory(session_id),
             'all_properties': [],
             'all_builders': [],
+            'last_shown_properties': [],
+            'last_shown_builders': [],
+            'last_result_type': None,
             'current_page': 0,
             'properties_offset': 0,
             'builders_offset': 0
@@ -172,6 +297,9 @@ def ask_bot():
         'memory': ConversationMemory(session_id) if session_id else None,
         'all_properties': [],
         'all_builders': [],
+        'last_shown_properties': [],
+        'last_shown_builders': [],
+        'last_result_type': None,
         'current_page': 0,
         'properties_offset': 0,
         'builders_offset': 0
@@ -218,7 +346,6 @@ def ask_bot():
     # resolve it using session tracking and return the DB-sourced detailed text immediately.
     intent = classify_intent(user_message)
     if intent == UserIntent.GET_DETAILS and session_id:
-        import re
         # numeric reference like 'prop 1' or 'property #2' or 'builder 2'
         m = re.search(r"\b(prop(?:erty)?|property|builder|proj|project)\b\s*#?\s*(\d+)", user_message.lower())
         if not m:
@@ -252,10 +379,11 @@ def ask_bot():
 
             # If no explicit token, infer from last intent
             if not referenced_type:
+                last_type = session_tracking.get(session_id, {}).get('last_result_type')
                 last_int = session_tracking.get(session_id, {}).get('last_intent')
-                if last_int == 'search_properties':
+                if last_type == 'property' or last_int == 'search_properties':
                     referenced_type = 'property'
-                elif last_int == 'search_builders':
+                elif last_type == 'builder' or last_int == 'search_builders':
                     referenced_type = 'builder'
 
             # Resolve the item id from last_shown lists
@@ -267,6 +395,8 @@ def ask_bot():
                     # mark shown
                     session_data['shown_ids'].add(str(prop.id))
                     session_data['last_shown_properties'] = [str(prop.id)]
+                    session_data['last_shown_builders'] = []
+                    session_data['last_result_type'] = 'property'
 
                     # Save chat messages
                     if session_id:
@@ -287,6 +417,8 @@ def ask_bot():
                     detailed = format_builder_details(builder)
                     session_data['shown_ids'].add(str(bid))
                     session_data['last_shown_builders'] = [str(bid)]
+                    session_data['last_shown_properties'] = []
+                    session_data['last_result_type'] = 'builder'
 
                     if session_id:
                         _save_chat_messages(session_id, user_message, detailed)
@@ -299,6 +431,62 @@ def ask_bot():
                         "has_more": len([b for b in session_data.get('all_builders', []) if str(b.get('id')) not in session_data['shown_ids']]) > 0
                     })
 
+    if intent == UserIntent.COMPARE_PROPERTIES and session_id:
+        compare_type, compare_items = _resolve_session_compare_items(session_data, user_message)
+        if len(compare_items) >= 2:
+            comparison_text = (
+                compare_properties(compare_items)
+                if compare_type == 'property'
+                else compare_builders(compare_items)
+            )
+
+            session_data['last_intent'] = 'compare'
+            session_data['last_result_type'] = compare_type
+            session_data['current_page'] = 0
+            session_data['properties_offset'] = len(compare_items) if compare_type == 'property' else 0
+            session_data['builders_offset'] = len(compare_items) if compare_type == 'builder' else 0
+
+            if compare_type == 'property':
+                for item in compare_items:
+                    session_data['shown_ids'].add(str(item.id))
+                session_data['all_properties'] = [item.to_dict() for item in compare_items]
+                session_data['all_builders'] = []
+                session_data['last_shown_properties'] = [item.id for item in compare_items]
+                session_data['last_shown_builders'] = []
+                properties_payload = [item.to_dict() for item in compare_items]
+                builders_payload = []
+            else:
+                for item in compare_items:
+                    session_data['shown_ids'].add(str(item.rera_id))
+                session_data['all_properties'] = []
+                session_data['all_builders'] = [item.to_dict() for item in compare_items]
+                session_data['last_shown_properties'] = []
+                session_data['last_shown_builders'] = [item.rera_id for item in compare_items]
+                properties_payload = []
+                builders_payload = [item.to_dict() for item in compare_items]
+
+            if session_id:
+                _save_chat_messages(session_id, user_message, comparison_text)
+
+            return jsonify({
+                "response": comparison_text,
+                "last_intent": 'compare',
+                "properties": properties_payload,
+                "builders": builders_payload,
+                "has_more": False,
+                "current_page": 0,
+                "total_results": {
+                    "properties": len(properties_payload),
+                    "builders": len(builders_payload),
+                },
+                "stats": {
+                    "properties_shown": len(properties_payload),
+                    "builders_shown": len(builders_payload),
+                    "conversation_count": session_data['conversation_count'],
+                },
+                "buffered_responses": [],
+            })
+
     # Call RAG Service
     try:
         # Keep a copy of previously shown IDs to determine what's newly shown
@@ -310,7 +498,8 @@ def ask_bot():
             chat_history,
             session_shown_ids=session_data['shown_ids'],
             conversation_memory=session_data.get('memory'),
-            last_intent=session_data.get('last_intent')
+            last_intent=session_data.get('last_intent'),
+            last_result_type=session_data.get('last_result_type'),
         )
         
         # Save last intent for this session
@@ -346,6 +535,15 @@ def ask_bot():
             builders_to_show = []
         elif last_intent == 'search_builders':
             properties_to_show = []
+
+        if builders_to_show and not properties_to_show:
+            session_data['last_result_type'] = 'builder'
+        elif properties_to_show and not builders_to_show:
+            session_data['last_result_type'] = 'property'
+        elif all_builders and not all_properties:
+            session_data['last_result_type'] = 'builder'
+        elif all_properties:
+            session_data['last_result_type'] = 'property'
 
         # Track cursor offsets for robust pagination per latest result set
         session_data['properties_offset'] = len(properties_to_show)
@@ -529,6 +727,10 @@ def load_more():
         # Store last shown order for 'details by index' references
         session_data['last_shown_properties'] = [p.get('id') for p in properties_to_show]
         session_data['last_shown_builders'] = [b.get('id') for b in builders_to_show]
+        if builders_to_show and not properties_to_show:
+            session_data['last_result_type'] = 'builder'
+        elif properties_to_show and not builders_to_show:
+            session_data['last_result_type'] = 'property'
 
         # Check if more results available for this intent
         if last_intent == 'search_properties':
@@ -597,6 +799,9 @@ def create_session():
             'memory': ConversationMemory(new_session.id),
             'all_properties': [],
             'all_builders': [],
+            'last_shown_properties': [],
+            'last_shown_builders': [],
+            'last_result_type': None,
             'current_page': 0,
             'properties_offset': 0,
             'builders_offset': 0
@@ -632,6 +837,9 @@ def create_session():
                     'memory': ConversationMemory(retry_session.id),
                     'all_properties': [],
                     'all_builders': [],
+                    'last_shown_properties': [],
+                    'last_shown_builders': [],
+                    'last_result_type': None,
                     'current_page': 0,
                     'properties_offset': 0,
                     'builders_offset': 0
@@ -693,6 +901,9 @@ def reset_session(session_id):
             session_tracking[session_id]['shown_ids'] = set()
             session_tracking[session_id]['all_properties'] = []
             session_tracking[session_id]['all_builders'] = []
+            session_tracking[session_id]['last_shown_properties'] = []
+            session_tracking[session_id]['last_shown_builders'] = []
+            session_tracking[session_id]['last_result_type'] = None
             session_tracking[session_id]['current_page'] = 0
             session_tracking[session_id]['properties_offset'] = 0
             session_tracking[session_id]['builders_offset'] = 0
@@ -1042,12 +1253,16 @@ def health_check():
         # Test database connection
         from models import Property
         Property.query.first()
+        azure_health = get_azure_openai_health()
+        status = "healthy" if azure_health["configured"] else "degraded"
+        status_code = 200 if azure_health["configured"] else 503
         
         return jsonify({
-            "status": "healthy",
+            "status": status,
             "database": "connected",
-            "active_sessions": len(session_tracking)
-        })
+            "active_sessions": len(session_tracking),
+            "chatbot": azure_health,
+        }), status_code
     except Exception as e:
         return jsonify({
             "status": "unhealthy",

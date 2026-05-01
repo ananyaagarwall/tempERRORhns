@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Navbar from '../hns_admin_page/Navbar'; // Adjust path as needed
 
 const tableHeaderStyle = {
   background: '#eef2f7',
@@ -80,18 +79,9 @@ const ManagePropertyInBuilderProfile = () => {
   ];
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#f5f5f5', fontFamily: 'Segoe UI, Arial, sans-serif' }}>
-      {/* Sidebar */}
-      <Navbar vertical sidebarLinksOverride={[
-        { name: 'Dashboard', path: '/dashboard/admin' },
-        { name: 'Leads', path: '/dashboard/leads' },
-        { name: 'Properties', path: '/dashboard/properties' },
-        { name: 'Add Builder', path: '/dashboard/add-builder' },
-        { name: 'Blogs', path: '/dashboard/blogs' },
-        { name: 'Categories', path: '/dashboard/categories' }
-      ]} />
+    <div style={{ minHeight: '100%', background: '#f5f5f5', fontFamily: 'Segoe UI, Arial, sans-serif' }}>
       {/* Main Content */}
-      <div style={{ flex: 1, padding: '32px 40px', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontSize: 22, fontWeight: 600, color: '#222', marginBottom: 24 }}>Manage Property in Builder Profile</div>
 
         {/* Builder Info and Add Property Button */}

@@ -24,9 +24,7 @@ const ChatbotBuilderCard = ({ builder }) => {
       }
     }
 
-    if (builder.company_name) {
-      navigate(`/builders?name=${encodeURIComponent(builder.company_name)}`);
-    }
+    navigate('/builders-page');
   };
 
   return (

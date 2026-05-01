@@ -12,6 +12,7 @@ import ConsultingSection from '../components/ui/ConsultingSection';
 import FooterSection from '../components/layout/FooterSection';
 import FooterNavBar from '../components/layout/FooterNavBar';
 import MobileFooter from '../../components/ui/MobileFooter';
+import ChatBot from '../components/ui/ChatBot';               // <-- always rendered
 import '../home_page_css/LandingPage.css';
 import { getCookie, setCookie } from '../../utils/cookieUtils';
 
@@ -23,17 +24,19 @@ const LandingPage = () => {
   const [searchFilters, setSearchFilters] = useState({
     location: '',
     priceRange: 0,
+    minBudget: null,
+    maxBudget: null,
     bhkTypes: [],
   });
 
-  /* ---------- Geolocation + Filter Listener ---------- */
+  /* ---------- Geolocation Effect ---------- */
   useEffect(() => {
     // Check if location is already stored in cookies
     const storedLocation = getCookie('user_location');
     if (storedLocation) {
       setUserLocation(storedLocation);
       setGeoStatus('');
-      return; // Skip geolocation if cookie exists
+      return; 
     }
 
     // Geolocation
@@ -41,7 +44,6 @@ const LandingPage = () => {
       setGeoStatus('Requesting location permission...');
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          // Hide banner once user has responded to permission prompt.
           setGeoStatus('');
           const { latitude, longitude } = position.coords;
           fetch(`${API_BASE_URL}/api/geolocation`, {
@@ -51,40 +53,32 @@ const LandingPage = () => {
           })
             .then((res) => res.json())
             .then((data) => {
-              // Extract district/location from response
-              let locValue = null;
-              if (data.received && data.received.district) {
-                locValue = data.received.district;
-              } else if (data.received && data.received.full_address) {
-                // Try to extract a known area from full address
-                locValue = data.received.full_address;
-              }
-
+              let locValue = data.received?.district || data.received?.full_address || null;
               if (locValue) {
                 setUserLocation(locValue);
-                // Store in cookie for 7 days
                 setCookie('user_location', locValue, 7);
               }
             })
             .catch(() => { });
         },
-        () => {
-          // Hide banner if permission denied/unavailable.
-          setGeoStatus('');
-        }
+        () => setGeoStatus('')
       );
     } else {
       setGeoStatus('');
     }
+  }, []);
 
-    // Filter event from header/search bar
+  /* ---------- Search Filter Listener Effect ---------- */
+  useEffect(() => {
     const handleFilter = (e) => {
+      console.log('LandingPage: Received filterLandingPage event', e.detail);
       setSearchFilters({
         location: e.detail.location || '',
         priceRange: e.detail.priceRange ?? 0,
+        minBudget: e.detail.minBudget ?? null,
+        maxBudget: e.detail.maxBudget ?? null,
         bhkTypes: e.detail.bhkTypes || [],
       });
-      // Also update userLocation if user searches for a specific location
       if (e.detail.location) {
         setUserLocation(e.detail.location);
       }
@@ -154,6 +148,7 @@ const LandingPage = () => {
       <MobileFooter />
 
       {/* ChatBot is always mounted – floating trigger hidden via CSS on mobile */}
+      <ChatBot />
     </div>
   );
 };

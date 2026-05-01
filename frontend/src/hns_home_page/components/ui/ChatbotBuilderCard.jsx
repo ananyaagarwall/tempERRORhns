@@ -10,22 +10,36 @@ const ChatbotBuilderCard = ({ builder }) => {
   const builderImage = builder.logo || `${API_BASE_URL}/public/building.webp`;
 
   const handleCardClick = () => {
-    // Assuming a builder detail page exists, e.g., /builders/:reraId
-    // For now, let's navigate to a generic builder page or the builder's projects if available
-    if (builder.rer-id) {
-      navigate(`/builder/${builder.rer-id}`);
-    } else if (builder.name) {
-      // Fallback if RERA ID is not available, navigate by name (might need a different route/component)
-      navigate(`/builders?name=${encodeURIComponent(builder.name)}`);
+    const companyName = builder.company_name || builder.name || builder.brand_name;
+    const slug = companyName
+      ? String(companyName)
+          .toLowerCase()
+          .trim()
+          .replace(/[_\s]+/g, '-')
+          .replace(/[^a-z0-9-]/g, '')
+          .replace(/-+/g, '-')
+          .replace(/^-|-$/g, '')
+      : '';
+
+    if (slug) {
+      navigate(`/builder/${slug}`);
+      return;
     }
+
+    if (builder.rera_id) {
+      navigate(`/builder/${builder.rera_id}`);
+      return;
+    }
+
+    navigate('/builders-page');
   };
 
   return (
     <div className="chatbot-builder-card" onClick={handleCardClick}>
-      <img src={builderImage} alt={builder.name || "Builder"} className="chatbot-builder-img" />
+      <img src={builderImage} alt={builder.company_name || builder.name || "Builder"} className="chatbot-builder-img" />
       <div className="chatbot-builder-info">
-        <h3 className="chatbot-builder-name">{builder.name || builder.company_name}</h3>
-        {builder.rer-id && <p className="chatbot-builder-rera">RERA ID: {builder.rer-id}</p>}
+        <h3 className="chatbot-builder-name">{builder.company_name || builder.name}</h3>
+        {builder.rera_id && <p className="chatbot-builder-rera">RERA ID: {builder.rera_id}</p>}
         {(builder.completed_projects !== undefined || builder.ongoing_projects !== undefined) && (
           <div className="chatbot-builder-projects-row">
             {builder.completed_projects !== undefined && (

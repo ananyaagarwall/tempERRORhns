@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, Calendar, MapPin, Award, ChevronRight } from "lucide-react";
+import { buildBuilderPath } from "../../../utils/entityRouting";
 
 const BuilderProfile = ({ builderData }) => {
   const navigate = useNavigate();
@@ -15,9 +16,9 @@ const BuilderProfile = ({ builderData }) => {
   const established = builderData?.established_year || builderData?.year_established || 1995;
   
   // Handle navigation
-  const handleBuilderClick = () => {
-    const builderNameParam = builderName.replace(/\s+/g, '-').toLowerCase();
-    navigate(`/builder/${builderNameParam}`);
+  const handleBuilderClick = async () => {
+    const builderPath = await buildBuilderPath(builderData);
+    navigate(builderPath);
   };
   
   return (
@@ -33,8 +34,8 @@ const BuilderProfile = ({ builderData }) => {
               className="w-16 h-16 sm:w-24 sm:h-24 lg:w-32 lg:h-32 bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl border border-blue-100 flex-shrink-0 flex items-center justify-center cursor-pointer overflow-hidden"
               onClick={handleBuilderClick}
             >
-              {builderData?.logo ? (
-                <img src={builderData.logo} alt={builderName} className="w-full h-full object-cover" />
+              {builderData?.builder_logo || builderData?.logo ? (
+                <img src={builderData?.builder_logo || builderData?.logo} alt={builderName} className="w-full h-full object-cover" />
               ) : (
                 <Building2 className="w-8 h-8 sm:w-12 sm:h-12 text-blue-600" />
               )}

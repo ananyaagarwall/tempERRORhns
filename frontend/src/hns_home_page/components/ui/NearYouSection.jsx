@@ -197,7 +197,15 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
     const filteredProperties = properties.filter(property => {
         // Price filter
         const priceValue = parsePriceInCr(property.price);
-        const priceMatch = !searchFilters.priceRange || priceValue <= searchFilters.priceRange;
+        
+        // Desktop priceRange filter (max price)
+        const priceRangeMatch = !searchFilters.priceRange || (priceValue * 100) <= searchFilters.priceRange;
+
+        // Mobile min/max budget filters
+        const minBudgetMatch = !searchFilters.minBudget || (priceValue * 100) >= searchFilters.minBudget;
+        const maxBudgetMatch = !searchFilters.maxBudget || (priceValue * 100) <= searchFilters.maxBudget;
+
+        const priceMatch = priceRangeMatch && minBudgetMatch && maxBudgetMatch;
 
         // BHK Type filter
         let bhkMatch = true;
