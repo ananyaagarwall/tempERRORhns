@@ -1,4 +1,4 @@
-import API_BASE_URL from './config';
+import { normalizeImageUrl } from './utils/imageUtils';
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
@@ -125,7 +125,7 @@ const BlogDetail = () => {
         <div className="text-sm text-gray-700 text-left">
           {blog.featured_image && (
             <img
-              src={`${API_BASE_URL}/uploads/${blog.featured_image}`}
+              src={normalizeImageUrl(blog.featured_image)}
               alt={blog.featured_image_alt || blog.title}
               className="w-full object-cover rounded-lg mb-2"
             />
@@ -180,7 +180,7 @@ const BlogDetail = () => {
               {/* Desktop/tablet only: Intro image and paragraph */}
               <div className="hidden md:block">
                 {blog.featured_image && (
-                  <img src={`${API_BASE_URL}/uploads/${blog.featured_image}`} alt={blog.featured_image_alt || blog.title} className="w-full object-cover rounded-lg mb-6" />
+                  <img src={normalizeImageUrl(blog.featured_image)} alt={blog.featured_image_alt || blog.title} className="w-full object-cover rounded-lg mb-6" />
                 )}
                 <div className="text-lg text-gray-700 mb-6 text-left">{blog.intro_paragraph}</div>
               </div>
@@ -188,19 +188,19 @@ const BlogDetail = () => {
               {blog.subheading1 && <h2 id="section-1" className="text-2xl font-bold text-gray-800 mt-8 mb-2 text-justify">{blog.subheading1}</h2>}
               {blog.content1 && <p className="text-gray-700 mb-4 whitespace-pre-line text-left">{blog.content1}</p>}
               {blog.image1 && (
-                <img src={`${API_BASE_URL}/uploads/${blog.image1}`} alt={blog.alt_text1 || ''} className="w-full object-cover rounded-lg mb-6" />
+                <img src={normalizeImageUrl(blog.image1)} alt={blog.alt_text1 || ''} className="w-full object-cover rounded-lg mb-6" />
               )}
 
               {blog.subheading2 && <h2 id="section-2" className="text-2xl font-bold text-gray-800 mt-8 mb-2 text-justify">{blog.subheading2}</h2>}
               {blog.content2 && <p className="text-gray-700 mb-4 whitespace-pre-line text-left">{blog.content2}</p>}
               {blog.image2 && (
-                <img src={`${API_BASE_URL}/uploads/${blog.image2}`} alt={blog.alt_text2 || ''} className="w-full object-cover rounded-lg mb-6" />
+                <img src={normalizeImageUrl(blog.image2)} alt={blog.alt_text2 || ''} className="w-full object-cover rounded-lg mb-6" />
               )}
 
               {blog.subheading3 && <h2 id="section-3" className="text-2xl font-bold text-gray-800 mt-8 mb-2 text-justify">{blog.subheading3}</h2>}
               {blog.content3 && <p className="text-gray-700 mb-4 whitespace-pre-line text-left">{blog.content3}</p>}
               {blog.image3 && (
-                <img src={`${API_BASE_URL}/uploads/${blog.image3}`} alt={blog.alt_text3 || ''} className="w-full object-cover rounded-lg mb-6" />
+                <img src={normalizeImageUrl(blog.image3)} alt={blog.alt_text3 || ''} className="w-full object-cover rounded-lg mb-6" />
               )}
 
               {blog.interlinks?.length > 0 && (

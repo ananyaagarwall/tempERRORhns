@@ -31,7 +31,7 @@ const CartBuilderCard = ({ builder, onRemove }) => {
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onRemove(builder.id);
+          onRemove(builder.rera_id);
         }}
         className="cart-builder-remove-button"
         aria-label="Remove builder"
@@ -55,10 +55,10 @@ const CartBuilderCard = ({ builder, onRemove }) => {
         justifyContent: 'center',
         padding: 0,
       }}>
-        {builder.logo && (
+        {(builder.builder_logo || builder.logo) && (
           <img
-            src={builder.logo}
-            alt={builder.name}
+            src={builder.builder_logo || builder.logo}
+            alt={builder.company_name || builder.brand_name || builder.name}
             className="builder-logo"
             style={{
               width: isMobile ? '44px' : '56px',
@@ -71,9 +71,9 @@ const CartBuilderCard = ({ builder, onRemove }) => {
             }}
           />
         )}
-        
+
         {/* Builder Title */}
-        <div 
+        <div
           className="builder-title"
           style={{
             fontFamily: "'Abril Fatface', serif",
@@ -85,11 +85,11 @@ const CartBuilderCard = ({ builder, onRemove }) => {
             padding: '0 12px',
           }}
         >
-          {builder.name}
+          {builder.company_name || builder.brand_name || builder.name}
         </div>
-        
+
         {/* Builder Subtitle (Location) */}
-        <div 
+        <div
           className="builder-subtitle"
           style={{
             fontWeight: 500,
@@ -101,7 +101,9 @@ const CartBuilderCard = ({ builder, onRemove }) => {
             padding: '0 12px',
           }}
         >
-          {builder.location || builder.address}
+          {builder.city
+            ? `${builder.city}${builder.state ? ', ' + builder.state : ''}`
+            : builder.location || builder.address || ''}
         </div>
         
         {/* Builder Price */}

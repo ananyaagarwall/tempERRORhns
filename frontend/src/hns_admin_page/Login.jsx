@@ -1,6 +1,7 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { SignIn } from '@clerk/clerk-react';
+import { Link, Navigate } from 'react-router-dom';
+import { SignIn, SignedIn, SignedOut } from '@clerk/clerk-react';
+import ClerkErrorBoundary from '../components/ClerkErrorBoundary';
 
 const Login = () => {
     return (
@@ -15,25 +16,40 @@ const Login = () => {
                 </div>
 
                 <div className="flex justify-center w-full clerk-container-override">
-                    <SignIn 
-                        routing="path" 
-                        path="/login" 
-                        signUpUrl="/signup"
-                        appearance={{
-                            elements: {
-                                rootBox: "w-full",
-                                card: "bg-white/80 backdrop-blur-sm shadow-lg border border-gray-200 rounded-xl w-full",
-                                headerTitle: "text-2xl font-bold text-gray-800",
-                                headerSubtitle: "text-gray-500",
-                                formButtonPrimary: "bg-blue-600 text-white font-semibold transition-all duration-300 hover:bg-blue-700 shadow-md",
-                                footerAction: "hidden", // This hides the Secured by Clerk and Sign up links
-                                footer: "hidden", // Completely hide the footer element (Secured by Clerk)
-                                formFieldInput: "bg-gray-50 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-transparent",
-                                socialButtonsBlockButton: "border-gray-300 rounded-lg py-2",
-                                dividerText: "text-gray-500"
+                    <SignedIn>
+                        <Navigate to="/" replace />
+                    </SignedIn>
+                    <SignedOut>
+                        <ClerkErrorBoundary
+                            fallback={
+                                <div className="w-full bg-white/80 backdrop-blur-sm shadow-lg border border-gray-200 rounded-xl p-6 text-center">
+                                    <p className="text-gray-700 font-semibold">Sign in is temporarily unavailable.</p>
+                                    <p className="text-gray-500 text-sm mt-2">Refresh the page and try again.</p>
+                                </div>
                             }
-                        }}
-                    />
+                        >
+                            <SignIn
+                                routing="path"
+                                path="/login"
+                                signUpUrl="/signup"
+                                fallbackRedirectUrl="/"
+                                appearance={{
+                                    elements: {
+                                        rootBox: "w-full",
+                                        card: "bg-white/80 backdrop-blur-sm shadow-lg border border-gray-200 rounded-xl w-full",
+                                        headerTitle: "text-2xl font-bold text-gray-800",
+                                        headerSubtitle: "text-gray-500",
+                                        formButtonPrimary: "bg-blue-600 text-white font-semibold transition-all duration-300 hover:bg-blue-700 shadow-md",
+                                        footerAction: "hidden",
+                                        footer: "hidden",
+                                        formFieldInput: "bg-gray-50 border-gray-300 rounded-lg focus:ring-blue-500 focus:border-transparent",
+                                        socialButtonsBlockButton: "border-gray-300 rounded-lg py-2",
+                                        dividerText: "text-gray-500"
+                                    }
+                                }}
+                            />
+                        </ClerkErrorBoundary>
+                    </SignedOut>
                 </div>
 
                 <p className="mt-6 text-center text-sm text-gray-600 font-medium">

@@ -9,7 +9,7 @@ import AdminSetup from './hns_admin_page/AdminSetup';
 import AdminDashboard from './hns_admin_page/AdminDashboard';
 import BuilderDashboard from './hns_admin_page/BuilderDashboard';
 import './App.css';
-import api, { getOrCreateGuestId } from './services/apiInstance';
+import api, { getOrCreateGuestId, setAuthTokenGetter } from './services/apiInstance';
 
 import AddBuilder from './Builder.jsx/addBuilder';
 import BlogManagement from './hns_admin_page/BlogManagement';
@@ -31,6 +31,7 @@ import CartPage from './hns_cart_page/app/CartPage';
 import ChatBot from './components/ui/ChatBot';
 import AboutUs from './hns_home_page/components/ui/AboutUs';
 import BuildersListing from './hns_home_page/components/ui/BuildersListing';
+import ProfilePage from './ProfilePage';
 
 // Chatbot Context
 export const ChatbotContext = createContext();
@@ -172,6 +173,16 @@ const UserSync = () => {
       cancelled = true;
     };
   }, [isLoaded, isSignedIn, getToken]);
+
+  useEffect(() => {
+    if (!isLoaded) {
+      setAuthTokenGetter(null);
+      return;
+    }
+
+    setAuthTokenGetter(() => getToken());
+    return () => setAuthTokenGetter(null);
+  }, [isLoaded, getToken]);
   
   return null;
 };
@@ -286,12 +297,13 @@ function App() {
 
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
+          <Route path="/profile/*" element={<ProfilePage />} />
           <Route path="/properties" element={<PropertyListing />} />
           <Route path="/property/:propertyToken" element={<PropertyListingPage />} />
           <Route path="/builder" element={<Navigate to="/builders-page" replace />} />
           <Route path="/builder-info" element={<Navigate to="/builders-page" replace />} />
-          <Route path="/builder/:builderToken" element={<BuilderInfoIndex />} />
-          <Route path="/builder-info/:builderToken" element={<BuilderInfoIndex />} />
+          <Route path="/builder/:builderName" element={<BuilderInfoIndex />} />
+          <Route path="/builder-info/:builderName" element={<BuilderInfoIndex />} />
           <Route path="/blogs" element={<BlogLanding />} />
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/cart" element={<CartPage />} />

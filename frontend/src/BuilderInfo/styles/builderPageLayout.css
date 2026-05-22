@@ -2,12 +2,8 @@
    BUILDER PAGE FULL-WIDTH LAYOUT
    ======================================== */
 
-/* Remove the max-w-6xl constraint and add full-width styling */
 .builder-page-container {
   width: 100%;
-  max-width: 100% !important;
-  padding: 0 !important;
-  margin: 0 !important;
 }
 
 /* Component spacing - add consistent padding */
@@ -79,7 +75,7 @@
   }
 }
 
-/* Remove all max-width constraints from sections */
+/* Sections fill the parent container width */
 .projects-grid-section,
 .floor-plans-section,
 .resource-hub-section,
@@ -87,8 +83,7 @@
 .schedule-visit-section,
 .search-filter-section,
 .who-we-are-section {
-  max-width: 100% !important;
-  width: 100% !important;
+  width: 100%;
 }
 
 /* Ensure cards and content respect full width */

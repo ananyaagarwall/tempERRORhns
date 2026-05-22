@@ -10,7 +10,7 @@ import CartBuilderCard from '../components/ui/CartBuilderCard.jsx';
 import '../../hns_home_page/home_page_css/TrustedBuildersSection.css';
 
 const CartPage = () => {
-  const { cartItems, removeFromCart } = useCart();
+  const { cartItems, removeFromCart, savedBuilders, removeBuilder } = useCart();
   const [compareList, setCompareList] = useState([]);
   const [showCompare, setShowCompare] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
@@ -24,23 +24,16 @@ const CartPage = () => {
   const mobileCalculatorRef = useRef(null);
   const navigate = useNavigate();
 
-  // Builder detection function
-  const isBuilder = (item) => {
-    return item.features === 'Builder Project' || 
-           item.bhk === 'N/A' || 
-           item.bhk === 'Builder Project';
-  };
+  const propertiesCount = cartItems.length;
+  const buildersCount = savedBuilders.length;
 
-  // Separate builders and properties
-  const builders = cartItems.filter(isBuilder);
-  const properties = cartItems.filter(item => !isBuilder(item));
-  const buildersCount = builders.length;
-  const propertiesCount = properties.length;
+  // Tag each item so the renderer knows which card + remove handler to use
+  const taggedProperties = cartItems.map(p => ({ ...p, _type: 'property' }));
+  const taggedBuilders   = savedBuilders.map(b => ({ ...b, _type: 'builder' }));
 
-  // Display logic based on active tab
-  const displayedItems = activeTab === 'all' ? cartItems :
-                          activeTab === 'properties' ? properties :
-                          activeTab === 'builders' ? builders : [];
+  const displayedItems = activeTab === 'all'       ? [...taggedProperties, ...taggedBuilders] :
+                         activeTab === 'properties' ? taggedProperties :
+                         activeTab === 'builders'   ? taggedBuilders : [];
 
   const toggleCompare = (propertyId) => {
     setCompareList(prev => {
@@ -351,13 +344,12 @@ const CartPage = () => {
               </div>
             ) : (
               displayedItems.map(item => {
-                // Check if item is a builder
-                if (isBuilder(item)) {
+                if (item._type === 'builder') {
                   return (
                     <CartBuilderCard
-                      key={item.id}
+                      key={item.rera_id}
                       builder={item}
-                      onRemove={removeFromCart}
+                      onRemove={removeBuilder}
                     />
                   );
                 }

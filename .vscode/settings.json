@@ -1,4 +1,4 @@
-{
+﻿{
   // Place your workspace-specific settings here
   "python.pythonPath": ".venv/Scripts/python.exe",
   "cSpell.words": ["faiss"]
