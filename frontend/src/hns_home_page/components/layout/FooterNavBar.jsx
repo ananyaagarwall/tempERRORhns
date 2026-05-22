@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { FaBars, FaTimes, FaUserCircle, FaRegUserCircle, FaShoppingCart } from 'react-icons/fa';
 import { MdTravelExplore, MdHome, MdBusiness, MdArticle } from 'react-icons/md';
 import { Link } from 'react-router-dom';
@@ -22,7 +22,7 @@ const FooterNavBar = ({ sticky = false }) => {
   const actionCards = [
     { label: 'Builders', icon: <MdBusiness size={38} color="#A21CAF" style={{ filter: 'drop-shadow(0 0 6px #A21CAF99)' }} />, to: '/builders-page', desc: 'Explore trusted builders' },
     { label: 'Projects', icon: <MdHome size={38} color="#22C55E" style={{ filter: 'drop-shadow(0 0 6px #22C55E99)' }} />, to: '/properties', desc: 'View all projects' },
-    { label: 'Cart', icon: <FaShoppingCart size={38} color="#F97316" style={{ filter: 'drop-shadow(0 0 6px #F9731699)' }} />, to: '/cart', desc: 'View saved properties' }, // ← NEW
+    { label: 'Cart', icon: <FaShoppingCart size={38} color="#F97316" style={{ filter: 'drop-shadow(0 0 6px #F9731699)' }} />, to: '/cart', desc: 'View saved properties' }, // â† NEW
     { label: 'Blogs', icon: <MdArticle size={38} color="#F59E42" style={{ filter: 'drop-shadow(0 0 6px #F59E4299)' }} />, to: '/blogs', desc: 'Read property news & tips' },
     { label: 'About Us', icon: <MdTravelExplore size={38} color="#3B82F6" style={{ filter: 'drop-shadow(0 0 6px #3B82F6AA)' }} />, to: '/about', desc: 'Learn about us' },
   ];
@@ -34,20 +34,20 @@ const FooterNavBar = ({ sticky = false }) => {
         style={
           sticky
             ? {
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                right: 0,
-                zIndex: 1000,
-              }
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 1000,
+            }
             : undefined
         }
       >
         {/* Logo */}
         <Link to="/" className="footer-logo-link">
-          <img 
-            src="/HouseNSeek.png" 
-            alt="HouseNSeek Logo" 
+          <img
+            src="/HouseNSeek.png"
+            alt="HouseNSeek Logo"
             className={`footer-logo ${isMobile ? 'footer-logo-mobile' : ''}`}
           />
         </Link>
@@ -64,27 +64,21 @@ const FooterNavBar = ({ sticky = false }) => {
             <Link to="/blogs" className="footer-nav-link">Blogs</Link>
             <Link to="/about" className="footer-nav-link">About Us</Link>
             <SignedOut>
-              <Link 
-                to="/login" 
-                className="footer-nav-link" 
+              <Link
+                to="/login"
+                className="footer-nav-link"
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               >
                 <FaRegUserCircle size={22} />
               </Link>
             </SignedOut>
-            <SignedIn>
-              <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
-                <UserButton 
-                  afterSignOutUrl="/" 
-                  appearance={{
-                    elements: {
-                      userButtonPopoverFooter: "hidden", 
-                      footer: "hidden"
-                    }
-                  }}
-                />
-              </div>
-            </SignedIn>
+	            <SignedIn>
+	              <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
+	                <UserButton
+	                  afterSignOutUrl="/"
+	                />
+	              </div>
+	            </SignedIn>
           </nav>
         )}
 
@@ -116,19 +110,13 @@ const FooterNavBar = ({ sticky = false }) => {
               &times;
             </button>
             <div className="user-info-container">
-              <SignedIn>
-                <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
-                   <UserButton 
-                     afterSignOutUrl="/" 
-                     appearance={{
-                       elements: {
-                         userButtonPopoverFooter: "hidden", 
-                         footer: "hidden"
-                       }
-                     }}
-                   />
-                </div>
-              </SignedIn>
+	              <SignedIn>
+	                <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
+	                  <UserButton
+	                    afterSignOutUrl="/"
+	                  />
+	                </div>
+	              </SignedIn>
               <SignedOut>
                 <FaUserCircle size={36} color="#fff" className="user-icon" />
               </SignedOut>
@@ -136,19 +124,24 @@ const FooterNavBar = ({ sticky = false }) => {
                 <div className="user-name">
                   {user ? `Hi, ${user.firstName || user.username || 'User'}` : 'Welcome Guest'}
                 </div>
-                <div className="user-status">
-                  {user ? (
-                    <span>Profile &bull; <span className="profile-link">Manage Profile</span></span>
-                  ) : (
-                    'Guest Profile'
-                  )}
-                </div>
+	                <div className="user-status">
+	                  {user ? (
+	                    <span>
+	                      Profile &bull;{" "}
+	                      <Link to="/profile" className="profile-link" onClick={() => setShowMenu(false)}>
+	                        Manage Profile
+	                      </Link>
+	                    </span>
+	                  ) : (
+	                    'Guest Profile'
+	                  )}
+	                </div>
               </div>
             </div>
             <SignedOut>
-              <Link 
-                to="/login" 
-                className="login-button" 
+              <Link
+                to="/login"
+                className="login-button"
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 onClick={() => setShowMenu(false)}
               >

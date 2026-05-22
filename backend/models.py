@@ -516,6 +516,54 @@ class Slug(db.Model):
     is_primary = db.Column(db.Boolean, default=False)
 
 
+# ── Media ─────────────────────────────────────────────────────────────────────
+
+class Media(db.Model):
+    """
+    Central media table — one row per uploaded asset.
+
+    entity_type : 'builder' | 'project' | 'property' | 'blog'
+    entity_id   : rera_id (string) for builders, integer ID for everything else
+    media_type  : 'logo' | 'cover' | 'gallery' | 'floor_plan' | 'certificate' | 'featured_image'
+    is_featured : marks the primary display image for a given entity_type+media_type pair
+    display_order: 0-based position in gallery listings
+    """
+    __tablename__ = 'media'
+
+    id               = db.Column(db.Integer, primary_key=True)
+    entity_type      = db.Column(db.String(50),  nullable=False)
+    entity_id        = db.Column(db.String(200), nullable=False)
+    blob_url         = db.Column(db.String(600), nullable=False)
+    media_type       = db.Column(db.String(50),  nullable=False, default='gallery')
+    is_featured      = db.Column(db.Boolean,     nullable=False, default=False)
+    display_order    = db.Column(db.Integer,     nullable=False, default=0)
+    alt_text         = db.Column(db.String(300), nullable=True)
+    original_filename= db.Column(db.String(300), nullable=True)
+    mime_type        = db.Column(db.String(100), nullable=True)
+    created_at       = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at       = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        db.Index('ix_media_entity',      'entity_type', 'entity_id'),
+        db.Index('ix_media_entity_type', 'entity_type', 'entity_id', 'media_type'),
+    )
+
+    def to_dict(self):
+        return {
+            'id':                self.id,
+            'entity_type':       self.entity_type,
+            'entity_id':         self.entity_id,
+            'blob_url':          self.blob_url,
+            'media_type':        self.media_type,
+            'is_featured':       self.is_featured,
+            'display_order':     self.display_order,
+            'alt_text':          self.alt_text,
+            'original_filename': self.original_filename,
+            'mime_type':         self.mime_type,
+            'created_at':        self.created_at.isoformat() if self.created_at else None,
+        }
+
+
 # ============================================
 # ADVANCED FEATURES - NEW MODELS
 # ============================================

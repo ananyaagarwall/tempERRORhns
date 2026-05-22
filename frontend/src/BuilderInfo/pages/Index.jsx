@@ -20,7 +20,6 @@ import ResourceHub from '../components/sections/ResourceHub';
 import PropertyComparison from '../components/sections/PropertyComparison';
 import ScheduleVistSection from '../components/sections/ScheduleVisit';
 
-import { fetchBuilderByName, fetchBuilderByReraId } from '../../services/api';
 import { resolveBuilderFromRouteToken } from '../../utils/entityRouting';
 
 import '../../hns_home_page/home_page_css/TrustedBuildersSection.css';
@@ -32,49 +31,32 @@ function BuilderInfoIndex() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const { builderToken, builderName } = useParams();
-  const builderRouteToken = builderName || builderToken;
+  const { builderName } = useParams();
 
   useEffect(() => {
     const fetchBuilderData = async () => {
       try {
         setLoading(true);
 
-        if (!builderRouteToken) {
+        if (!builderName) {
           setError('No builder specified. Please select a builder from the search results.');
           setLoading(false);
           return;
         }
 
         try {
-          let builderData = null;
-
-          try {
-            const resolved = await resolveBuilderFromRouteToken(builderRouteToken);
-            if (resolved?.builder?.rera_id) {
-              builderData = await fetchBuilderByReraId(resolved.builder.rera_id);
-            } else if (resolved?.builder) {
-              builderData = resolved.builder;
-            }
-          } catch (resolveError) {
-            // Continue with direct fetch fallbacks.
-          }
-
+          const { builder: builderData } = await resolveBuilderFromRouteToken(builderName);
           if (!builderData) {
-            try {
-              builderData = await fetchBuilderByReraId(builderRouteToken);
-            } catch (byIdError) {
-              builderData = await fetchBuilderByName(builderRouteToken);
-            }
+            setError(
+              `Builder "${builderName.replace(/-/g, ' ')}" information is not available. This might be because the builder profile hasn't been added yet.`
+            );
+          } else {
+            setBuilder(builderData);
+            setError(null);
           }
-
-          setBuilder(builderData);
-          setError(null);
         } catch (fetchError) {
-          console.log(`Builder "${builderRouteToken}" not found in database`);
-          setError(
-            `Builder "${String(builderRouteToken).replace(/-/g, ' ')}" information is not available. This might be because the builder profile hasn't been added yet.`
-          );
+          console.log(`Builder "${builderName}" not found in database`);
+          setError('Failed to load builder information.');
         }
       } catch (err) {
         console.log('Error fetching builder data:', err);
@@ -85,7 +67,7 @@ function BuilderInfoIndex() {
     };
 
     fetchBuilderData();
-  }, [builderRouteToken]);
+  }, [builderName]);
 
   if (loading) {
     return (
@@ -115,13 +97,13 @@ function BuilderInfoIndex() {
     <div className="min-h-screen" style={{ background: '#ffff' }}>
       <FooterNavBar sticky={true} />
       <DynamicBreadcrumb
-        customLabels={{ [`/builder/${builderRouteToken}`]: builder?.company_name || 'Builder' }}
+        customLabels={{ [`/builder/${builderName}`]: builder?.company_name || 'Builder' }}
       />
 
       {/* Hero Strip */}
       <BuilderHero builder={builder} />
 
-      <div className="w-full">
+      <div className="w-full max-w-7xl mx-auto">
         <div className="builder-page-title" style={{ marginTop: 16 }}>
           <h2 className="builder-section-heading">
             Look into The <span style={{ color: '#2b2bb2' }}>Builders</span>

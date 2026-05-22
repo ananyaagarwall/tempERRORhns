@@ -1,5 +1,7 @@
-import React from "react";
-import { Heart, Star } from "lucide-react";
+import React, { useState } from "react";
+import { Heart, Star, ChevronLeft, ChevronRight } from "lucide-react";
+import { normalizeImageUrl } from "../../../utils/imageUtils";
+import { useMedia } from "../../../hooks/useMedia";
 import { useCart } from "../../../hns_cart_page/js/CartContent.jsx";
 import propertyHero from "../../../assets/property-hero.jpg";
 import Button from "../ui/Button";
@@ -25,8 +27,23 @@ const normalizeConfigLabel = (config) => {
   return String(config);
 };
 
+function _safeList(val) {
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") { try { return JSON.parse(val); } catch { return []; } }
+  return [];
+}
+
 const PropertyHero = ({ propertyData, projectData }) => {
   const { addToCart, removeFromCart, isInCart } = useCart();
+  const [slideIndex, setSlideIndex] = useState(0);
+
+  // Media API — provides DB-persisted gallery images.
+  // Falls back gracefully to raw project fields while the media table is empty.
+  const { urls: mediaUrls } = useMedia(
+    'project',
+    projectData?.id ?? null,
+    null,   // all types: gallery + floor_plan combined
+  );
 
   const configLabels = Array.from(
     new Set(
@@ -59,7 +76,22 @@ const PropertyHero = ({ propertyData, projectData }) => {
     propertyData?.Address || projectData?.full_address || propertyData?.Location || projectData?.location || "Address not available";
   const propertyPrice =
     propertyData?.Pricing || propertyData?.Price_Starting_From || projectData?.price_range || "Price on request";
-  const propertyImage = propertyData?.builder_project_image || projectData?.project_image || propertyHero;
+  // Merge: Media-table URLs first (DB-driven, ordered), then raw entity fields as fallback.
+  const rawFallback = [
+    propertyData?.builder_project_image,
+    projectData?.project_image,
+    ..._safeList(projectData?.image_urls),
+    ..._safeList(projectData?.floor_plans),
+  ]
+    .map(normalizeImageUrl)
+    .filter(Boolean);
+  const merged = [...mediaUrls, ...rawFallback];
+  const dedupedImages = [...new Set(merged)];
+  const sliderImages = dedupedImages.length > 0 ? dedupedImages : [propertyHero];
+  const slideCount = sliderImages.length;
+  const prevSlide = () => setSlideIndex(i => (i - 1 + slideCount) % slideCount);
+  const nextSlide = () => setSlideIndex(i => (i + 1) % slideCount);
+  const propertyImage = sliderImages[0];
   const areaLabel =
     propertyData?.Carpet_Area ||
     (projectData?.carpet_area_min && projectData?.carpet_area_max
@@ -124,29 +156,65 @@ const PropertyHero = ({ propertyData, projectData }) => {
   return (
     <section className="px-4 sm:px-6 md:px-8 lg:px-16 py-6 sm:py-8">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-start">
-        <div className="relative">
+        <div className="relative overflow-hidden rounded-lg">
+          {/* ── Slide image ── */}
           <img
-            src={propertyImage}
-            alt={propertyName}
-            className="w-full h-[300px] md:h-[400px] lg:h-[500px] object-cover rounded-lg"
+            src={sliderImages[slideIndex]}
+            alt={`${propertyName} — image ${slideIndex + 1} of ${slideCount}`}
+            className="w-full h-[300px] md:h-[400px] lg:h-[500px] object-cover rounded-lg transition-opacity duration-300"
           />
+
+          {/* ── Heart button (top-left) ── */}
           <button
             onClick={handleHeartClick}
             className={`property-heart-button ${isPropertyInCart ? "in-cart" : ""}`}
-            style={{
-              position: "absolute",
-              top: "14px",
-              left: "14px",
-              zIndex: 10,
-            }}
+            style={{ position: "absolute", top: "14px", left: "14px", zIndex: 10 }}
             aria-label={isPropertyInCart ? "Remove from cart" : "Add to cart"}
           >
             <HeartIcon filled={isPropertyInCart} />
           </button>
-          <div className="absolute top-4 right-4 bg-yellow-400 px-3 py-1 rounded-lg flex items-center gap-1">
+
+          {/* ── Rating badge (top-right) ── */}
+          <div className="absolute top-4 right-4 bg-yellow-400 px-3 py-1 rounded-lg flex items-center gap-1 z-10">
             <Star className="w-4 h-4 text-gray-900 fill-current" />
             <span className="font-bold text-gray-900">95%</span>
           </div>
+
+          {/* ── Prev / Next arrows (only when > 1 image) ── */}
+          {slideCount > 1 && (
+            <>
+              <button
+                onClick={prevSlide}
+                className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/65 text-white rounded-full w-9 h-9 flex items-center justify-center z-10 transition-colors"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={nextSlide}
+                className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/65 text-white rounded-full w-9 h-9 flex items-center justify-center z-10 transition-colors"
+                aria-label="Next image"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </>
+          )}
+
+          {/* ── Dot indicators ── */}
+          {slideCount > 1 && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+              {sliderImages.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setSlideIndex(i)}
+                  aria-label={`Go to image ${i + 1}`}
+                  className={`h-2 rounded-full transition-all duration-200 ${
+                    i === slideIndex ? "w-5 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="space-y-4 sm:space-y-6">

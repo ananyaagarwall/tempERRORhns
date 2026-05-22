@@ -20,7 +20,7 @@ const Newsletter = () => {
 
             <div className="newsletter-form">
               <div className="newsletter-input">
-                <input type="email" placeholder="Email Address" />
+                <input id="newsletter-email" name="email" type="email" placeholder="Email Address" autoComplete="email" />
                 <span>📧</span>
               </div>
               <div className="newsletter-button">

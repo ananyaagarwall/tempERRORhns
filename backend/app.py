@@ -17,8 +17,10 @@ from models import (
     Blog,
     Slug,
     UserInteraction,
-    Favorite
+    Favorite,
+    Media,
 )
+import media_service
 
 from flask import Flask, request, jsonify, send_from_directory, redirect, g
 
@@ -29,6 +31,7 @@ from datetime import datetime
 from itertools import groupby
 from werkzeug.utils import secure_filename
 import json
+import storage
 from flask_migrate import Migrate
 import sys
 from slugify import slugify
@@ -979,6 +982,9 @@ def _ensure_schema_compatibility():
     - Always runs `db.create_all()` to ensure new tables exist.
     - Adds missing columns for known drift where possible.
     """
+    # Create any tables defined in models that don't exist yet (e.g. media).
+    db.create_all()
+
     dialect = db.engine.dialect.name
     inspector = inspect(db.engine)
 
@@ -1010,6 +1016,18 @@ def _ensure_schema_compatibility():
         db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_guest_id ON user_interaction (guest_id)"))
         db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_property_id ON user_interaction (property_id)"))
         db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_user_interaction_session_id ON user_interaction (session_id)"))
+
+    # media table — new table; db.create_all() above creates it.
+    # Add indexes explicitly so they exist even without a full migration run.
+    if inspector.has_table('media') and dialect == 'postgresql':
+        db.session.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_media_entity "
+            "ON media (entity_type, entity_id)"
+        ))
+        db.session.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_media_entity_type "
+            "ON media (entity_type, entity_id, media_type)"
+        ))
 
     if dialect == 'postgresql' and inspector.has_table('favorite'):
         _dedupe_favorite_rows()
@@ -3484,6 +3502,102 @@ def merge_guest_data():
             print(f"Interaction merge error (best-effort): {ie}")
     
     return jsonify({'message': 'Data merged successfully'}), 200
+
+
+# ------------------------------------------------------------------ Media API
+VALID_ENTITY_TYPES = {'builder', 'project', 'property', 'blog'}
+VALID_MEDIA_TYPES = {'logo', 'cover', 'gallery', 'floor_plan', 'certificate', 'featured_image'}
+
+
+@app.route('/api/media/<entity_type>/<entity_id>', methods=['GET'])
+def get_entity_media(entity_type, entity_id):
+    """List all media for an entity. Optional ?media_type= filter."""
+    if entity_type not in VALID_ENTITY_TYPES:
+        return jsonify({'error': f'Unknown entity_type: {entity_type}'}), 400
+    mt = request.args.get('media_type')
+    items = media_service.get_media(entity_type, entity_id, mt)
+    return jsonify([m.to_dict() for m in items])
+
+
+@app.route('/api/media/<entity_type>/<entity_id>', methods=['POST'])
+@admin_only
+def upload_entity_media(entity_type, entity_id):
+    """Upload a file and create a Media record. Requires multipart/form-data."""
+    if entity_type not in VALID_ENTITY_TYPES:
+        return jsonify({'error': f'Unknown entity_type: {entity_type}'}), 400
+
+    file = request.files.get('file')
+    if not file:
+        return jsonify({'error': 'file is required (multipart/form-data)'}), 400
+
+    mt = (request.form.get('media_type') or 'gallery').strip()
+    if mt not in VALID_MEDIA_TYPES:
+        return jsonify({'error': f'Unknown media_type: {mt}'}), 400
+
+    is_featured = (request.form.get('is_featured') or 'false').lower() == 'true'
+    alt_text = request.form.get('alt_text')
+    raw_order = request.form.get('display_order')
+    display_order = int(raw_order) if raw_order and str(raw_order).isdigit() else None
+
+    if not storage.is_enabled():
+        return jsonify({'error': 'Azure Blob Storage is not configured on this server'}), 503
+
+    try:
+        record = media_service.add_media(
+            entity_type, entity_id, file, mt,
+            is_featured=is_featured, alt_text=alt_text, display_order=display_order,
+        )
+        return jsonify(record.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/media/<int:media_id>', methods=['PATCH'])
+@admin_only
+def update_entity_media(media_id):
+    """Update display_order, is_featured, or alt_text."""
+    data = request.json or {}
+    try:
+        record = media_service.update_media(
+            media_id,
+            display_order=data.get('display_order'),
+            is_featured=data.get('is_featured'),
+            alt_text=data.get('alt_text'),
+        )
+        return jsonify(record.to_dict())
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/media/<int:media_id>', methods=['DELETE'])
+@admin_only
+def delete_entity_media(media_id):
+    """Delete a Media record and its Azure blob."""
+    try:
+        media_service.delete_media(media_id)
+        return jsonify({'message': 'deleted'}), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/media/<entity_type>/<entity_id>/reorder', methods=['POST'])
+@admin_only
+def reorder_entity_media(entity_type, entity_id):
+    """Apply a new display_order. Body: { media_type: str, ordered_ids: [int, ...] }"""
+    data = request.json or {}
+    ordered_ids = [int(i) for i in data.get('ordered_ids', []) if str(i).isdigit()]
+    mt = (data.get('media_type') or 'gallery').strip()
+    if mt not in VALID_MEDIA_TYPES:
+        return jsonify({'error': f'Unknown media_type: {mt}'}), 400
+    items = media_service.reorder(entity_type, entity_id, mt, ordered_ids)
+    return jsonify([m.to_dict() for m in items])
 
 from chatbot.routes import chatbot_bp
 

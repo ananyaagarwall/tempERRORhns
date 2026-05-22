@@ -187,9 +187,12 @@ function ScheduleModal({ onClose }) {
                                 <div className="cs-field">
                                     <label className="cs-field-label">Your Name</label>
                                     <input
+                                        id="cs-name"
+                                        name="name"
                                         className="cs-field-input"
                                         type="text"
                                         placeholder="e.g. Rohan Mehta"
+                                        autoComplete="name"
                                         value={name}
                                         onChange={e => setName(e.target.value)}
                                     />
@@ -197,9 +200,12 @@ function ScheduleModal({ onClose }) {
                                 <div className="cs-field">
                                     <label className="cs-field-label">Phone Number</label>
                                     <input
+                                        id="cs-phone"
+                                        name="phone"
                                         className="cs-field-input"
                                         type="tel"
                                         placeholder="+91 98765 43210"
+                                        autoComplete="tel"
                                         value={phone}
                                         onChange={e => setPhone(e.target.value)}
                                     />

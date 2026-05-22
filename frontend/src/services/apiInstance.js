@@ -1,6 +1,13 @@
 import axios from "axios";
 import { API_API_URL } from "../config";
 
+let authTokenGetter = null;
+
+// Allow React hooks (useAuth/getToken) to register a token getter once Clerk is loaded.
+export const setAuthTokenGetter = (getter) => {
+  authTokenGetter = typeof getter === "function" ? getter : null;
+};
+
 // --- GUEST ID LOGIC (Vanilla JS implementation to avoid extra dependencies) ---
 export const getOrCreateGuestId = () => {
   const getCookie = (name) => {
@@ -35,13 +42,12 @@ const api = axios.create({
 // Request Interceptor: Attach Clerk Token
 api.interceptors.request.use(async (config) => {
   try {
-    // Check if Clerk is initialized and session is available on window
-    const clerk = window.Clerk;
-    if (clerk?.session) {
-      const token = await clerk.session.getToken();
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+    const token = authTokenGetter
+      ? await authTokenGetter()
+      : await window?.Clerk?.session?.getToken?.();
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     
     // Always include Guest ID for merge & tracking

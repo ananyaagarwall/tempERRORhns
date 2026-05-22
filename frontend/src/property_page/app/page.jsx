@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 
 // Layout Components
 import FooterNavBar from '../../hns_home_page/components/layout/FooterNavBar';
-import PropertyHeader from '../components/layouts/PropertyHeader';
+// import PropertyHeader from '../components/layouts/PropertyHeader';
 import PropertyFooter from '../components/layouts/PropertyFooter';
 import DynamicBreadcrumb from '../../components/ui/DynamicBreadcrumb.jsx';
 import MobileFooter from '../../components/ui/MobileFooter.jsx'; // Added from second version
@@ -130,7 +130,7 @@ const PropertyListingPage = () => {
       {/* Main Content */}
       <main className="pt-16 sm:pt-20 lg:pt-24 pb-16 lg:pb-0">
         <DynamicBreadcrumb />
-        <PropertyHeader propertyData={propertyData} />
+        {/* <PropertyHeader propertyData={propertyData} /> */}
         {builderData && <BuilderProfile builderData={builderData} />}
         <PropertyHero propertyData={propertyData} projectData={projectData} />
         <MainContentSection propertyData={propertyData} projectData={projectData} builderData={builderData} />

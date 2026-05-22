@@ -6,14 +6,12 @@ import { buildBuilderPath } from "../../../utils/entityRouting";
 const BuilderProfile = ({ builderData }) => {
   const navigate = useNavigate();
   
-  // Extract builder information with fallback values
+  // Extract builder information mapped to actual DB schema fields
   const builderName = builderData?.company_name || builderData?.builder_name || "Builder Name";
-  const builderMotto = builderData?.motto || builderData?.tagline || "Building Dreams | Creating Realities";
-  const builderRanking = builderData?.ranking || builderData?.rank || 7;
-  const totalCities = builderData?.total_cities || builderData?.cities || 123;
-  const completedProjects = builderData?.completed_projects || builderData?.projects_done || 23;
-  const newProjects = builderData?.new_projects || builderData?.ongoing_projects || 14;
-  const established = builderData?.established_year || builderData?.year_established || 1995;
+  const builderMotto = builderData?.short_description || null;
+  const completedProjects = builderData?.completed_projects ?? 0;
+  const newProjects = builderData?.ongoing_projects ?? 0;
+  const established = builderData?.established_year ?? null;
   
   // Handle navigation
   const handleBuilderClick = async () => {
@@ -51,11 +49,13 @@ const BuilderProfile = ({ builderData }) => {
               </h2>
               <p className="text-xs sm:text-base lg:text-xl text-gray-500 line-clamp-1">{builderMotto}</p>
               
-              {/* Ranking Badge - Mobile Optimized */}
-              <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-md w-fit mt-1">
-                <Award className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>Rank #{builderRanking} in India</span>
-              </div>
+              {/* Ranking Badge - only shown when ranking data exists in DB */}
+              {builderData?.ranking && (
+                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-md w-fit mt-1">
+                  <Award className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span>Rank #{builderData.ranking} in India</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -69,10 +69,10 @@ const BuilderProfile = ({ builderData }) => {
                 <span className="text-[10px] sm:text-xs lg:text-sm text-gray-500 font-medium uppercase tracking-wide mt-0.5">Projects</span>
               </div>
 
-              {/* Stat 2 */}
+              {/* Stat 2 - city from DB (no cities-count field in schema) */}
               <div className="flex flex-col items-center lg:items-start text-center lg:text-left px-1">
-                <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{totalCities}</span>
-                <span className="text-[10px] sm:text-xs lg:text-sm text-gray-500 font-medium uppercase tracking-wide mt-0.5">Cities</span>
+                <span className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">{builderData?.city || '—'}</span>
+                <span className="text-[10px] sm:text-xs lg:text-sm text-gray-500 font-medium uppercase tracking-wide mt-0.5">City</span>
               </div>
 
               {/* Stat 3 */}

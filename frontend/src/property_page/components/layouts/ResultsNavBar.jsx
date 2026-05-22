@@ -57,7 +57,7 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
       
       const sections = [
         { ref: overviewRef, name: 'overview' },
-        { ref: floorPlansRef, name: 'floor-plans' },
+        { ref: floorPlansRef, id: 'floor-plans', name: 'floor-plans' },
         { ref: amenitiesRef, name: 'amenities' },
         { ref: mapRef, name: 'map' }
       ];
@@ -77,9 +77,9 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
       
       for (let i = 0; i < sections.length; i++) {
         const section = sections[i];
-        if (section.ref?.current) {
-          const rect = section.ref.current.getBoundingClientRect();
-          
+        const el = section.ref?.current || (section.id ? document.getElementById(section.id) : null);
+        if (el) {
+          const rect = el.getBoundingClientRect();
           if (rect.top <= triggerPoint) {
             currentSection = section.name;
           } else {
@@ -108,15 +108,13 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
     return totalOffset + (navRef.current?.offsetHeight || 0) + 16;
   };
 
-  const scrollToSection = (targetRef) => {
-    if (!targetRef?.current) return;
-    
-    const offset = calculateOffset(); 
-    const elementTop = targetRef.current.getBoundingClientRect().top;
-    
-    // Unified logic: Always offset from top
-    const offsetPosition = elementTop + window.pageYOffset - offset;
-    
+  const scrollToSection = (targetRef, fallbackId) => {
+    const el = targetRef?.current || (fallbackId ? document.getElementById(fallbackId) : null);
+    if (!el) return;
+
+    const offset = calculateOffset();
+    const offsetPosition = el.getBoundingClientRect().top + window.pageYOffset - offset;
+
     window.scrollTo({
       top: offsetPosition,
       behavior: "smooth"
@@ -183,17 +181,8 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
               >
                 Overview
               </button>
-              <div className="w-px h-4 bg-gray-300"></div>
-               <button 
-                onClick={() => scrollToSection(floorPlansRef)} 
-                className={`px-2 xl:px-3 py-2 font-semibold text-xs xl:text-sm rounded-lg transition-colors whitespace-nowrap ${
-                  activeSection === 'floor-plans' 
-                    ? 'bg-blue-100 text-blue-900' 
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-              >
-                Floor Plans
-              </button> 
+
+              
               <div className="w-px h-4 bg-gray-300"></div>
               <button 
                 onClick={() => scrollToSection(amenitiesRef)} 
@@ -205,6 +194,7 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
               >
                 Amenities
               </button>
+
               <div className="w-px h-4 bg-gray-300"></div>
               <button 
                 onClick={() => scrollToSection(mapRef)} 
@@ -216,6 +206,19 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
               >
                 Map
               </button>
+
+              <div className="w-px h-4 bg-gray-300"></div>
+               <button
+                onClick={() => scrollToSection(floorPlansRef, 'floor-plans')}
+                className={`px-2 xl:px-3 py-2 font-semibold text-xs xl:text-sm rounded-lg transition-colors whitespace-nowrap ${
+                  activeSection === 'floor-plans'
+                    ? 'bg-blue-100 text-blue-900'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }`}
+              >
+                Floor Plans
+              </button>
+
               <div className="w-px h-4 bg-gray-300"></div>
               <button 
                 onClick={scrollToReadMore} 
@@ -241,11 +244,11 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
               >
                 Overview
               </button>
-              <button 
-                onClick={() => scrollToSection(floorPlansRef)} 
+              <button
+                onClick={() => scrollToSection(floorPlansRef, 'floor-plans')}
                 className={`px-2.5 py-1.5 font-semibold text-xs rounded-lg transition-colors whitespace-nowrap flex-shrink-0 ${
-                  activeSection === 'floor-plans' 
-                    ? 'bg-blue-100 text-blue-900' 
+                  activeSection === 'floor-plans'
+                    ? 'bg-blue-100 text-blue-900'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                 }`}
               >

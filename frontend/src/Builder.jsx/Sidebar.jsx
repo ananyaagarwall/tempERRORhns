@@ -19,7 +19,7 @@ const Sidebar = () => {
       setGeoLocation(res.data);
     } catch (e) {
       // ignore
-    }
+    }   
   };
 
   const handleLogout = () => {

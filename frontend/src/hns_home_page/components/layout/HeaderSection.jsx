@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { FaSearch, FaBars, FaTimes, FaHome, FaBuilding, FaRegFileAlt, FaEnvelope, FaUser, FaUserCircle, FaRegUserCircle } from 'react-icons/fa';
 import headerBg from '../../../assets/Header.img1.gradient1.png';
 import { Link, useNavigate } from 'react-router-dom';
+import { useUser, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
 import '../../home_page_css/HeaderSection.css';
 
 const HeaderSection = () => {
@@ -11,7 +12,7 @@ const HeaderSection = () => {
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const navigate = useNavigate();
   // const [activeMenu, setActiveMenu] = useState('Projects');
-  const [user, setUser] = useState(null);
+  const { user } = useUser();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   // Price slider state (single slider for max price)
   const [priceRange, setPriceRange] = useState(0); // 0 means "All Range"
@@ -456,9 +457,14 @@ const HeaderSection = () => {
               <Link to="/about" className="nav-link" style={{
                 fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
               }}>About Us</Link>
-              <Link to="/login" className="nav-link" style={{
-                fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
-              }}><FaRegUserCircle size={22} /></Link>
+              <SignedIn>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+              <SignedOut>
+                <Link to="/login" className="nav-link" style={{
+                  fontSize: isTablet ? '13px' : isLaptop ? '14px' : '16px'
+                }}><FaRegUserCircle size={22} /></Link>
+              </SignedOut>
             </div>
           )}
 
@@ -558,16 +564,34 @@ const HeaderSection = () => {
               &times;
             </button>
             <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, marginTop: 2 }}>
-              <FaUserCircle size={36} color="#fff" className="user-avatar" style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%' }} />
+              <SignedIn>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+              <SignedOut>
+                <FaUserCircle size={36} color="#fff" className="user-avatar" style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%' }} />
+              </SignedOut>
               <div>
-                <div className="user-name" style={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', marginBottom: 1 }}>
-                  {user ? `Hi, ${user.name}` : 'Welcome Guest'}
-                </div>
-                <div className="user-status" style={{ color: '#eaf1ff', fontWeight: 500, fontSize: '0.92rem' }}>
-                  {user ? <span>Profile &bull; <span style={{ textDecoration: 'underline', cursor: 'pointer' }}>Manage Profile</span></span> : 'Guest Profile'}
-                </div>
-              </div>
-            </div>
+	                <div className="user-name" style={{ color: '#fff', fontWeight: 700, fontSize: '1.05rem', marginBottom: 1 }}>
+	                  {user ? `Hi, ${user.firstName || user.username || user.primaryEmailAddress?.emailAddress || 'User'}` : 'Welcome Guest'}
+	                </div>
+	                <div className="user-status" style={{ color: '#eaf1ff', fontWeight: 500, fontSize: '0.92rem' }}>
+	                  {user ? (
+	                    <span>
+	                      Profile &bull;{" "}
+	                      <Link
+	                        to="/profile"
+	                        onClick={toggleMenu}
+	                        style={{ textDecoration: 'underline', cursor: 'pointer', color: 'inherit' }}
+	                      >
+	                        Manage Profile
+	                      </Link>
+	                    </span>
+	                  ) : (
+	                    'Guest Profile'
+	                  )}
+	                </div>
+	              </div>
+	            </div>
             {!user && (
               <Link
                 to="/login"
@@ -740,9 +764,12 @@ const HeaderSection = () => {
               </label>
               <div className="mobile-search-input-container">
                 <input
+                  id="mobile-location-search"
+                  name="location"
                   type="text"
                   placeholder="Enter location..."
                   className="mobile-search-input"
+                  autoComplete="off"
                   autoFocus
                   value={location}
                   onChange={e => setLocation(e.target.value)}
