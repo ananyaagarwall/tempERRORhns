@@ -147,11 +147,29 @@ instance_dir = os.path.join(basedir, 'instance')
 os.makedirs(instance_dir, exist_ok=True)  # This line fixes most issues
 
 
-# Use PostgreSQL (DATABASE_URL from .env)
-_db_url = os.getenv('DATABASE_URL', f"sqlite:///{os.path.join(instance_dir, 'hns.db')}")
-# SQLAlchemy requires 'postgresql://' not 'postgres://' (Heroku-style URLs)
-if _db_url.startswith('postgres://'):
-    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+# Use Neon (primary) with local PostgreSQL as fallback
+def _resolve_db_url():
+    import socket
+    from urllib.parse import urlparse
+
+    def rewrite(url):
+        return url.replace('postgres://', 'postgresql://', 1) if url.startswith('postgres://') else url
+
+    primary  = rewrite(os.getenv('DATABASE_URL', ''))
+    fallback = rewrite(os.getenv('DATABASE_URL_FALLBACK', f"sqlite:///{os.path.join(instance_dir, 'hns.db')}"))
+
+    if primary:
+        try:
+            host = urlparse(primary).hostname
+            socket.getaddrinfo(host, None, socket.AF_INET)
+            print(f"DB: connected to Neon (primary)  host={host}")
+            return primary
+        except socket.gaierror:
+            print(f"DB: Neon unreachable — falling back to local PostgreSQL")
+
+    return fallback
+
+_db_url = _resolve_db_url()
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY') or os.getenv('SECRET_KEY') or CLERK_SECRET_KEY or 'dev-admin-session-secret'

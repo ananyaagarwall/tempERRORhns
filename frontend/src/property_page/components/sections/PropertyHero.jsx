@@ -42,7 +42,7 @@ const PropertyHero = ({ propertyData, projectData }) => {
   const { urls: mediaUrls } = useMedia(
     'project',
     projectData?.id ?? null,
-    null,   // all types: gallery + floor_plan combined
+    'gallery',  // gallery only — floor plans shown in ExistingFloorPlansSection
   );
 
   const configLabels = Array.from(
@@ -81,7 +81,6 @@ const PropertyHero = ({ propertyData, projectData }) => {
     propertyData?.builder_project_image,
     projectData?.project_image,
     ..._safeList(projectData?.image_urls),
-    ..._safeList(projectData?.floor_plans),
   ]
     .map(normalizeImageUrl)
     .filter(Boolean);
