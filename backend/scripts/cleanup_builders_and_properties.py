@@ -1,4 +1,4 @@
-"""
+﻿"""
 cleanup_builders_and_properties.py
 ---------------------------------
 One-off Postgres data cleanup script requested for:
