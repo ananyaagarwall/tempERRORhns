@@ -1,4 +1,4 @@
-"""
+﻿"""
 One-time script: populate the `media` table from blob/local URLs already
 stored in the Builder, BuilderProject, Blog, and Property entity fields.
 
