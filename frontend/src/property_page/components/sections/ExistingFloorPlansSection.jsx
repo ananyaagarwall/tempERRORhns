@@ -1,8 +1,7 @@
 import React from "react";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check } from "lucide-react";
 import { Card, CardContent } from "../ui/Card";
 import Button from "../ui/Button";
-import { useMedia } from "../../../hooks/useMedia";
 
 import floorPlan2BHK from "../../../assets/floor-plan-2bhk.jpg";
 import floorPlan3BHK from "../../../assets/floor-plan-3bhk.jpg";
@@ -92,21 +91,9 @@ const floorPlanDetails = {
 const BHK_LABELS = { "2bhk": "2 BHK", "3bhk": "3 BHK", "4bhk": "4 BHK" };
 const TYPE_LABELS = { "type-i": "Type I", "type-ii": "Type II", "type-iii": "Type III" };
 
-const ExistingFloorPlansSection = ({ projectData }) => {
+const ExistingFloorPlansSection = () => {
   const [activeBHK, setActiveBHK] = React.useState("3bhk");
   const [activeType, setActiveType] = React.useState("type-i");
-  const [mediaIndex, setMediaIndex] = React.useState(0);
-
-  const { urls: floorPlanUrls, loading: mediaLoading } = useMedia(
-    'project',
-    projectData?.id ?? null,
-    'floor_plan',
-  );
-
-  const hasMediaPlans = floorPlanUrls.length > 0;
-  const total = floorPlanUrls.length;
-  const prevPlan = () => setMediaIndex(i => (i - 1 + total) % total);
-  const nextPlan = () => setMediaIndex(i => (i + 1) % total);
 
   const handleBHKChange = (bhk) => {
     setActiveBHK(bhk);
@@ -115,73 +102,6 @@ const ExistingFloorPlansSection = ({ projectData }) => {
 
   const plan = floorPlanDetails[activeBHK][activeType];
 
-  // ── Media-driven carousel (shown when floor plan images exist in DB) ──────────
-  if (!mediaLoading && hasMediaPlans) {
-    return (
-      <section id="floor-plans" className="w-full max-w-7xl mx-auto px-4 sm:px-8 lg:px-16 py-8 sm:py-12 lg:py-16 bg-white">
-        <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <div className="w-8 sm:w-12 h-0.5 bg-gray-400" />
-          <h2 className="text-base sm:text-lg font-medium text-gray-900">Floor Plans</h2>
-        </div>
-
-        <Card className="max-w-7xl mx-auto shadow-lg border border-gray-200 rounded-xl overflow-hidden">
-          <CardContent className="p-0">
-            <div className="relative bg-blue-900 min-h-[300px] sm:min-h-[420px] lg:min-h-[540px] flex items-center justify-center">
-              <img
-                key={floorPlanUrls[mediaIndex]}
-                src={floorPlanUrls[mediaIndex]}
-                alt={`Floor Plan ${mediaIndex + 1} of ${total}`}
-                className="w-full h-full object-contain max-h-[540px]"
-              />
-
-              {/* Counter badge */}
-              <div className="absolute top-4 left-4 bg-black/50 text-white text-sm px-3 py-1 rounded-full">
-                {mediaIndex + 1} / {total}
-              </div>
-
-              {/* Prev / Next */}
-              {total > 1 && (
-                <>
-                  <button
-                    onClick={prevPlan}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/65 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors z-10"
-                    aria-label="Previous floor plan"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={nextPlan}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/65 text-white rounded-full w-9 h-9 flex items-center justify-center transition-colors z-10"
-                    aria-label="Next floor plan"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </>
-              )}
-
-              {/* Dot indicators */}
-              {total > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-                  {floorPlanUrls.map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setMediaIndex(i)}
-                      aria-label={`Floor plan ${i + 1}`}
-                      className={`h-2 rounded-full transition-all duration-200 ${
-                        i === mediaIndex ? "w-5 bg-white" : "w-2 bg-white/50 hover:bg-white/75"
-                      }`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-    );
-  }
-
-  // ── Static fallback UI (shown when no floor plan images in DB) ───────────────
   return (
     <section id="floor-plans" className="w-full max-w-7xl mx-auto px-4 sm:px-8 lg:px-16 py-8 sm:py-12 lg:py-16 bg-white">
       <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
