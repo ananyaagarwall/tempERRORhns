@@ -176,6 +176,14 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
     </div>
   );
 
+  const hasActiveFilter = !!(
+    searchFilters.location ||
+    searchFilters.priceRange > 0 ||
+    searchFilters.minBudget !== null ||
+    searchFilters.maxBudget !== null ||
+    searchFilters.bhkTypes?.length > 0
+  );
+
   return (
     <section className="property-section-custom">
       <div style={{ textAlign: 'center', marginBottom: '120px' }}>
@@ -226,7 +234,26 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
           ) : error ? (
             <div style={{ color: 'red', padding: '2rem', fontWeight: 600 }}>{error}</div>
           ) : properties.length === 0 ? (
-            renderPropertyCard(sampleProperty, 0)
+            hasActiveFilter ? (
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '3rem 2rem',
+                color: '#223A5F',
+                textAlign: 'center',
+                minWidth: '300px',
+              }}>
+                <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔍</div>
+                <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.5rem' }}>No properties found</h3>
+                <p style={{ fontSize: '0.9rem', color: '#8a9bbf', margin: 0 }}>
+                  Try a different location or adjust your filters.
+                </p>
+              </div>
+            ) : (
+              renderPropertyCard(sampleProperty, 0)
+            )
           ) : (
             properties.map((prop, idx) => renderPropertyCard(prop, idx))
           )}

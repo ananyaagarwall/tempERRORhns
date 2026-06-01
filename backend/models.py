@@ -731,3 +731,14 @@ class Favorite(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+
+# ── Search Suggestions (fuzzy autocomplete) ────────────────────────────────────
+class SearchSuggestion(db.Model):
+    __tablename__ = 'search_suggestions'
+
+    id     = db.Column(db.Integer, primary_key=True)
+    phrase = db.Column(db.String(255), unique=True, nullable=False)
+
+    def to_dict(self):
+        return {'phrase': self.phrase}

@@ -19,6 +19,7 @@ from models import (
     UserInteraction,
     Favorite,
     Media,
+    SearchSuggestion,
 )
 import media_service
 
@@ -160,12 +161,18 @@ def _resolve_db_url():
 
     if primary:
         try:
-            host = urlparse(primary).hostname
-            socket.getaddrinfo(host, None, socket.AF_INET)
-            print(f"DB: connected to Neon (primary)  host={host}")
+            parsed = urlparse(primary)
+            host = parsed.hostname
+            port = parsed.port or 5432
+            # TCP connect test (3 s timeout) — catches DNS failures, paused projects, firewall blocks
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(3)
+            sock.connect((host, port))
+            sock.close()
+            print(f"DB: Neon reachable — using primary  host={host}")
             return primary
-        except socket.gaierror:
-            print(f"DB: Neon unreachable — falling back to local PostgreSQL")
+        except (socket.gaierror, socket.timeout, OSError):
+            print("DB: Neon unreachable — falling back to local PostgreSQL")
 
     return fallback
 
@@ -1075,6 +1082,15 @@ def _ensure_schema_compatibility():
             "WHERE guest_id IS NOT NULL AND property_id IS NOT NULL"
         ))
 
+    # search_suggestions — fuzzy autocomplete via pg_trgm
+    if dialect == 'postgresql':
+        db.session.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+        if inspector.has_table('search_suggestions'):
+            db.session.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_suggestions_trgm "
+                "ON search_suggestions USING gin (phrase gin_trgm_ops)"
+            ))
+
     db.session.commit()
 
 
@@ -1677,6 +1693,27 @@ def get_builder_by_name(company_name):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ── Fuzzy autocomplete ─────────────────────────────────────────────────────────
+@app.route('/api/search/suggest', methods=['GET'])
+def get_search_suggestions():
+    q = request.args.get('q', '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    try:
+        rows = db.session.execute(
+            text("""
+                SELECT phrase FROM search_suggestions
+                WHERE phrase % :q
+                ORDER BY phrase <-> :q
+                LIMIT 6
+            """),
+            {'q': q}
+        ).fetchall()
+        return jsonify([r[0] for r in rows]), 200
+    except Exception:
+        return jsonify([]), 200
 
 
 # Alternative: Add a route that lists all builders for debugging
@@ -3114,14 +3151,55 @@ def search_properties():
     property_status_filter_canonical = set(_canonical_property_status(s) for s in property_status_filter)
     society_type_filter = [t.lower().strip() for t in request.args.getlist('society_type') if t]
 
-    query = Property.query
+    from sqlalchemy import or_, outerjoin
 
-    # ---- LOCATION FILTER ----
+    # ---- LOCATION / NAME / STATUS FILTER ----
+    # Joins BuilderProject so that project titles (e.g. "The Trellis") also match.
     if location:
-        query = query.filter(Property.Location.ilike(f"%{location}%"))
+        query = Property.query.outerjoin(
+            BuilderProject, Property.project_id == BuilderProject.id
+        ).filter(
+            or_(
+                Property.Location.ilike(f"%{location}%"),
+                Property.Property_Name.ilike(f"%{location}%"),
+                Property.Project_Status.ilike(f"%{location}%"),
+                BuilderProject.title.ilike(f"%{location}%"),
+            )
+        )
+    else:
+        query = Property.query
 
-    # Fetch all rows first (filtered by location)
+    # Fetch all rows first (filtered above)
     results = query.all()
+
+    # ---- FUZZY FALLBACK (typo correction via pg_trgm) ----
+    # If ILIKE returned nothing AND we're on PostgreSQL, find the closest match
+    # across Location, Property_Name, and BuilderProject.title using trigram similarity.
+    if location and not results and db.engine.dialect.name == 'postgresql':
+        try:
+            fuzzy_row = db.session.execute(
+                text("""
+                    SELECT phrase FROM search_suggestions
+                    WHERE phrase % :loc
+                    ORDER BY phrase <-> :loc
+                    LIMIT 1
+                """),
+                {'loc': location}
+            ).fetchone()
+            if fuzzy_row:
+                corrected = fuzzy_row[0]
+                results = Property.query.outerjoin(
+                    BuilderProject, Property.project_id == BuilderProject.id
+                ).filter(
+                    or_(
+                        Property.Location.ilike(f"%{corrected}%"),
+                        Property.Property_Name.ilike(f"%{corrected}%"),
+                        Property.Project_Status.ilike(f"%{corrected}%"),
+                        BuilderProject.title.ilike(f"%{corrected}%"),
+                    )
+                ).all()
+        except Exception:
+            pass
 
     # Use 'price' param as max_price if max_price is not explicitly provided (desktop compatibility)
     if not max_price and price > 0:
