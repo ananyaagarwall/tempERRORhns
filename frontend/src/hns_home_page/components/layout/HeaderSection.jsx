@@ -333,44 +333,123 @@ const HeaderSection = () => {
 
   const navbarStyles = getNavbarStyles();
   const [location, setLocation] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const debounceRef = useRef(null);
+  const suggestBoxRef = useRef(null);
 
-  // List of valid locations for autocorrect---------------------------------------------
-  const VALID_LOCATIONS = ["Thane", "Ghansoli", "Airoli", "Koparkharaine"];
-
-
-  function levenshtein(a, b) {
-    const matrix = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
-    for (let i = 0; i <= a.length; i++) matrix[i][0] = i;
-    for (let j = 0; j <= b.length; j++) matrix[0][j] = j;
-    for (let i = 1; i <= a.length; i++) {
-      for (let j = 1; j <= b.length; j++) {
-        if (a[i - 1].toLowerCase() === b[j - 1].toLowerCase()) {
-          matrix[i][j] = matrix[i - 1][j - 1];
-        } else {
-          matrix[i][j] = 1 + Math.min(matrix[i - 1][j], matrix[i][j - 1], matrix[i - 1][j - 1]);
-        }
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e) => {
+      if (suggestBoxRef.current && !suggestBoxRef.current.contains(e.target)) {
+        setShowSuggestions(false);
       }
-    }
-    return matrix[a.length][b.length];
-  }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
-  function autocorrectLocation(input) {
-    if (!input) return input;
-    let best = VALID_LOCATIONS[0];
-    let minDist = levenshtein(input, best);
-    for (let i = 1; i < VALID_LOCATIONS.length; i++) {
-      const dist = levenshtein(input, VALID_LOCATIONS[i]);
-      if (dist < minDist) {
-        minDist = dist;
-        best = VALID_LOCATIONS[i];
+  // Maps a suggestion phrase to the correct filter fields.
+  // BHK phrases (e.g. "2 BHK") route to bhkTypes; everything else is a location/name search.
+  const BHK_ID_MAP = {
+    '1bhk': '1bhk', '2bhk': '2bhk', '3bhk': '3bhk', '4bhk': '4bhk', '4+bhk': '4plus',
+    '1.5bhk': '1bhk', '2.5bhk': '2bhk', 'studio': '1bhk', 'penthouse': '4plus', 'duplex': '4plus',
+  };
+  const _buildFilterDetail = (phrase, priceRange, minBudget, maxBudget, currentBhkTypes) => {
+    const key = phrase.toLowerCase().replace(/\s+/g, '');
+    if (BHK_ID_MAP[key]) {
+      return { location: '', priceRange, minBudget, maxBudget, bhkTypes: [BHK_ID_MAP[key]] };
+    }
+    return { location: phrase, priceRange, minBudget, maxBudget, bhkTypes: currentBhkTypes };
+  };
+
+  const fetchSuggestions = (val) => {
+    clearTimeout(debounceRef.current);
+    if (!val || val.trim().length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      // Reset property filter immediately when input is cleared
+      if (!val || val.trim() === '') {
+        window.dispatchEvent(new CustomEvent('filterLandingPage', {
+          detail: { location: '', priceRange, minBudget, maxBudget, bhkTypes: selectedBhkTypes }
+        }));
       }
+      return;
     }
-    // Only autocorrect if the match is reasonably close (distance <= 3 or input is a substring)
-    if (minDist <= 3 || VALID_LOCATIONS.some(loc => loc.toLowerCase().includes(input.toLowerCase()))) {
-      return best;
-    }
-    return input;
-  }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+        const res = await fetch(`${API_BASE}/api/search/suggest?q=${encodeURIComponent(val.trim())}`);
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : [];
+        setSuggestions(list);
+        setShowSuggestions(list.length > 0);
+        const phrase = list.length > 0 ? list[0] : val.trim();
+        window.dispatchEvent(new CustomEvent('filterLandingPage', {
+          detail: _buildFilterDetail(phrase, priceRange, minBudget, maxBudget, selectedBhkTypes)
+        }));
+      } catch {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        window.dispatchEvent(new CustomEvent('filterLandingPage', {
+          detail: _buildFilterDetail(val.trim(), priceRange, minBudget, maxBudget, selectedBhkTypes)
+        }));
+      }
+    }, 300);
+  };
+
+  const handleLocationChange = (val) => {
+    setLocation(val);
+    fetchSuggestions(val);
+  };
+
+  const selectSuggestion = (phrase) => {
+    setLocation(phrase);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    window.dispatchEvent(new CustomEvent('filterLandingPage', {
+      detail: _buildFilterDetail(phrase, priceRange, minBudget, maxBudget, selectedBhkTypes)
+    }));
+  };
+
+  const SuggestionsDropdown = () =>
+    showSuggestions && suggestions.length > 0 ? (
+      <ul
+        ref={suggestBoxRef}
+        style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          right: 0,
+          backgroundColor: '#fff',
+          border: '1px solid #dde3ee',
+          borderRadius: '8px',
+          listStyle: 'none',
+          padding: '4px 0',
+          margin: '4px 0 0 0',
+          zIndex: 9999,
+          boxShadow: '0 8px 24px rgba(34,58,95,0.13)',
+        }}
+      >
+        {suggestions.map((phrase, idx) => (
+          <li
+            key={idx}
+            onMouseDown={() => selectSuggestion(phrase)}
+            style={{
+              padding: '10px 16px',
+              cursor: 'pointer',
+              fontSize: '14px',
+              color: '#223A5F',
+              borderBottom: idx < suggestions.length - 1 ? '1px solid #f0f3f8' : 'none',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f0f5ff'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >
+            {phrase}
+          </li>
+        ))}
+      </ul>
+    ) : null;
 
   return (
     <div
@@ -762,7 +841,7 @@ const HeaderSection = () => {
               <label className="mobile-search-label">
                 Location
               </label>
-              <div className="mobile-search-input-container">
+              <div className="mobile-search-input-container" style={{ position: 'relative' }}>
                 <input
                   id="mobile-location-search"
                   name="location"
@@ -772,10 +851,10 @@ const HeaderSection = () => {
                   autoComplete="off"
                   autoFocus
                   value={location}
-                  onChange={e => setLocation(e.target.value)}
+                  onChange={e => handleLocationChange(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
-                      const correctedLocation = autocorrectLocation(location);
+                      const correctedLocation = location;
                       window.dispatchEvent(new CustomEvent('filterLandingPage', {
                         detail: {
                           location: correctedLocation,
@@ -789,6 +868,7 @@ const HeaderSection = () => {
                     }
                   }}
                 />
+                <SuggestionsDropdown />
                 <button
                   style={{
                     background: '#2563EB',
@@ -804,7 +884,7 @@ const HeaderSection = () => {
                     flexShrink: 0,
                   }}
                   onClick={() => {
-                    const correctedLocation = autocorrectLocation(location);
+                    const correctedLocation = location;
                     window.dispatchEvent(new CustomEvent('filterLandingPage', {
                       detail: {
                         location: correctedLocation,
@@ -919,7 +999,7 @@ const HeaderSection = () => {
             <button
               className="mobile-search-submit-btn"
               onClick={() => {
-                const correctedLocation = autocorrectLocation(location);
+                const correctedLocation = location;
                 window.dispatchEvent(new CustomEvent('filterLandingPage', {
                   detail: {
                     location: correctedLocation,
@@ -969,7 +1049,7 @@ const HeaderSection = () => {
             {/* Main row */}
             <div className="searchbar-main-row">
               {/* Location Field */}
-              <div className="searchbar-field-box">
+              <div className="searchbar-field-box" style={{ position: 'relative' }}>
                 <span className="searchbar-field-label">Location</span>
                 <div className="searchbar-field-inner">
                   <FaSearch className="searchbar-icon" />
@@ -978,9 +1058,11 @@ const HeaderSection = () => {
                     placeholder="Enter location"
                     className="searchbar-input enter-location-input"
                     value={location}
-                    onChange={e => setLocation(e.target.value)}
+                    onChange={e => handleLocationChange(e.target.value)}
+                    onFocus={() => location.length >= 2 && setShowSuggestions(suggestions.length > 0)}
                   />
                 </div>
+                <SuggestionsDropdown />
               </div>
 
               <div className="searchbar-vdivider" />
@@ -1032,7 +1114,7 @@ const HeaderSection = () => {
               <button
                 className="searchbar-btn-pro"
                 onClick={() => {
-                  const correctedLocation = autocorrectLocation(location);
+                  const correctedLocation = location;
                   window.dispatchEvent(new CustomEvent('filterLandingPage', {
                     detail: { location: correctedLocation, priceRange, bhkTypes: selectedBhkTypes }
                   }));
