@@ -138,6 +138,16 @@ const PropertyCard = ({ property }) => {
             src={property.img || '/main-image.jpeg'}
             alt={`${property.name} main view`}
             className="main-property-image"
+            onError={(e) => {
+              const tried = e.currentTarget.dataset.tried || '';
+              if (!tried.includes('fb') && property.imgFallback) {
+                e.currentTarget.dataset.tried = tried + 'fb';
+                e.currentTarget.src = property.imgFallback;
+              } else if (!tried.includes('static')) {
+                e.currentTarget.dataset.tried = (tried || '') + 'static';
+                e.currentTarget.src = '/main-image.jpeg';
+              }
+            }}
           />
         </div>
 
@@ -308,11 +318,16 @@ const SearchResults = ({
                 .filter(Boolean)
             )
           );
+          const projectId = p.project_id || null;
+          const azureGallery = projectId
+            ? `https://hnsblob001.blob.core.windows.net/hns-media/projects/${projectId}/gallery/img1.jpg`
+            : null;
           return {
             id: p.id || p._id,
             name: p.Property_Name || '',
             status: p.Project_Status || '',
-            img: p.builder_project_image || p.image || '',
+            img: azureGallery || p.builder_project_image || p.image || '',
+            imgFallback: p.builder_project_image || p.image || '',
             price: p.Pricing || p.Price_Starting_From || '',
             pricePerSqft: '',
             carpetArea: p.Carpet_Area || '',

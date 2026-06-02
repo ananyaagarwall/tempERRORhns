@@ -4,6 +4,7 @@ import { FaSearch, FaBars, FaTimes, FaHome, FaBuilding, FaRegFileAlt, FaEnvelope
 import headerBg from '../../../assets/Header.img1.gradient1.png';
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser, SignedIn, SignedOut, UserButton } from '@clerk/clerk-react';
+import { useSearchSuggestions } from '../../../hooks/useSearchSuggestions';
 import '../../home_page_css/HeaderSection.css';
 
 const HeaderSection = () => {
@@ -11,7 +12,6 @@ const HeaderSection = () => {
   const [showMenu, setShowMenu] = useState(false);
   const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
   const navigate = useNavigate();
-  // const [activeMenu, setActiveMenu] = useState('Projects');
   const { user } = useUser();
   const [showMobileSearch, setShowMobileSearch] = useState(false);
   // Price slider state (single slider for max price)
@@ -332,90 +332,36 @@ const HeaderSection = () => {
   };
 
   const navbarStyles = getNavbarStyles();
-  const [location, setLocation] = useState("");
-  const [suggestions, setSuggestions] = useState([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const debounceRef = useRef(null);
-  const suggestBoxRef = useRef(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handler = (e) => {
-      if (suggestBoxRef.current && !suggestBoxRef.current.contains(e.target)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  // Maps a suggestion phrase to the correct filter fields.
-  // BHK phrases (e.g. "2 BHK") route to bhkTypes; everything else is a location/name search.
-  const BHK_ID_MAP = {
-    '1bhk': '1bhk', '2bhk': '2bhk', '3bhk': '3bhk', '4bhk': '4bhk', '4+bhk': '4plus',
-    '1.5bhk': '1bhk', '2.5bhk': '2bhk', 'studio': '1bhk', 'penthouse': '4plus', 'duplex': '4plus',
-  };
-  const _buildFilterDetail = (phrase, priceRange, minBudget, maxBudget, currentBhkTypes) => {
-    const key = phrase.toLowerCase().replace(/\s+/g, '');
-    if (BHK_ID_MAP[key]) {
-      return { location: '', priceRange, minBudget, maxBudget, bhkTypes: [BHK_ID_MAP[key]] };
-    }
-    return { location: phrase, priceRange, minBudget, maxBudget, bhkTypes: currentBhkTypes };
-  };
-
-  const fetchSuggestions = (val) => {
-    clearTimeout(debounceRef.current);
-    if (!val || val.trim().length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      // Reset property filter immediately when input is cleared
-      if (!val || val.trim() === '') {
-        window.dispatchEvent(new CustomEvent('filterLandingPage', {
-          detail: { location: '', priceRange, minBudget, maxBudget, bhkTypes: selectedBhkTypes }
-        }));
-      }
-      return;
-    }
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
-        const res = await fetch(`${API_BASE}/api/search/suggest?q=${encodeURIComponent(val.trim())}`);
-        const data = await res.json();
-        const list = Array.isArray(data) ? data : [];
-        setSuggestions(list);
-        setShowSuggestions(list.length > 0);
-        const phrase = list.length > 0 ? list[0] : val.trim();
-        window.dispatchEvent(new CustomEvent('filterLandingPage', {
-          detail: _buildFilterDetail(phrase, priceRange, minBudget, maxBudget, selectedBhkTypes)
-        }));
-      } catch {
-        setSuggestions([]);
-        setShowSuggestions(false);
-        window.dispatchEvent(new CustomEvent('filterLandingPage', {
-          detail: _buildFilterDetail(val.trim(), priceRange, minBudget, maxBudget, selectedBhkTypes)
-        }));
-      }
-    }, 300);
-  };
-
-  const handleLocationChange = (val) => {
-    setLocation(val);
-    fetchSuggestions(val);
-  };
-
-  const selectSuggestion = (phrase) => {
-    setLocation(phrase);
-    setSuggestions([]);
-    setShowSuggestions(false);
+  const dispatchFilter = (phrase) => {
     window.dispatchEvent(new CustomEvent('filterLandingPage', {
-      detail: _buildFilterDetail(phrase, priceRange, minBudget, maxBudget, selectedBhkTypes)
+      detail: { location: phrase, priceRange, minBudget, maxBudget, bhkTypes: selectedBhkTypes }
     }));
+  };
+
+  const { value: location, suggestions, showSuggestions,
+    containerRef: suggestBoxRef, handleChange: handleLocationChange,
+    handleSelect: selectSuggestion, handleKeyDown: handleLocationKeyDown,
+  } = useSearchSuggestions({
+    onChange: (val) => {
+      // Real-time filter on landing page as user types
+      if (!val || val.trim() === '') dispatchFilter('');
+    },
+    onSelect: (phrase) => {
+      dispatchFilter(phrase);
+    },
+  });
+
+  // Navigate to /properties with all current filter state passed as route state.
+  const navigateToListing = (overrideLocation) => {
+    const loc = overrideLocation !== undefined ? overrideLocation : location;
+    navigate('/properties', {
+      state: { location: loc, priceRange, minBudget, maxBudget, bhkTypes: selectedBhkTypes }
+    });
   };
 
   const SuggestionsDropdown = () =>
     showSuggestions && suggestions.length > 0 ? (
       <ul
-        ref={suggestBoxRef}
         style={{
           position: 'absolute',
           top: '100%',
@@ -846,24 +792,16 @@ const HeaderSection = () => {
                   id="mobile-location-search"
                   name="location"
                   type="text"
-                  placeholder="Enter location..."
+                  placeholder='Search "2 BHK in Thane"'
                   className="mobile-search-input"
                   autoComplete="off"
                   autoFocus
                   value={location}
                   onChange={e => handleLocationChange(e.target.value)}
                   onKeyDown={e => {
+                    handleLocationKeyDown(e);
                     if (e.key === 'Enter') {
-                      const correctedLocation = location;
-                      window.dispatchEvent(new CustomEvent('filterLandingPage', {
-                        detail: {
-                          location: correctedLocation,
-                          priceRange,
-                          minBudget,
-                          maxBudget,
-                          bhkTypes: selectedBhkTypes
-                        }
-                      }));
+                      navigateToListing();
                       setShowMobileSearch(false);
                     }
                   }}
@@ -883,26 +821,7 @@ const HeaderSection = () => {
                     cursor: 'pointer',
                     flexShrink: 0,
                   }}
-                  onClick={() => {
-                    const correctedLocation = location;
-                    window.dispatchEvent(new CustomEvent('filterLandingPage', {
-                      detail: {
-                        location: correctedLocation,
-                        priceRange,
-                        minBudget,
-                        maxBudget,
-                        bhkTypes: selectedBhkTypes
-                      }
-                    }));
-                    setTimeout(() => {
-                      const el = document.querySelector('.property-section-custom');
-                      if (el) {
-                        const y = el.getBoundingClientRect().top + window.scrollY - 100;
-                        window.scrollTo({ top: y, behavior: 'smooth' });
-                      }
-                    }, 100);
-                    setShowMobileSearch(false);
-                  }}
+                  onClick={() => { navigateToListing(); setShowMobileSearch(false); }}
                 >
                   <FaSearch style={{ fontSize: '14px' }} />
                 </button>
@@ -999,23 +918,7 @@ const HeaderSection = () => {
             <button
               className="mobile-search-submit-btn"
               onClick={() => {
-                const correctedLocation = location;
-                window.dispatchEvent(new CustomEvent('filterLandingPage', {
-                  detail: {
-                    location: correctedLocation,
-                    priceRange,
-                    minBudget,
-                    maxBudget,
-                    bhkTypes: selectedBhkTypes
-                  }
-                }));
-                setTimeout(() => {
-                  const el = document.querySelector('.property-section-custom');
-                  if (el) {
-                    const y = el.getBoundingClientRect().top + window.scrollY - 100;
-                    window.scrollTo({ top: y, behavior: 'smooth' });
-                  }
-                }, 100);
+                navigateToListing();
                 setShowMobileSearch(false);
               }}>
               <FaSearch style={{ marginRight: '10px', fontSize: '14px' }} />
@@ -1049,17 +952,17 @@ const HeaderSection = () => {
             {/* Main row */}
             <div className="searchbar-main-row">
               {/* Location Field */}
-              <div className="searchbar-field-box" style={{ position: 'relative' }}>
+              <div className="searchbar-field-box" ref={suggestBoxRef} style={{ position: 'relative' }}>
                 <span className="searchbar-field-label">Location</span>
                 <div className="searchbar-field-inner">
                   <FaSearch className="searchbar-icon" />
                   <input
                     type="text"
-                    placeholder="Enter location"
+                    placeholder='Search "2 BHK in Thane"'
                     className="searchbar-input enter-location-input"
                     value={location}
                     onChange={e => handleLocationChange(e.target.value)}
-                    onFocus={() => location.length >= 2 && setShowSuggestions(suggestions.length > 0)}
+                    onKeyDown={e => { handleLocationKeyDown(e); if (e.key === 'Enter') navigateToListing(location); }}
                   />
                 </div>
                 <SuggestionsDropdown />
@@ -1113,19 +1016,7 @@ const HeaderSection = () => {
               {/* Search Button */}
               <button
                 className="searchbar-btn-pro"
-                onClick={() => {
-                  const correctedLocation = location;
-                  window.dispatchEvent(new CustomEvent('filterLandingPage', {
-                    detail: { location: correctedLocation, priceRange, bhkTypes: selectedBhkTypes }
-                  }));
-                  setTimeout(() => {
-                    const el = document.querySelector('.property-section-custom');
-                    if (el) {
-                      const y = el.getBoundingClientRect().top + window.scrollY - 100;
-                      window.scrollTo({ top: y, behavior: 'smooth' });
-                    }
-                  }, 100);
-                }}
+                onClick={() => navigateToListing()}
               >
                 <FaSearch style={{ fontSize: '13px' }} />
                 Search

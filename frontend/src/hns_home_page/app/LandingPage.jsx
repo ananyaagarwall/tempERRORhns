@@ -27,6 +27,8 @@ const LandingPage = () => {
     minBudget: null,
     maxBudget: null,
     bhkTypes: [],
+    bhkSearch: '',
+    amenities: [],
   });
 
   /* ---------- Geolocation Effect ---------- */
@@ -78,6 +80,8 @@ const LandingPage = () => {
         minBudget: e.detail.minBudget ?? null,
         maxBudget: e.detail.maxBudget ?? null,
         bhkTypes: e.detail.bhkTypes || [],
+        bhkSearch: e.detail.bhkSearch || '',
+        amenities: e.detail.amenities || [],
       });
       if (e.detail.location) {
         setUserLocation(e.detail.location);

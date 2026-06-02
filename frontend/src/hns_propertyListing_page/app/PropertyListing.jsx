@@ -17,15 +17,28 @@ const PropertyListing = () => {
     priceMax: initPriceMax = 0,
     city: initCity = "Navi Mumbai",
     nodes: initNodes = [],
+    // Passed from landing page search bar
+    location: initLocation = "",
+    priceRange: initPriceRange = 0,
+    minBudget: initMinBudget = null,
+    maxBudget: initMaxBudget = null,
+    bhkTypes: initBhkTypes = [],
   } = routeState;
 
-  // Convert lakhs → Crores for the slider (slider is in Cr)
-  const initPriceCr = initPriceMax > 0 ? Math.round((initPriceMax / 100) * 10) / 10 : 0;
+  // Convert lakhs → Crores for the slider if coming from BudgetSection (priceMax in Lakhs)
+  const initPriceCr = initPriceMax > 0
+    ? Math.round((initPriceMax / 100) * 10) / 10
+    : initPriceRange || 0;
+
+  // Seed location: explicit location > first node from budget section > empty
+  const initLocSeed = initLocation || (initNodes.length > 0 ? initNodes[0] : "");
 
   const [searchFilters, setSearchFilters] = useState({
-    location: initNodes.length > 0 ? initNodes[0] : "",
-    priceRange: initPriceCr, // in Crores
-    bhkTypes: [],
+    location: initLocSeed,
+    priceRange: initPriceCr,
+    minBudget: initMinBudget,
+    maxBudget: initMaxBudget,
+    bhkTypes: initBhkTypes,
     propertyStatus: [],
     amenities: [],
     societyTypes: [],

@@ -19,7 +19,6 @@ from models import (
     UserInteraction,
     Favorite,
     Media,
-    SearchSuggestion,
 )
 import media_service
 
@@ -1082,14 +1081,9 @@ def _ensure_schema_compatibility():
             "WHERE guest_id IS NOT NULL AND property_id IS NOT NULL"
         ))
 
-    # search_suggestions — fuzzy autocomplete via pg_trgm
+    # pg_trgm — used for fuzzy autocomplete on live tables
     if dialect == 'postgresql':
         db.session.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
-        if inspector.has_table('search_suggestions'):
-            db.session.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_suggestions_trgm "
-                "ON search_suggestions USING gin (phrase gin_trgm_ops)"
-            ))
 
     db.session.commit()
 
@@ -1637,6 +1631,45 @@ def get_builders():
         print(f"Error in get_builders: {str(e)}")  # Debug log
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/builders/search', methods=['GET'])
+def search_builders_by_query():
+    """Search builders by name, city, or project name with fuzzy matching."""
+    q = request.args.get('q', '', type=str).strip()
+    if not q:
+        builders = Builder.query.all()
+        return jsonify([b.to_dict() for b in builders])
+    try:
+        from sqlalchemy import or_
+        # Direct ILIKE match on builder fields + project titles via JOIN
+        matched = Builder.query.outerjoin(
+            BuilderProject, BuilderProject.builder_id == Builder.rera_id
+        ).filter(
+            or_(
+                Builder.company_name.ilike(f'%{q}%'),
+                Builder.brand_name.ilike(f'%{q}%'),
+                Builder.city.ilike(f'%{q}%'),
+                Builder.state.ilike(f'%{q}%'),
+                BuilderProject.title.ilike(f'%{q}%'),
+                BuilderProject.location.ilike(f'%{q}%'),
+            )
+        ).distinct().all()
+
+        # pg_trgm fuzzy fallback if no results
+        if not matched and db.engine.dialect.name == 'postgresql':
+            fuzzy_ids = db.session.execute(text("""
+                SELECT DISTINCT b.rera_id FROM builder b
+                LEFT JOIN builder_project bp ON bp.builder_id = b.rera_id
+                WHERE b.company_name % :q OR b.brand_name % :q
+                   OR b.city % :q OR bp.title % :q
+            """), {'q': q}).fetchall()
+            ids = [r[0] for r in fuzzy_ids]
+            if ids:
+                matched = Builder.query.filter(Builder.rera_id.in_(ids)).all()
+
+        return jsonify([b.to_dict() for b in matched])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # New endpoint to fetch builder by company_name
 @app.route('/api/builders/name/<company_name>', methods=['GET'])
 # 6 @jwt_required()
@@ -1695,56 +1728,95 @@ def get_builder_by_name(company_name):
         return jsonify({'error': str(e)}), 500
 
 
-# ── Fuzzy autocomplete ─────────────────────────────────────────────────────────
+# ── Fuzzy autocomplete — sourced directly from live DB tables ──────────────────
+# Pulls from property, builder_project, project_amenity, unit_config so the
+# suggestions are always in sync with real data — no separate seed step needed.
 @app.route('/api/search/suggest', methods=['GET'])
 def get_search_suggestions():
     q = request.args.get('q', '').strip()
     if len(q) < 2:
         return jsonify([])
     try:
-        rows = db.session.execute(
-            text("""
-                SELECT phrase FROM search_suggestions
-                WHERE phrase % :q
-                ORDER BY phrase <-> :q
+        if db.engine.dialect.name == 'postgresql':
+            rows = db.session.execute(text("""
+                WITH candidates AS (
+                    -- Locations from property table
+                    SELECT DISTINCT "Location" AS phrase FROM property
+                        WHERE "Location" IS NOT NULL AND "Location" <> ''
+                    UNION
+                    -- Project names from property table
+                    SELECT DISTINCT "Property_Name" FROM property
+                        WHERE "Property_Name" IS NOT NULL AND "Property_Name" <> ''
+                    UNION
+                    -- Project status (e.g. "Under Construction", "Ready to Move")
+                    SELECT DISTINCT "Project_Status" FROM property
+                        WHERE "Project_Status" IS NOT NULL AND "Project_Status" <> ''
+                    UNION
+                    -- Builder project titles (e.g. "The Trellis")
+                    SELECT DISTINCT title FROM builder_project
+                        WHERE title IS NOT NULL AND title <> ''
+                    UNION
+                    -- Builder project locations
+                    SELECT DISTINCT location FROM builder_project
+                        WHERE location IS NOT NULL AND location <> ''
+                    UNION
+                    -- Amenity names (e.g. "Swimming Pool", "Gym")
+                    SELECT DISTINCT name FROM project_amenity
+                        WHERE name IS NOT NULL AND name <> ''
+                    UNION
+                    -- BHK types (e.g. "2 BHK", "3 BHK")
+                    SELECT DISTINCT bhk_type FROM unit_config
+                        WHERE bhk_type IS NOT NULL AND bhk_type <> ''
+                    UNION
+                    -- Builder company names
+                    SELECT DISTINCT company_name FROM builder
+                        WHERE company_name IS NOT NULL AND company_name <> ''
+                    UNION
+                    -- Builder brand names
+                    SELECT DISTINCT brand_name FROM builder
+                        WHERE brand_name IS NOT NULL AND brand_name <> ''
+                    UNION
+                    -- Builder cities
+                    SELECT DISTINCT city FROM builder
+                        WHERE city IS NOT NULL AND city <> ''
+                )
+                SELECT phrase FROM candidates
+                WHERE phrase ILIKE :prefix   -- prefix match (fast, works for short input)
+                   OR phrase % :q            -- trigram fuzzy match (typo tolerance)
+                ORDER BY
+                    CASE WHEN LOWER(phrase) LIKE LOWER(:prefix) THEN 0 ELSE 1 END,
+                    phrase <-> :q
                 LIMIT 6
-            """),
-            {'q': q}
-        ).fetchall()
-        return jsonify([r[0] for r in rows]), 200
+            """), {'q': q, 'prefix': f'%{q}%'}).fetchall()
+        else:
+            # SQLite fallback: simple LIKE (no pg_trgm)
+            rows = db.session.execute(text("""
+                SELECT "Location" AS phrase FROM property
+                    WHERE "Location" LIKE :pat
+                UNION
+                SELECT "Property_Name" FROM property
+                    WHERE "Property_Name" LIKE :pat
+                UNION
+                SELECT title FROM builder_project
+                    WHERE title LIKE :pat
+                UNION
+                SELECT name FROM project_amenity
+                    WHERE name LIKE :pat
+                LIMIT 6
+            """), {'pat': f'%{q}%'}).fetchall()
+
+        seen = set()
+        results = []
+        for r in rows:
+            phrase = (r[0] or '').strip()
+            if phrase and phrase.lower() not in seen:
+                seen.add(phrase.lower())
+                results.append(phrase)
+        return jsonify(results), 200
     except Exception:
         return jsonify([]), 200
 
 
-# Alternative: Add a route that lists all builders for debugging
-@app.route('/api/builders/search', methods=['GET'])
-def search_builders():
-    """
-    Search builders by name with query parameter
-    Usage: /api/builders/search?name=hiranandani
-    """
-    try:
-        search_term = request.args.get('name', '').strip()
-        
-        if not search_term:
-            return jsonify({'error': 'Please provide a search term'}), 400
-        
-        # Search by company name or brand name
-        builders = Builder.query.filter(
-            (Builder.company_name.ilike(f'%{search_term}%')) |
-            (Builder.brand_name.ilike(f'%{search_term}%'))
-        ).all()
-        
-        if not builders:
-            return jsonify({
-                'error': 'No builders found',
-                'searched_term': search_term
-            }), 404
-        
-        return jsonify([builder.to_dict() for builder in builders])
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/<rera_id>', methods=['GET'])
 def get_builder(rera_id):
@@ -3139,11 +3211,25 @@ def get_filters():
 # Simplified property search endpoint: direct filtering only
 @app.route('/api/properties/search', methods=['GET'])
 def search_properties():
-    location = request.args.get('location', '', type=str)
+    location = request.args.get('location', '', type=str).strip()
     price = request.args.get('price', 0, type=float)  # price in Cr (desktop slider)
     min_price = request.args.get('min_price', 0, type=float)
     max_price = request.args.get('max_price', 0, type=float)
-    bhk_types = request.args.getlist('type')  # e.g., ['1BHK', '2BHK']
+    bhk_types = request.args.getlist('type')  # e.g., ['1bhk', '2bhk'] from BHK dropdown
+    bhk_search = request.args.get('bhk_search', '', type=str).strip()  # e.g., '2 BHK' from search bar
+
+    # ---- COMPOUND QUERY PARSING ----
+    # Handles inputs like "2bhk in ghansoli", "3 BHK koparkhairane", "swimming pool vashi"
+    # Splits into separate bhk_search + location terms so both filters apply.
+    import re as _re
+    if location and not bhk_search:
+        # Strip connector words
+        _clean = _re.sub(r'\bin\b|\bnear\b|\bat\b', ' ', location, flags=_re.IGNORECASE).strip()
+        _bhk_match = _re.search(r'(\d[\d.]*\s*(?:\+\s*\d+)?\s*bhk|\bstudio\b|\bpenthouse\b|\bduplex\b)', _clean, _re.IGNORECASE)
+        if _bhk_match:
+            bhk_search = _bhk_match.group(0).strip()
+            location = _clean[:_bhk_match.start()].strip() + ' ' + _clean[_bhk_match.end():].strip()
+            location = location.strip()
     amenities_filter = [a.lower().strip() for a in request.args.getlist('amenities') if a]
     amenity_category_filter = [c.lower().strip() for c in request.args.getlist('amenity_category') if c]
     property_status_filter = [s.lower().strip() for s in request.args.getlist('property_status') if s]
@@ -3151,35 +3237,72 @@ def search_properties():
     property_status_filter_canonical = set(_canonical_property_status(s) for s in property_status_filter)
     society_type_filter = [t.lower().strip() for t in request.args.getlist('society_type') if t]
 
-    from sqlalchemy import or_, outerjoin
+    from sqlalchemy import or_
 
-    # ---- LOCATION / NAME / STATUS FILTER ----
-    # Joins BuilderProject so that project titles (e.g. "The Trellis") also match.
-    if location:
-        query = Property.query.outerjoin(
+    def _query_by_term(term):
+        """Search properties by location, name, status, or project title."""
+        return Property.query.outerjoin(
             BuilderProject, Property.project_id == BuilderProject.id
         ).filter(
             or_(
-                Property.Location.ilike(f"%{location}%"),
-                Property.Property_Name.ilike(f"%{location}%"),
-                Property.Project_Status.ilike(f"%{location}%"),
-                BuilderProject.title.ilike(f"%{location}%"),
+                Property.Location.ilike(f"%{term}%"),
+                Property.Property_Name.ilike(f"%{term}%"),
+                Property.Project_Status.ilike(f"%{term}%"),
+                BuilderProject.title.ilike(f"%{term}%"),
             )
-        )
-    else:
-        query = Property.query
+        ).all()
 
-    # Fetch all rows first (filtered above)
-    results = query.all()
+    results = _query_by_term(location) if location else Property.query.all()
 
-    # ---- FUZZY FALLBACK (typo correction via pg_trgm) ----
-    # If ILIKE returned nothing AND we're on PostgreSQL, find the closest match
-    # across Location, Property_Name, and BuilderProject.title using trigram similarity.
+    # ---- AMENITY SEARCH FALLBACK ----
+    # If location search returned nothing, check if the term matches an amenity name.
+    # This means typing "Swimming Pool" or "Gym" in the search bar will work.
+    if location and not results:
+        try:
+            matched_project_ids = set(
+                r[0] for r in db.session.execute(
+                    text("SELECT DISTINCT project_id FROM project_amenity WHERE LOWER(name) LIKE :pat"),
+                    {'pat': f'%{location.lower()}%'}
+                ).fetchall()
+            )
+            if matched_project_ids:
+                results = Property.query.filter(
+                    Property.project_id.in_(matched_project_ids)
+                ).all()
+        except Exception:
+            pass
+
+    # ---- BHK SEARCH FALLBACK ----
+    # If still nothing, check if term matches a BHK type (e.g. "2 BHK").
+    if location and not results:
+        try:
+            matched_project_ids = set(
+                r[0] for r in db.session.execute(
+                    text("SELECT DISTINCT project_id FROM unit_config WHERE LOWER(bhk_type) LIKE :pat"),
+                    {'pat': f'%{location.lower()}%'}
+                ).fetchall()
+            )
+            if matched_project_ids:
+                results = Property.query.filter(
+                    Property.project_id.in_(matched_project_ids)
+                ).all()
+        except Exception:
+            pass
+
+    # ---- FUZZY TYPO FALLBACK (pg_trgm) ----
+    # If still nothing, find the closest trigram match across all candidate phrases.
     if location and not results and db.engine.dialect.name == 'postgresql':
         try:
             fuzzy_row = db.session.execute(
                 text("""
-                    SELECT phrase FROM search_suggestions
+                    WITH candidates AS (
+                        SELECT DISTINCT "Location" AS phrase FROM property WHERE "Location" IS NOT NULL
+                        UNION SELECT DISTINCT "Property_Name" FROM property WHERE "Property_Name" IS NOT NULL
+                        UNION SELECT DISTINCT title FROM builder_project WHERE title IS NOT NULL
+                        UNION SELECT DISTINCT name FROM project_amenity WHERE name IS NOT NULL
+                        UNION SELECT DISTINCT bhk_type FROM unit_config WHERE bhk_type IS NOT NULL
+                    )
+                    SELECT phrase FROM candidates
                     WHERE phrase % :loc
                     ORDER BY phrase <-> :loc
                     LIMIT 1
@@ -3188,16 +3311,23 @@ def search_properties():
             ).fetchone()
             if fuzzy_row:
                 corrected = fuzzy_row[0]
-                results = Property.query.outerjoin(
-                    BuilderProject, Property.project_id == BuilderProject.id
-                ).filter(
-                    or_(
-                        Property.Location.ilike(f"%{corrected}%"),
-                        Property.Property_Name.ilike(f"%{corrected}%"),
-                        Property.Project_Status.ilike(f"%{corrected}%"),
-                        BuilderProject.title.ilike(f"%{corrected}%"),
-                    )
-                ).all()
+                results = _query_by_term(corrected)
+                # Also check amenity/BHK if corrected term still yields nothing via location
+                if not results:
+                    try:
+                        pids = set(r[0] for r in db.session.execute(
+                            text("SELECT DISTINCT project_id FROM project_amenity WHERE LOWER(name) LIKE :pat"),
+                            {'pat': f'%{corrected.lower()}%'}
+                        ).fetchall())
+                        if not pids:
+                            pids = set(r[0] for r in db.session.execute(
+                                text("SELECT DISTINCT project_id FROM unit_config WHERE LOWER(bhk_type) LIKE :pat"),
+                                {'pat': f'%{corrected.lower()}%'}
+                            ).fetchall())
+                        if pids:
+                            results = Property.query.filter(Property.project_id.in_(pids)).all()
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -3238,33 +3368,40 @@ def search_properties():
         results = [p for p in results if price_matches(p, min_price, max_price)]
 
     # ---- BHK FILTER ----
-    if bhk_types and any(bhk_types):
-        def matches_bhk_type(prop):
+    # Uses Flat_Details (e.g. '["2 BHK – 650–750 sq.ft."]') as primary source.
+    # bhk_search: raw string from search bar e.g. "2 BHK"
+    # bhk_types: IDs from BHK dropdown e.g. ['2bhk', '3bhk']
+    if bhk_search or (bhk_types and any(bhk_types)):
+        if bhk_search:
+            search_terms = [bhk_search.lower()]
+        else:
+            # Map dropdown IDs to number strings: '2bhk' → '2', '4plus' → '4+'
+            search_terms = [
+                bt.lower().replace('bhk', '').replace('plus', '+').strip()
+                for bt in bhk_types
+            ]
+
+        def matches_bhk(prop):
+            # Primary: check Flat_Details JSON (e.g. ["2 BHK – 650 sq.ft."])
+            try:
+                flat = json.loads(prop.Flat_Details) if prop.Flat_Details else []
+                flat_text = ' '.join(str(f) for f in flat).lower()
+                if any(term in flat_text for term in search_terms):
+                    return True
+            except Exception:
+                pass
+            # Fallback: check Existing_Configurations JSON field
             try:
                 configs = json.loads(prop.Existing_Configurations) if prop.Existing_Configurations else []
-                
-                # Handle both formats:
-                # 1. Simple array format: ["2", "3"] 
-                # 2. Object format: [{"type": "2BHK"}, {"type": "3BHK"}]
-                
-                if isinstance(configs, list) and len(configs) > 0:
-                    if isinstance(configs[0], dict):
-                        # Object format: [{"type": "2BHK"}, {"type": "3BHK"}]
-                        types = [c.get('type','').lower() for c in configs if isinstance(c, dict) and 'type' in c]
-                    else:
-                        # Simple array format: ["2", "3"]
-                        types = [str(c).lower() for c in configs if c]
-                    
-                    # Check if any of the requested BHK types match
-                    requested_types = [bt.lower().replace('bhk', '').strip() for bt in bhk_types]
-                    return any(any(req_type in t for req_type in requested_types) for t in types)
-                
-                return False
-            except Exception as e:
-                print(f"Error parsing BHK configs: {e}")
-                return False
+                for c in configs:
+                    val = (c.get('type', '') or c.get('bhk_type', '') if isinstance(c, dict) else str(c)).lower()
+                    if any(term in val for term in search_terms):
+                        return True
+            except Exception:
+                pass
+            return False
 
-        results = [p for p in results if matches_bhk_type(p)]
+        results = [p for p in results if matches_bhk(p)]
 
     # ---- AMENITIES / PROPERTY STATUS / SOCIETY TYPE FILTERS ----
     if amenities_filter or amenity_category_filter or property_status_filter or society_type_filter:
@@ -3293,11 +3430,20 @@ def search_properties():
             # Canonicalize property status value for comparison
             prop_status_value = _canonical_property_status(prop.Project_Status) if prop.Project_Status else None
 
-            # Amenities: require all requested to be present (subset)
+            # Amenities: any match is enough when from search bar (single amenity);
+            # require all if multiple explicitly selected via filter panel.
             if amenities_filter:
                 prj_amen_lower = set([a.lower() for a in prj_amenities])
-                if not all(a in prj_amen_lower for a in amenities_filter):
-                    return False
+                # Also do substring match so "Swimming Pool" matches "pool"
+                def amen_matches(requested, available_set):
+                    req = requested.lower()
+                    return req in available_set or any(req in a for a in available_set) or any(a in req for a in available_set)
+                if len(amenities_filter) == 1:
+                    if not amen_matches(amenities_filter[0], prj_amen_lower):
+                        return False
+                else:
+                    if not all(amen_matches(a, prj_amen_lower) for a in amenities_filter):
+                        return False
 
             if amenity_category_filter:
                 if not all(category in prj_amenity_categories for category in amenity_category_filter):

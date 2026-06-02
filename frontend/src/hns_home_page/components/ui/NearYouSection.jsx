@@ -190,7 +190,7 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
         recentlyViewed = recentlyViewed.slice(0, 5);
         localStorage.setItem('recentlyViewedProperties', JSON.stringify(recentlyViewed));
 
-        navigate('/properties');
+        navigate(`/property/${property.id}`);
     };
 
     // Filter properties based on searchFilters
