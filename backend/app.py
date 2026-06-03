@@ -1958,8 +1958,20 @@ def get_builder_projects(rera_id):
         if status:
             # Allow partial, case-insensitive match for status
             query = query.filter(BuilderProject.status.ilike(f"%{status}%"))
-        projects = query.all()
-        return jsonify([project.to_dict() for project in projects])
+        projects = query.order_by(BuilderProject.id.asc()).all()
+        unique_projects = []
+        seen_keys = set()
+        for project in projects:
+            key = (
+                (project.title or '').strip().lower(),
+                (project.location or '').strip().lower(),
+                (project.builder_name or '').strip().lower(),
+            )
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+            unique_projects.append(project)
+        return jsonify([project.to_dict() for project in unique_projects])
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

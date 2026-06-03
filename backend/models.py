@@ -339,8 +339,53 @@ class BuilderProject(db.Model):
     project_amenities = db.relationship('ProjectAmenity', backref='project', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
+        primary_property = None
+        property_ids = []
+        try:
+            sorted_properties = sorted(self.properties, key=lambda prop: prop.id or 0)
+            title_key = (self.title or "").strip().lower()
+            location_key = (self.location or "").strip().lower()
+            builder_label = self.builder_name or (self.builder.company_name if self.builder else None)
+            builder_key = (builder_label or "").strip().lower()
+
+            if not sorted_properties and title_key:
+                fallback_query = Property.query.filter(
+                    db.func.lower(db.func.trim(Property.Property_Name)) == title_key
+                )
+                if builder_key:
+                    fallback_query = fallback_query.filter(
+                        db.func.lower(db.func.trim(Property.Builder_Name)) == builder_key
+                    )
+                sorted_properties = fallback_query.order_by(Property.id.asc()).all()
+
+            if not sorted_properties and title_key and location_key:
+                sorted_properties = (
+                    Property.query
+                    .filter(db.func.lower(db.func.trim(Property.Property_Name)) == title_key)
+                    .filter(db.func.lower(db.func.trim(Property.Location)) == location_key)
+                    .order_by(Property.id.asc())
+                    .all()
+                )
+
+            if not sorted_properties and self.builder_id and location_key:
+                sorted_properties = (
+                    Property.query
+                    .filter(db.func.lower(db.func.trim(Property.RERA_ID)) == str(self.builder_id).strip().lower())
+                    .filter(db.func.lower(db.func.trim(Property.Location)) == location_key)
+                    .order_by(Property.id.asc())
+                    .all()
+                )
+            property_ids = [prop.id for prop in sorted_properties]
+            primary_property = sorted_properties[0].to_dict() if sorted_properties else None
+        except Exception:
+            primary_property = None
+            property_ids = []
+
         return {
             'id': self.id,
+            'property_id': property_ids[0] if property_ids else None,
+            'property_ids': property_ids,
+            'primary_property': primary_property,
             'builder_id': self.builder_id,
             'builder_name': self.builder_name,
             'title': self.title,
