@@ -1,11 +1,56 @@
 import API_BASE_URL from '../../../config';
 import React, { useState, useRef, useEffect } from 'react';
 import { Heart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import { fetchBuilderProjects } from '../../../services/api';
+import { buildPropertyPath } from '../../../utils/entityRouting';
 
-const ProjectCard = ({ status = 'Ready-to-move', title, image, project, onHeartClick, isInCart }) => (
-  <div className="rounded-xl border border-blue-300 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:border-blue-400 hover:scale-[1.005] transform origin-center relative">
+const firstText = (...values) => {
+  for (const value of values) {
+    if (Array.isArray(value)) {
+      const found = value.find((item) => String(item || '').trim());
+      if (found) return String(found).trim();
+    } else if (value !== null && value !== undefined && String(value).trim()) {
+      return String(value).trim();
+    }
+  }
+  return '';
+};
+
+const formatCarpetArea = (project, property) => {
+  const dbArea = firstText(property?.Carpet_Area);
+  if (dbArea) return dbArea;
+
+  const min = project?.carpet_area_min;
+  const max = project?.carpet_area_max;
+  if (min && max) return `${min}-${max} sq.ft.`;
+  if (min) return `${min} sq.ft.`;
+  if (max) return `Up to ${max} sq.ft.`;
+  return '';
+};
+
+const formatPossession = (project, property) =>
+  firstText(property?.Possession_Date, project?.possession_date, project?.completion_date);
+
+const getPrimaryProperty = (project) => project?.primary_property || {};
+
+const getProjectPropertyId = (project) =>
+  project?.property_id || getPrimaryProperty(project)?.id || (Array.isArray(project?.property_ids) ? project.property_ids[0] : null);
+
+const ProjectCard = ({ status = 'Ready-to-move', title, image, project, onHeartClick, isInCart, onOpen }) => {
+  const property = getPrimaryProperty(project);
+  const carpetArea = formatCarpetArea(project, property);
+  const highlight = firstText(property?.Key_Highlights, property?.Highlights, project?.highlights, project?.usps);
+  const possession = formatPossession(project, property);
+  const charges = firstText(property?.Extra_Charges);
+  const price = firstText(property?.Price_Starting_From, property?.Pricing, project?.price_range);
+
+  return (
+  <article
+    className="rounded-xl border border-blue-300 bg-white shadow-lg hover:shadow-xl transition-all duration-300 hover:border-blue-400 hover:scale-[1.005] transform origin-center relative cursor-pointer focus-within:ring-2 focus-within:ring-blue-400"
+    onClick={onOpen}
+  >
     {/* Heart Button */}
     <button
       onClick={(e) => {
@@ -35,11 +80,26 @@ const ProjectCard = ({ status = 'Ready-to-move', title, image, project, onHeartC
     </div>
     <div className="p-2 md:p-3">
       <div className="font-serif text-gray-800 text-sm md:text-base">{title}</div>
-      <div className="mt-1 text-xs md:text-sm text-gray-600">Carpet Area: <span className="font-sans">685–715 sq.ft.</span> | Spacious balconies</div>
-      <div className="text-xs md:text-sm text-gray-600">2 Years old | Maintenance: <span className="font-serif text-black">₹2.5/sq.ft.</span></div>
+      {(carpetArea || highlight) && (
+        <div className="mt-1 text-xs md:text-sm text-gray-600">
+          {carpetArea && <>Carpet Area: <span className="font-sans">{carpetArea}</span></>}
+          {carpetArea && highlight && ' | '}
+          {highlight}
+        </div>
+      )}
+      {(possession || charges || price) && (
+        <div className="text-xs md:text-sm text-gray-600">
+          {possession && <>{possession}</>}
+          {possession && (charges || price) && ' | '}
+          {charges && <span>{charges}</span>}
+          {charges && price && ' | '}
+          {price && <span className="font-serif text-black">{price}</span>}
+        </div>
+      )}
     </div>
-  </div>
-);
+  </article>
+  );
+};
 
 const withBackendOrigin = (path) => {
   if (!path) return '';
@@ -61,6 +121,8 @@ const looksLikeUrl = (val) => {
 };
 
 const pickProjectImage = (project) => {
+  const propertyImage = getPrimaryProperty(project)?.builder_project_image;
+  if (propertyImage) return normalizeUrl(propertyImage);
   if (project.project_image) return normalizeUrl(project.project_image);
   if (project.image_urls) {
     try {
@@ -80,6 +142,7 @@ const pickProjectImage = (project) => {
 
 const ProjectsGrid = ({ title, builderId, statusFilter }) => {
   const sliderRef = useRef(null);
+  const navigate = useNavigate();
   const [scrollPosition, setScrollPosition] = useState(0);
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -113,24 +176,33 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
   }, [builderId, statusFilter]);
 
   const handleHeartClick = (project) => {
+    const property = getPrimaryProperty(project);
+    const propertyId = getProjectPropertyId(project);
     const propertyData = {
-      id: project.id,
-      name: project.title,
-      price: project.price || 'Contact for Price',
-      location: project.location || 'Location not specified',
+      id: propertyId || project.id,
+      name: property.Property_Name || project.title,
+      price: property.Price_Starting_From || property.Pricing || project.price_range || 'Contact for Price',
+      location: property.Location || project.location || 'Location not specified',
       image: pickProjectImage(project),
-      availability: project.status || 'Available',
-      bhk: project.configuration || '2-3 BHK',
-      area: project.carpet_area || 'N/A',
-      builder: project.builder_name || 'Builder',
-      amenities: project.amenities || [],
+      availability: property.Project_Status || project.property_status || project.status || 'Available',
+      bhk: property.Existing_Configurations || project.configuration || 'N/A',
+      area: property.Carpet_Area || formatCarpetArea(project, property) || 'N/A',
+      builder: property.Builder_Name || project.builder_name || 'Builder',
+      amenities: property.Key_Highlights || project.amenities || [],
       source: 'builder_profile'
     };
 
-    if (isInCart(project.id)) {
-      removeFromCart(project.id);
+    if (isInCart(propertyData.id)) {
+      removeFromCart(propertyData.id);
     } else {
       addToCart(propertyData, 'builder_profile');
+    }
+  };
+
+  const openProjectProperty = (project) => {
+    const propertyId = getProjectPropertyId(project);
+    if (propertyId) {
+      navigate(buildPropertyPath(propertyId));
     }
   };
 
@@ -150,7 +222,8 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
 
   const filteredProjects = projects.filter((p) => {
     if (!statusFilter) return true;
-    const status = (p.status || '').toLowerCase();
+    const property = getPrimaryProperty(p);
+    const status = (property.Project_Status || p.property_status || p.status || '').toLowerCase();
     return Array.isArray(statusFilter)
       ? statusFilter.some((s) => status.includes(s.toLowerCase()))
       : status.includes(String(statusFilter).toLowerCase());
@@ -198,15 +271,18 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
           )}
           {!loading && !error && filteredProjects.map((p) => {
             const image = pickProjectImage(p);
+            const property = getPrimaryProperty(p);
+            const propertyId = getProjectPropertyId(p);
             return (
               <div key={p.id} className="w-[240px] xs:w-[260px] sm:w-60 md:w-72 flex-shrink-0 my-1">
                 <ProjectCard
-                  title={p.title}
-                  status={p.status || 'Ready-to-move'}
+                  title={property.Property_Name || p.title}
+                  status={property.Project_Status || p.property_status || p.status || 'Ready-to-move'}
                   image={image}
                   project={p}
                   onHeartClick={handleHeartClick}
-                  isInCart={isInCart(p.id)}
+                  isInCart={isInCart(propertyId || p.id)}
+                  onOpen={() => openProjectProperty(p)}
                 />
               </div>
             );

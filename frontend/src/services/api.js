@@ -89,6 +89,9 @@ export const fetchProperties = async (filters = {}) => {
             filters.bhkTypes.forEach(type => params.append('type', type));
         }
 
+        // bhkSearch: raw BHK string from search bar suggestion (e.g. "2 BHK")
+        if (filters.bhkSearch) params.append('bhk_search', filters.bhkSearch);
+
         if (filters.amenities && Array.isArray(filters.amenities)) {
             filters.amenities.forEach((amenity) => params.append('amenities', amenity));
         }

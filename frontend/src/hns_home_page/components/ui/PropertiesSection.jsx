@@ -14,6 +14,16 @@ const HeartIcon = ({ filled }) => (
   </svg>
 );
 
+const AZURE_BASE = 'https://hnsblob001.blob.core.windows.net/hns-media';
+
+// Returns the primary gallery image URL for a project, no API call needed.
+function getCardImage(prop) {
+  if (prop.project_id) {
+    return `${AZURE_BASE}/projects/${prop.project_id}/gallery/img1.jpg`;
+  }
+  return prop.builder_project_image || prop.img || '/Presidential Towers.jpg.png';
+}
+
 const sampleProperty = {
   img: '/Presidential Towers.jpg.png',
   name: 'Sample Property',
@@ -44,7 +54,7 @@ function parsePriceInCr(priceStr) {
   }
 }
 
-const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minBudget: null, maxBudget: null, bhkTypes: [] } }) => {
+const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minBudget: null, maxBudget: null, bhkTypes: [], bhkSearch: '', amenities: [] } }) => {
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
   const [properties, setProperties] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +82,8 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
       minBudget: searchFilters.minBudget ?? undefined,
       maxBudget: searchFilters.maxBudget ?? undefined,
       bhkTypes: searchFilters.bhkTypes?.length ? searchFilters.bhkTypes : undefined,
+      bhkSearch: searchFilters.bhkSearch || undefined,
+      amenities: searchFilters.amenities?.length ? searchFilters.amenities : undefined,
     })
       .then(data => {
         if (cancelled) return;
@@ -81,7 +93,9 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
           address: p.Address || p.Location || '',
           price: p.Price_Starting_From || p.Pricing || '',
           confidence: p.confidence || '',
-          img: p.image || '/Presidential Towers.jpg.png',
+          img: p.image || p.builder_project_image || '/Presidential Towers.jpg.png',
+          project_id: p.project_id || null,
+          builder_project_image: p.builder_project_image || null,
           features: p.Features || '',
           Existing_Configurations: p.Existing_Configurations || [],
         })) : [];
@@ -100,11 +114,13 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
   // JSON.stringify makes array dep safe without causing infinite re-renders
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    searchFilters.location, 
-    searchFilters.priceRange, 
-    searchFilters.minBudget, 
-    searchFilters.maxBudget, 
-    JSON.stringify(searchFilters.bhkTypes)
+    searchFilters.location,
+    searchFilters.priceRange,
+    searchFilters.minBudget,
+    searchFilters.maxBudget,
+    JSON.stringify(searchFilters.bhkTypes),
+    searchFilters.bhkSearch,
+    JSON.stringify(searchFilters.amenities),
   ]);
 
   const scrollCards = (direction) => {
@@ -150,7 +166,22 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
         navigate(`/property/${prop.id}`);
       }}
     >
-      <img src={prop.img} alt={prop.name} className="property-img-custom" />
+      <img
+        src={getCardImage(prop)}
+        alt={prop.name}
+        className="property-img-custom"
+        onError={(e) => {
+          // Fallback chain: gallery blob → builder_project_image → static default
+          const tried = e.currentTarget.dataset.tried || '';
+          if (!tried.includes('bpi') && prop.builder_project_image) {
+            e.currentTarget.dataset.tried = tried + 'bpi';
+            e.currentTarget.src = prop.builder_project_image;
+          } else if (!tried.includes('static')) {
+            e.currentTarget.dataset.tried = (tried || '') + 'static';
+            e.currentTarget.src = '/Presidential Towers.jpg.png';
+          }
+        }}
+      />
 
       {/* Heart Button - TOP RIGHT */}
       <button
@@ -181,7 +212,9 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
     searchFilters.priceRange > 0 ||
     searchFilters.minBudget !== null ||
     searchFilters.maxBudget !== null ||
-    searchFilters.bhkTypes?.length > 0
+    searchFilters.bhkTypes?.length > 0 ||
+    searchFilters.bhkSearch ||
+    searchFilters.amenities?.length > 0
   );
 
   return (

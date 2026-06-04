@@ -1,6 +1,7 @@
 import API_BASE_URL from '../../../config';
 import React, { useState, useEffect } from 'react';
 import { Search, Building2, MapPin, Award, CheckCircle, Calendar, ExternalLink, Phone, Mail, Heart } from 'lucide-react';
+import { useSearchSuggestions } from '../../../hooks/useSearchSuggestions';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import FooterNavBar from '../layout/FooterNavBar';
 import DynamicBreadcrumb from '../../../components/ui/DynamicBreadcrumb';
@@ -33,53 +34,51 @@ const HeartSVG = ({ filled }) => (
 
 const BuildersListing = () => {
   const [builders, setBuilders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);   // initial page load only
+  const [searching, setSearching] = useState(false); // lightweight filter indicator
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [hoveredCard, setHoveredCard] = useState(null);
-  const [searchFocused, setSearchFocused] = useState(false);
 
   const { addBuilder, removeBuilder, isBuilderSaved } = useCart();
 
-  useEffect(() => {
-    fetchBuilders();
-  }, []);
-
-  const fetchBuilders = async () => {
+  const fetchBuilders = async (q = '', isSearch = false) => {
     try {
-      setLoading(true);
+      if (isSearch) setSearching(true);
+      else setLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE_URL}/api/builders`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const url = q
+        ? `${API_BASE_URL}/api/builders/search?q=${encodeURIComponent(q)}`
+        : `${API_BASE_URL}/api/builders`;
+      const response = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
       });
       if (!response.ok) throw new Error('Failed to fetch builders');
       const data = await response.json();
       setBuilders(data);
       setError(null);
     } catch (err) {
-      console.error('Error fetching builders:', err);
       setError(err.message);
     } finally {
       setLoading(false);
+      setSearching(false);
     }
   };
 
+  const { value: searchTerm, inputRef: searchInputRef, handleChange: handleSearchChange,
+    handleKeyDown: handleSearchKeyDown, SuggestionsPortal,
+  } = useSearchSuggestions({
+    onFilter: (val) => fetchBuilders(val, true),
+    onSelect: (phrase) => fetchBuilders(phrase, true),
+  });
+
+  useEffect(() => { fetchBuilders(); }, []);
+
   const filteredBuilders = builders
-    .filter(b => {
-      const matchesSearch =
-        b.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.brand_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        b.location?.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesType =
-        filterType === 'all' || b.builder_type?.toLowerCase().includes(filterType.toLowerCase());
-      return matchesSearch && matchesType;
-    })
+    .filter(b =>
+      filterType === 'all' || b.builder_type?.toLowerCase().includes(filterType.toLowerCase())
+    )
     .sort((a, b) => {
       switch (sortBy) {
         case 'name': return (a.company_name || '').localeCompare(b.company_name || '');
@@ -406,7 +405,6 @@ const BuildersListing = () => {
             <p style={{ color: C.textSecondary, fontWeight: 600, fontSize: '1rem' }}>Loading builders...</p>
           </div>
         </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -445,6 +443,7 @@ const BuildersListing = () => {
   /* ── Main Render ── */
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: font }}>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <FooterNavBar />
       <DynamicBreadcrumb />
 
@@ -503,21 +502,22 @@ const BuildersListing = () => {
               <div style={{ flex: '1 1 280px', position: 'relative', minWidth: '220px' }}>
                 <Search
                   size={17}
-                  style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: searchFocused ? C.navy : C.textMuted, transition: 'color 0.2s' }}
+                  style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: C.textMuted, transition: 'color 0.2s', zIndex: 1 }}
                 />
                 <input
+                  ref={searchInputRef}
                   type="text"
-                  placeholder="Search by builder name, city, or type..."
+                  placeholder="Search by builder name, project, city..."
                   value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  onFocus={() => setSearchFocused(true)}
-                  onBlur={() => setSearchFocused(false)}
+                  onChange={e => handleSearchChange(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  autoComplete="off"
                   style={{
                     width: '100%',
                     paddingLeft: '42px',
-                    paddingRight: '16px',
+                    paddingRight: searching ? '42px' : '16px',
                     height: '46px',
-                    border: `1.5px solid ${searchFocused ? C.navy : C.border}`,
+                    border: `1.5px solid ${searching ? C.navy : C.border}`,
                     borderRadius: '10px',
                     fontSize: '0.93rem',
                     color: C.textPrimary,
@@ -526,9 +526,17 @@ const BuildersListing = () => {
                     background: '#f7f9ff',
                     transition: 'all 0.2s ease',
                     boxSizing: 'border-box',
-                    boxShadow: searchFocused ? `0 0 0 3px rgba(34,58,95,0.08)` : 'none',
                   }}
                 />
+                {searching && (
+                  <div style={{
+                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+                    width: '16px', height: '16px', borderRadius: '50%',
+                    border: `2px solid ${C.border}`, borderTopColor: C.navy,
+                    animation: 'spin 0.7s linear infinite',
+                  }} />
+                )}
+                <SuggestionsPortal />
               </div>
 
               {/* Type Filter */}
@@ -605,23 +613,25 @@ const BuildersListing = () => {
       {/* ── Builders Grid ── */}
       <div style={{ background: C.bg, paddingBottom: '80px', padding: '0 32px 80px' }}>
         <div style={{ maxWidth: '1360px', margin: '0 auto' }}>
-          {filteredBuilders.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-              <Building2 size={72} style={{ color: C.border, marginBottom: '20px' }} />
-              <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: C.textPrimary, margin: '0 0 8px' }}>No Builders Found</h3>
-              <p style={{ color: C.textSecondary, fontSize: '1.02rem' }}>Try adjusting your search or filters</p>
-            </div>
-          ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-              gap: '28px',
-            }}>
-              {filteredBuilders.map(builder => (
-                <BuilderCard key={builder.rera_id || builder.company_name} builder={builder} />
-              ))}
-            </div>
-          )}
+          <div style={{ position: 'relative' }}>
+            {filteredBuilders.length === 0 && !searching ? (
+              <div style={{ textAlign: 'center', padding: '80px 20px' }}>
+                <Building2 size={72} style={{ color: C.border, marginBottom: '20px' }} />
+                <h3 style={{ fontSize: '1.5rem', fontWeight: 800, color: C.textPrimary, margin: '0 0 8px' }}>No Builders Found</h3>
+                <p style={{ color: C.textSecondary, fontSize: '1.02rem' }}>Try adjusting your search or filters</p>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                gap: '28px',
+              }}>
+                {filteredBuilders.map(builder => (
+                  <BuilderCard key={builder.rera_id || builder.company_name} builder={builder} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
