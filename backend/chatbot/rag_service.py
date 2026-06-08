@@ -348,7 +348,6 @@ class SmartFilter:
         
         s = str(price_str).lower().replace(',', '')
         try:
-            import re
             # Check for Lac/Lakh/L (standalone 'l' as used in "28 L")
             is_lakh = 'lakh' in s or 'lac' in s or bool(re.search(r'\bl\b', s))
 
@@ -390,8 +389,8 @@ class SmartFilter:
         return p, p
 
     @staticmethod
-    def filter_by_budget(properties, user_budget, buffer_percent=20):
-        """Remove properties significantly above budget"""
+    def filter_by_budget(properties, user_budget, buffer_percent=5):
+        """Remove properties whose starting price exceeds the budget"""
         if not user_budget:
             return properties
 
@@ -403,7 +402,7 @@ class SmartFilter:
                 prop.metadata.get('price', '0')
             )
             prop_price = min_price if min_price > 0 else SmartFilter.parse_price(prop.metadata.get('price', '0'))
-            if prop_price <= max_budget and (max_price == 0 or max_price <= float(user_budget) * 1.5):
+            if prop_price <= max_budget and (max_price == 0 or max_price <= float(user_budget) * 1.1):
                 filtered.append(prop)
 
         return filtered
@@ -969,7 +968,32 @@ def clean_json_field(field_value):
     if not field_value: return "Not Specified"
     try:
         data = json.loads(field_value)
-        if isinstance(data, list): return ", ".join([str(x) for x in data])
+        if isinstance(data, list):
+            parts = []
+            for item in data:
+                if isinstance(item, dict):
+                    # For unit configs, show a human-readable summary
+                    bhk = item.get('type') or item.get('bhk_type') or ''
+                    area_min = item.get('carpet_area_min')
+                    area_max = item.get('carpet_area_max')
+                    price_from = item.get('price_from')
+                    price_to = item.get('price_to')
+                    unit = item.get('area_unit') or 'sqft'
+                    label = bhk
+                    if area_min and area_max and area_min != area_max:
+                        label += f" ({area_min}–{area_max} {unit})"
+                    elif area_min:
+                        label += f" ({area_min} {unit})"
+                    if price_from and price_to and price_from != price_to:
+                        label += f" ₹{price_from}–{price_to} Cr"
+                    elif price_from:
+                        label += f" ₹{price_from} Cr"
+                    parts.append(label.strip())
+                else:
+                    parts.append(str(item))
+            return ", ".join(parts) if parts else "Not Specified"
+        if isinstance(data, dict):
+            return str(data)
         return str(data)
     except:
         return str(field_value)
@@ -1355,16 +1379,25 @@ def compare_builders(builders):
     if len(builders) < 2:
         return "I found only one builder to compare. Share another builder name or ask for builders in a city."
 
-    if len(builders) >= 5:
-        return (
-            "I compared the top 5 best-fit builders point by point. "
-            "The table below lines up their experience, location coverage, project counts, "
-            "RERA status, and verification."
-        )
+    def _builder_name(b):
+        if hasattr(b, 'company_name'):
+            return b.company_name or getattr(b, 'brand_name', None)
+        if isinstance(b, dict):
+            return b.get('company_name') or b.get('brand_name') or b.get('name')
+        return None
 
-    return (
-        f"I compared {len(builders)} builders point by point. "
-        "The table below highlights their experience, footprint, project counts, "
+    names = [n for n in (_builder_name(b) for b in builders) if n]
+
+    if len(names) >= 2:
+        if len(names) == 2:
+            intro = f"Here's how {names[0]} compares to {names[1]}."
+        else:
+            intro = f"I compared {', '.join(names[:-1])} and {names[-1]} side by side."
+    else:
+        intro = f"I compared {len(builders)} builders point by point."
+
+    return intro + (
+        " The table below highlights their experience, footprint, project counts, "
         "RERA status, and verification."
     )
 
@@ -1380,16 +1413,25 @@ def compare_properties(props):
     if len(props) < 2:
         return "I found only one property to compare. Share another property name or refine the query."
 
-    if len(props) >= 5:
-        return (
-            "I compared the top 5 best-fit properties point by point. "
-            "The table below covers builder, location, starting price, configuration, "
-            "status, possession, carpet area, highlights, and RERA."
-        )
+    def _prop_name(p):
+        if hasattr(p, 'Property_Name'):
+            return p.Property_Name
+        if isinstance(p, dict):
+            return p.get('Property_Name') or p.get('name')
+        return None
 
-    return (
-        f"I compared {len(props)} properties point by point. "
-        "The table below covers builder, location, starting price, configuration, "
+    names = [n for n in (_prop_name(p) for p in props) if n]
+
+    if len(names) >= 2:
+        if len(names) == 2:
+            intro = f"Here's how {names[0]} compares to {names[1]}."
+        else:
+            intro = f"I compared {', '.join(names[:-1])} and {names[-1]} side by side."
+    else:
+        intro = f"I compared {len(props)} properties point by point."
+
+    return intro + (
+        " The table below covers builder, location, starting price, configuration, "
         "status, possession, carpet area, highlights, and RERA."
     )
 
@@ -1411,10 +1453,11 @@ def _property_matches_filters(prop, location=None, bhk=None, budget=None):
         try:
             min_price, max_price = SmartFilter.parse_price_range(getattr(prop, 'Price_Starting_From', None))
             price_value = min_price if min_price > 0 else SmartFilter.parse_price(getattr(prop, 'Price_Starting_From', None))
-            if price_value and price_value > float(budget) * 1.25:
+            # Exclude properties whose starting price exceeds the budget (5% rounding tolerance)
+            if price_value and price_value > float(budget) * 1.05:
                 return False
-            # Exclude if the full range goes well beyond the budget
-            if max_price > 0 and max_price > float(budget) * 1.5:
+            # Exclude if the full price range goes significantly beyond the budget
+            if max_price > 0 and max_price > float(budget) * 1.1:
                 return False
         except Exception:
             pass
@@ -1994,32 +2037,107 @@ Our team is available to assist you with any questions or schedule property visi
                 tmp_res = tmp_chain.invoke({"question": user_query, "chat_history": chat_history})
                 small_docs = tmp_res.get('source_documents', [])
 
-            # Prefer property/project docs for details
+            # Extract meaningful name tokens from the user query so we can
+            # verify the vector result actually matches what was asked for.
+            # Strip generic words and keep the specific name fragments.
+            _detail_stop = {
+                'tell', 'me', 'more', 'about', 'details', 'of', 'on', 'the',
+                'property', 'properties', 'project', 'projects', 'flat', 'apartment',
+                'home', 'builder', 'buildings', 'info', 'information', 'give',
+                'show', 'what', 'is', 'are', 'find', 'explain', 'describe',
+            }
+            query_name_tokens = [
+                t for t in re.findall(r'[a-z0-9]+', user_query.lower())
+                if t not in _detail_stop and len(t) > 1
+            ]
+
+            def _name_score(candidate_name):
+                """How many query tokens appear in the candidate name."""
+                if not candidate_name:
+                    return 0
+                cn = re.sub(r'[^a-z0-9\s]', ' ', candidate_name.lower())
+                cn_tokens = set(cn.split())
+                return sum(1 for t in query_name_tokens if t in cn_tokens)
+
+            # Prefer property/project docs that match the queried name.
+            # Score all candidates and pick the best match (min score 1).
+            best_prop, best_prop_score = None, 0
+            best_builder, best_builder_score = None, 0
+
             for doc in small_docs:
                 t = doc.metadata.get('type')
                 if t in ['property', 'project']:
                     pid = doc.metadata.get('id')
-                    if pid:
+                    if not pid:
+                        continue
+                    try:
                         prop = Property.query.get(int(pid))
-                        if prop:
-                            detailed = format_property_details(prop)
-                            session_shown_ids.add(str(prop.id))
-                            if user_id:
-                                extract_and_save_preferences(user_query, user_id)
-                            return detailed, session_shown_ids, [prop], [], intent.value, []
+                    except (TypeError, ValueError):
+                        prop = None
+                    if not prop:
+                        continue
+                    score = _name_score(prop.Property_Name)
+                    if score > best_prop_score:
+                        best_prop_score, best_prop = score, prop
                 elif t == 'builder':
                     bid = doc.metadata.get('id')
-                    if bid:
-                        try:
-                            builder = Builder.query.get(bid)
-                        except Exception:
-                            builder = None
-                        if builder:
-                            detailed = format_builder_details(builder)
-                            session_shown_ids.add(str(bid))
-                            if user_id:
-                                extract_and_save_preferences(user_query, user_id)
-                            return detailed, session_shown_ids, [], [builder], intent.value, []
+                    if not bid:
+                        continue
+                    try:
+                        builder = Builder.query.get(bid)
+                    except Exception:
+                        builder = None
+                    if not builder:
+                        continue
+                    score = _name_score(builder.company_name or builder.brand_name)
+                    if score > best_builder_score:
+                        best_builder_score, best_builder = score, builder
+
+            # Return the best-matching item (prefer property over builder when tied)
+            if best_prop and best_prop_score >= 1:
+                detailed = format_property_details(best_prop)
+                session_shown_ids.add(str(best_prop.id))
+                if user_id:
+                    extract_and_save_preferences(user_query, user_id)
+                return detailed, session_shown_ids, [best_prop], [], intent.value, []
+
+            if best_builder and best_builder_score >= 1:
+                detailed = format_builder_details(best_builder)
+                session_shown_ids.add(str(best_builder.rera_id))
+                if user_id:
+                    extract_and_save_preferences(user_query, user_id)
+                return detailed, session_shown_ids, [], [best_builder], intent.value, []
+
+            # No name match from vector results — try a direct DB name search before
+            # giving up. This handles properties that are in the DB but not yet indexed
+            # in the vector store, or where the vector search ranked them too low.
+            if not best_prop and query_name_tokens:
+                all_props = Property.query.all()
+                db_best, db_best_score = None, 0
+                for p in all_props:
+                    s = _name_score(p.Property_Name)
+                    if s > db_best_score:
+                        db_best_score, db_best = s, p
+                if db_best and db_best_score >= 2:
+                    detailed = format_property_details(db_best)
+                    session_shown_ids.add(str(db_best.id))
+                    if user_id:
+                        extract_and_save_preferences(user_query, user_id)
+                    return detailed, session_shown_ids, [db_best], [], intent.value, []
+
+            if not best_builder and query_name_tokens:
+                all_builders = Builder.query.all()
+                db_best_b, db_best_b_score = None, 0
+                for b in all_builders:
+                    s = _name_score(b.company_name or b.brand_name)
+                    if s > db_best_b_score:
+                        db_best_b_score, db_best_b = s, b
+                if db_best_b and db_best_b_score >= 2:
+                    detailed = format_builder_details(db_best_b)
+                    session_shown_ids.add(str(db_best_b.rera_id))
+                    if user_id:
+                        extract_and_save_preferences(user_query, user_id)
+                    return detailed, session_shown_ids, [], [db_best_b], intent.value, []
 
             # If we didn't find a direct DB item, ask the LLM for a detailed answer using retrieved context
             try:
@@ -2395,7 +2513,6 @@ Our team is available to assist you with any questions or schedule property visi
                                 else:
                                     user_budget = float(budget_val)
                             except:
-                                import re
                                 numbers = re.findall(r'\d+\.?\d*', budget_val)
                                 if numbers:
                                     user_budget = float(numbers[0])
@@ -2425,7 +2542,21 @@ Our team is available to assist you with any questions or schedule property visi
         context_blocks.append(f"RECENT CONVERSATION:\n{history_text}")
     
     if session_shown_ids:
-        context_blocks.append(f"ALREADY SHOWN PROPERTY IDs: {list(session_shown_ids)}")
+        shown_snippets = []
+        for pid in list(session_shown_ids)[:10]:
+            try:
+                prop = Property.query.get(int(pid))
+                if prop:
+                    shown_snippets.append(
+                        f"- {prop.Property_Name} | Location: {prop.Location} | "
+                        f"Price: {prop.Price_Starting_From} | Config: {clean_json_field(prop.Existing_Configurations)}"
+                    )
+            except Exception:
+                pass
+        if shown_snippets:
+            context_blocks.append("PROPERTIES CURRENTLY SHOWN TO USER:\n" + "\n".join(shown_snippets))
+        else:
+            context_blocks.append(f"ALREADY SHOWN PROPERTY IDs: {list(session_shown_ids)}")
     
     context_blocks = enhance_context_with_behavior(user_id, context_blocks)
 
@@ -2497,9 +2628,10 @@ CRITICAL INSTRUCTIONS:
 1. Read the USER PROFILE section in the context carefully — it contains the user's preferred location, BHK, budget, and builders they have shown interest in.
 2. Personalise your answer using that profile. For example, if the user asks "what should my budget be for a 2 BHK?" and their profile shows they browse properties in Ghansoli at Rs 0.80 Cr, reference that.
 3. If you are suggesting or recommending a property type, lean towards what matches their history.
-4. Provide a helpful, conversational response (4-6 lines).
-5. NO markdown formatting.
-6. Property cards will be shown separately if applicable.
+4. IMPORTANT: If the context contains a "PROPERTIES CURRENTLY SHOWN TO USER" section, use ONLY those exact names and prices when referring to specific properties. Do NOT contradict or second-guess prices listed there.
+5. Provide a helpful, conversational response (4-6 lines).
+6. NO markdown formatting.
+7. Property cards will be shown separately if applicable.
 
 Context: {context}
 Question: {question}
@@ -2510,7 +2642,25 @@ Personalised Response (4-6 lines, no formatting):"""
 
     # --- SETUP LLM ---
     llm = _create_chat_llm(temperature=0.4, max_output_tokens=700)
-    
+
+    # For ASK_GENERAL/opinion intents, bypass the vector-retrieval chain entirely.
+    # The chain fills {context} only from vector search docs — it never injects
+    # full_system_context (user profile + shown property details).  Calling the LLM
+    # directly with full_system_context guarantees the model sees the real prices and
+    # names of the cards currently on screen.
+    if intent == UserIntent.ASK_GENERAL:
+        direct_prompt = answer_template.replace("{context}", full_system_context).replace("{question}", user_query)
+        try:
+            direct_res = llm.invoke(direct_prompt)
+            ai_answer = getattr(direct_res, 'content', str(direct_res)).strip()
+        except Exception as e:
+            print(f"ASK_GENERAL direct LLM call failed: {e}")
+            ai_answer = "I'm sorry, I couldn't generate a response right now. Please try again."
+        ai_answer = ai_answer.replace('**', '').replace('*', '').replace('#', '')
+        if user_id:
+            extract_and_save_preferences(user_query, user_id)
+        return ai_answer, session_shown_ids, [], [], intent.value, []
+
     retriever = vectorstore.as_retriever(
         search_type="mmr",
         search_kwargs={
@@ -2648,7 +2798,6 @@ def generate_buffered_responses(current_properties, current_builders, current_in
         # Count BHKs
         for p in current_properties:
             configs = str(p.Existing_Configurations).replace("'", "").replace('"', "")
-            import re
             matches = re.findall(r'(\d)\s*BHK', configs, re.IGNORECASE)
             for m in matches:
                 if m not in bhk_counts: bhk_counts[m] = 0
