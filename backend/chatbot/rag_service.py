@@ -503,29 +503,58 @@ def sync_extract_params(query):
     if bhk_match:
         params['bhk'] = bhk_match.group(1)
     
-    # 2. Extract Budget
-    budget_match = re.search(r'(under|below|max|upto)?\s*(\d+(\.\d)?)\s*(cr|crore|lakh|l|lac|k)', q_lower)
-    if budget_match:
+    # 2. Detect explicit "any range / any budget / any price" — user wants no budget filter.
+    # Set a sentinel so callers know to ignore saved-preference budgets.
+    if re.search(r'\b(any\s+(range|budget|price|cost)|no\s+(budget|price)\s+limit|all\s+range|regardless\s+of\s+(price|budget|cost))\b', q_lower):
+        params['budget_any'] = True
+
+    # 3. Extract Budget — also capture "above/over/more than" as a min-price direction
+    budget_match = re.search(
+        r'(under|below|max|upto|above|over|more\s+than|minimum|min|at\s+least|starting\s+from)?\s*'
+        r'(\d+(?:\.\d+)?)\s*(cr|crore|lakh|l|lac|k)',
+        q_lower,
+    )
+    if budget_match and not params.get('budget_any'):
         try:
+            qualifier = (budget_match.group(1) or "").replace(" ", "")
             val = float(budget_match.group(2))
-            unit = budget_match.group(4)
+            unit = budget_match.group(3)
             if unit in ['cr', 'crore']:
-                params['budget'] = val
+                amount = val
             elif unit in ['lakh', 'l', 'lac']:
-                params['budget'] = val / 100.0
+                amount = val / 100.0
             elif unit == 'k':
-                params['budget'] = val / 100000.0
+                amount = val / 100000.0
+            else:
+                amount = val
+
+            if qualifier in ('above', 'over', 'morethan', 'minimum', 'min', 'atleast', 'startingfrom'):
+                params['budget_min'] = amount
+            else:
+                params['budget'] = amount
         except:
             pass
-            
-    # 3. Extract Location
-    # Look for "in/at/near/from [Location]"
-    loc_match = re.search(r'\b(in|at|near|from)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)', q_lower)
-    if loc_match:
-        ignored = ['mumbai', 'india', 'details', 'information', 'comparison', 'search', 'properties', 'builder', 'builders', 'project', 'projects']
-        candidate = loc_match.group(2).strip()
-        if candidate not in ignored and len(candidate) > 2:
-            params['location'] = candidate
+
+    # 4. Extract Location — only capture the first word after the preposition.
+    # Multi-word locations (e.g. "kopar khairane", "navi mumbai") are handled
+    # by the canonical fallback list below, so greedy two-word capture here
+    # just causes false positives like "koparkhairane will" or "koparkhairane of".
+    _loc_ignored = {
+        'mumbai', 'india', 'details', 'information', 'comparison', 'search',
+        'properties', 'builder', 'builders', 'project', 'projects',
+        'any', 'all', 'a', 'an', 'the',
+        # pronouns / determiners that are not locations
+        'that', 'this', 'those', 'these', 'there', 'here', 'which', 'what',
+        'same', 'some', 'such', 'my', 'your', 'our', 'their',
+        # filler words that follow prepositions
+        'range', 'price', 'budget', 'area', 'location', 'place',
+    }
+    # Scan all matches so a filler word like "that" doesn't shadow the real location.
+    for loc_match in re.finditer(r'\b(in|at|near|from)\s+([a-zA-Z]+)', q_lower):
+        raw = loc_match.group(2).strip()
+        if raw not in _loc_ignored and len(raw) > 2:
+            params['location'] = raw
+            break
 
     # Fallback: if query includes a known location without a preposition.
     # Each entry is (canonical_name, [variants]) — variants are matched as
@@ -1273,14 +1302,16 @@ def _is_direct_listing_query(user_query, target="property"):
     return True
 
 
-def summarize_property_search_results(props, location=None, budget=None, bhk=None, user_query=None):
+def summarize_property_search_results(props, location=None, budget=None, budget_min=None, bhk=None, user_query=None):
     if not props:
         filters = []
         if bhk:
             filters.append(f"{bhk} BHK")
         if location:
             filters.append(f"in {str(location).title()}")
-        if budget:
+        if budget_min:
+            filters.append(f"above {_format_budget_label(budget_min)}")
+        elif budget:
             filters.append(f"within {_format_budget_label(budget)}")
 
         if _is_direct_listing_query(user_query, target="property"):
@@ -1303,7 +1334,9 @@ def summarize_property_search_results(props, location=None, budget=None, bhk=Non
         parts.append("properties")
         if location:
             parts.append(f"in {str(location).title()}")
-        if budget:
+        if budget_min:
+            parts.append(f"above {_format_budget_label(budget_min)}")
+        elif budget:
             parts.append(f"within {_format_budget_label(budget)}")
         return " ".join(parts) + "."
 
@@ -1313,7 +1346,9 @@ def summarize_property_search_results(props, location=None, budget=None, bhk=Non
     scope.append("properties")
     if location:
         scope.append(f"in {str(location).title()}")
-    if budget:
+    if budget_min:
+        scope.append(f"above {_format_budget_label(budget_min)}")
+    elif budget:
         scope.append(f"within {_format_budget_label(budget)}")
 
     response = [f"I found {len(props)} matching {' '.join(scope)}."]
@@ -1436,7 +1471,7 @@ def compare_properties(props):
     )
 
 
-def _property_matches_filters(prop, location=None, bhk=None, budget=None):
+def _property_matches_filters(prop, location=None, bhk=None, budget=None, budget_min=None):
     if not prop:
         return False
 
@@ -1449,16 +1484,24 @@ def _property_matches_filters(prop, location=None, bhk=None, budget=None):
         if target and target not in config_text and f"{target} bhk" not in config_text:
             return False
 
-    if budget:
+    if budget or budget_min:
         try:
             min_price, max_price = SmartFilter.parse_price_range(getattr(prop, 'Price_Starting_From', None))
             price_value = min_price if min_price > 0 else SmartFilter.parse_price(getattr(prop, 'Price_Starting_From', None))
-            # Exclude properties whose starting price exceeds the budget (5% rounding tolerance)
-            if price_value and price_value > float(budget) * 1.05:
-                return False
-            # Exclude if the full price range goes significantly beyond the budget
-            if max_price > 0 and max_price > float(budget) * 1.1:
-                return False
+
+            if budget:
+                # Exclude properties whose starting price exceeds the max budget (5% rounding tolerance)
+                if price_value and price_value > float(budget) * 1.05:
+                    return False
+                # Exclude if the full price range goes significantly beyond the budget
+                if max_price > 0 and max_price > float(budget) * 1.1:
+                    return False
+
+            if budget_min:
+                # Exclude properties entirely below the minimum budget
+                effective_price = max_price if max_price > 0 else price_value
+                if effective_price and effective_price < float(budget_min) * 0.95:
+                    return False
         except Exception:
             pass
 
@@ -1813,7 +1856,7 @@ def _search_builders_from_db(user_query, location=None, limit=10):
     return results
 
 
-def _search_properties_from_vector(user_query, location=None, bhk=None, budget=None, limit=20, search_k=25, fetch_k=50):
+def _search_properties_from_vector(user_query, location=None, bhk=None, budget=None, budget_min=None, limit=20, search_k=25, fetch_k=50):
     try:
         retriever = vectorstore.as_retriever(
             search_type="mmr",
@@ -1841,7 +1884,7 @@ def _search_properties_from_vector(user_query, location=None, bhk=None, budget=N
 
         if not prop or prop.id in seen:
             continue
-        if not _property_matches_filters(prop, location=location, bhk=bhk, budget=budget):
+        if not _property_matches_filters(prop, location=location, bhk=bhk, budget=budget, budget_min=budget_min):
             continue
 
         seen.add(prop.id)
@@ -1852,7 +1895,7 @@ def _search_properties_from_vector(user_query, location=None, bhk=None, budget=N
     return results
 
 
-def _search_properties_from_db(user_query, location=None, bhk=None, budget=None, limit=20):
+def _search_properties_from_db(user_query, location=None, bhk=None, budget=None, budget_min=None, limit=20):
     query_text = (user_query or "").strip().lower()
     location_text = (location or "").strip()
 
@@ -1873,7 +1916,7 @@ def _search_properties_from_db(user_query, location=None, bhk=None, budget=None,
 
     scored = []
     for prop in properties:
-        if not _property_matches_filters(prop, location=location, bhk=bhk, budget=budget):
+        if not _property_matches_filters(prop, location=location, bhk=bhk, budget=budget, budget_min=budget_min):
             continue
 
         haystacks = [
@@ -2413,13 +2456,19 @@ Our team is available to assist you with any questions or schedule property visi
              # doesn't specify a param and conversation memory doesn't have one either.
              hist_loc, hist_budget, hist_bhk = get_user_search_defaults(user_id)
 
-             loc    = params.get('location') or mem_prefs.get('location') or hist_loc
-             bhk    = params.get('bhk')      or mem_prefs.get('bhk')      or hist_bhk
-             budget = params.get('budget')   or mem_prefs.get('budget')   or hist_budget
+             loc        = params.get('location')   or mem_prefs.get('location') or hist_loc
+             bhk        = params.get('bhk')        or mem_prefs.get('bhk')      or hist_bhk
+             # If user said "any range/budget", ignore all saved budget preferences
+             if params.get('budget_any'):
+                 budget     = None
+                 budget_min = None
+             else:
+                 budget     = params.get('budget')     or mem_prefs.get('budget')   or hist_budget
+                 budget_min = params.get('budget_min') or None
 
              candidates = _merge_unique_records(
-                 _search_properties_from_db(user_query, location=loc, bhk=bhk, budget=budget, limit=20),
-                 _search_properties_from_vector(user_query, location=loc, bhk=bhk, budget=budget, limit=20, search_k=search_k, fetch_k=fetch_k),
+                 _search_properties_from_db(user_query, location=loc, bhk=bhk, budget=budget, budget_min=budget_min, limit=20),
+                 _search_properties_from_vector(user_query, location=loc, bhk=bhk, budget=budget, budget_min=budget_min, limit=20, search_k=search_k, fetch_k=fetch_k),
                  key_func=lambda prop: getattr(prop, 'id', None),
                  limit=20,
              )
@@ -2429,6 +2478,7 @@ Our team is available to assist you with any questions or schedule property visi
                      candidates,
                      location=loc,
                      budget=budget,
+                     budget_min=budget_min,
                      bhk=bhk,
                      user_query=user_query,
                  )
@@ -2452,6 +2502,7 @@ Our team is available to assist you with any questions or schedule property visi
                      [],
                      location=loc,
                      budget=budget,
+                     budget_min=budget_min,
                      bhk=bhk,
                      user_query=user_query,
                  ),
