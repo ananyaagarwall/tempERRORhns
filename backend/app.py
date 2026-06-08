@@ -3943,4 +3943,6 @@ def promote_to_admin():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='::', port=5002, debug=True, use_reloader=False)
+
+
