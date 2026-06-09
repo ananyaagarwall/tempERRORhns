@@ -170,6 +170,8 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
         src={getCardImage(prop)}
         alt={prop.name}
         className="property-img-custom"
+        loading="lazy"
+        decoding="async"
         onError={(e) => {
           // Fallback chain: gallery blob → builder_project_image → static default
           const tried = e.currentTarget.dataset.tried || '';

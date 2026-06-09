@@ -199,7 +199,8 @@ class Review(db.Model):
     property_id = db.Column(db.Integer, db.ForeignKey('property.id'), nullable=False)
 
 class Builder(db.Model):
-    rera_id = db.Column(db.String(50), primary_key=True)
+    id = db.Column(db.Integer, primary_key=True)
+    rera_id = db.Column(db.String(50), unique=True, nullable=True)  # builder's own RERA reg number, not PK
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     company_name = db.Column(db.String(100), nullable=False)
     brand_name = db.Column(db.String(100))
@@ -228,19 +229,8 @@ class Builder(db.Model):
     projects = db.relationship('BuilderProject', backref='builder', lazy=True)
 
     def to_dict(self):
-        def safe_iso(dt):
-            try:
-                if dt is None:
-                    return None
-                if hasattr(dt, 'isoformat'):
-                    return dt.isoformat()
-                if isinstance(dt, str):
-                    return dt
-                return str(dt)
-            except Exception:
-                return str(dt)
         return {
-            'id': self.rera_id,
+            'id': self.id,
             'rera_id': self.rera_id,
             'user_id': self.user_id,
             'company_name': self.company_name,
@@ -269,7 +259,7 @@ class Builder(db.Model):
 
 class BuilderProject(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    builder_id = db.Column(db.String(50), db.ForeignKey('builder.rera_id'), nullable=False)
+    builder_id = db.Column(db.Integer, db.ForeignKey('builder.id'), nullable=False)
     builder_name = db.Column(db.String(100))  # Manually entered builder name
     title = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
@@ -452,10 +442,25 @@ class UnitConfig(db.Model):
     carpet_area_max = db.Column(db.Float)         # in area_unit
     rera_carpet_area = db.Column(db.Float)        # explicit RERA carpet (may differ from saleable)
     deck_area       = db.Column(db.Float)         # additional deck/balcony area (e.g. 3 BHK)
-    area_unit       = db.Column(db.String(10), default='sqft')  # 'sqft' | 'sq.mt'
+    area_unit       = db.Column(db.String(10), default='sqft')  # 'sqft' | 'sq.mt' | 'sqm'
     price_from      = db.Column(db.Float)         # in Crores or absolute — your convention
     price_to        = db.Column(db.Float)         # upper bound (None if single price)
     price_label     = db.Column(db.String(50))   # e.g. 'All Inclusive', 'Base Price'
+
+    # Extended fields
+    unit_type             = db.Column(db.String(30))   # e.g. 'Type 1', 'Type 3A'
+    wing                  = db.Column(db.String(20))   # e.g. 'Wing A', 'Tower R6'
+    floor_range_raw       = db.Column(db.String(100))  # e.g. '3-29', '30-37,39'
+    balcony_area          = db.Column(db.Float)
+    enclosed_balcony_area = db.Column(db.Float)
+    service_area          = db.Column(db.Float)
+    ceiling_height        = db.Column(db.String(50))
+    main_door_facing      = db.Column(db.String(50))
+    modular_kitchen       = db.Column(db.Boolean)
+    kitchen_type          = db.Column(db.String(50))
+    is_combination        = db.Column(db.Boolean, default=False)
+
+    room_details = db.relationship('UnitRoomDetail', backref='unit_config', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
@@ -470,6 +475,46 @@ class UnitConfig(db.Model):
             'price_from': self.price_from,
             'price_to': self.price_to,
             'price_label': self.price_label,
+            'unit_type': self.unit_type,
+            'wing': self.wing,
+            'floor_range_raw': self.floor_range_raw,
+            'balcony_area': self.balcony_area,
+            'enclosed_balcony_area': self.enclosed_balcony_area,
+            'service_area': self.service_area,
+            'ceiling_height': self.ceiling_height,
+            'main_door_facing': self.main_door_facing,
+            'modular_kitchen': self.modular_kitchen,
+            'kitchen_type': self.kitchen_type,
+            'is_combination': self.is_combination,
+            'room_details': [r.to_dict() for r in self.room_details],
+        }
+
+
+# =============================================================================
+# UNIT ROOM DETAIL  — one row per room per unit_config
+# =============================================================================
+
+class UnitRoomDetail(db.Model):
+    """Dimensions for each room in a unit configuration."""
+    __tablename__ = 'unit_room_detail'
+
+    id             = db.Column(db.Integer, primary_key=True)
+    unit_config_id = db.Column(db.Integer, db.ForeignKey('unit_config.id', ondelete='CASCADE'), nullable=False)
+    room_name      = db.Column(db.String(50), nullable=False)
+    length         = db.Column(db.Float)
+    width          = db.Column(db.Float)
+    area_sqm       = db.Column(db.Float)
+    area_unit      = db.Column(db.String(10), default='sqft')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'unit_config_id': self.unit_config_id,
+            'room_name': self.room_name,
+            'length': self.length,
+            'width': self.width,
+            'area_sqm': self.area_sqm,
+            'area_unit': self.area_unit,
         }
 
 
