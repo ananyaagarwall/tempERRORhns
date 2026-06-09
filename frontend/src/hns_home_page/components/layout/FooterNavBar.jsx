@@ -72,13 +72,13 @@ const FooterNavBar = ({ sticky = false }) => {
                 <FaRegUserCircle size={22} />
               </Link>
             </SignedOut>
-	            <SignedIn>
-	              <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
-	                <UserButton
-	                  afterSignOutUrl="/"
-	                />
-	              </div>
-	            </SignedIn>
+            <SignedIn>
+              <div style={{ display: 'flex', alignItems: 'center', marginLeft: '8px' }}>
+                <UserButton
+                  afterSignOutUrl="/"
+                />
+              </div>
+            </SignedIn>
           </nav>
         )}
 
@@ -110,13 +110,13 @@ const FooterNavBar = ({ sticky = false }) => {
               &times;
             </button>
             <div className="user-info-container">
-	              <SignedIn>
-	                <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
-	                  <UserButton
-	                    afterSignOutUrl="/"
-	                  />
-	                </div>
-	              </SignedIn>
+              <SignedIn>
+                <div style={{ background: 'rgba(255,255,255,0.12)', borderRadius: '50%', padding: '2px', display: 'flex' }}>
+                  <UserButton
+                    afterSignOutUrl="/"
+                  />
+                </div>
+              </SignedIn>
               <SignedOut>
                 <FaUserCircle size={36} color="#fff" className="user-icon" />
               </SignedOut>
@@ -124,18 +124,18 @@ const FooterNavBar = ({ sticky = false }) => {
                 <div className="user-name">
                   {user ? `Hi, ${user.firstName || user.username || 'User'}` : 'Welcome Guest'}
                 </div>
-	                <div className="user-status">
-	                  {user ? (
-	                    <span>
-	                      Profile &bull;{" "}
-	                      <Link to="/profile" className="profile-link" onClick={() => setShowMenu(false)}>
-	                        Manage Profile
-	                      </Link>
-	                    </span>
-	                  ) : (
-	                    'Guest Profile'
-	                  )}
-	                </div>
+                <div className="user-status">
+                  {user ? (
+                    <span>
+                      Profile &bull;{" "}
+                      <Link to="/profile" className="profile-link" onClick={() => setShowMenu(false)}>
+                        Manage Profile
+                      </Link>
+                    </span>
+                  ) : (
+                    'Guest Profile'
+                  )}
+                </div>
               </div>
             </div>
             <SignedOut>

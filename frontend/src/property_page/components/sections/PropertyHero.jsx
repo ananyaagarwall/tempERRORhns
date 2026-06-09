@@ -154,14 +154,14 @@ const PropertyHero = ({ propertyData, projectData }) => {
 
   return (
     <section className="px-4 sm:px-6 md:px-8 lg:px-16 py-6 sm:py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-start">
-        <div className="relative rounded-lg overflow-hidden" style={{ height: '480px' }}>
+      <div className="property-hero-grid grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-start">
+        <div className="property-hero-carousel relative rounded-lg overflow-hidden">
           {/* ── Slide image ── */}
           <img
             src={sliderImages[slideIndex]}
             alt={`${propertyName} — image ${slideIndex + 1} of ${slideCount}`}
             className="w-full h-full rounded-lg transition-opacity duration-300"
-            style={{ objectFit: 'fill' }}
+            style={{ objectFit: 'cover' }}
           />
 
           {/* ── Heart button (top-left) ── */}
