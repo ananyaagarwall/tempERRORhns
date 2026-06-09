@@ -138,6 +138,8 @@ const PropertyCard = ({ property }) => {
             src={property.img || '/main-image.jpeg'}
             alt={`${property.name} main view`}
             className="main-property-image"
+            loading="lazy"
+            decoding="async"
             onError={(e) => {
               const tried = e.currentTarget.dataset.tried || '';
               if (!tried.includes('fb') && property.imgFallback) {

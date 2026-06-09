@@ -198,6 +198,14 @@
   object-fit: cover;
   filter: brightness(0.88);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(90deg, #e8edf5 25%, #d0d8e8 50%, #e8edf5 75%);
+  background-size: 200% 100%;
+  animation: img-shimmer 1.4s infinite;
+}
+
+@keyframes img-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .property-confidence-badge {

@@ -149,13 +149,22 @@ instance_dir = os.path.join(basedir, 'instance')
 os.makedirs(instance_dir, exist_ok=True)  # This line fixes most issues
 
 
-# Use Neon (primary) with local PostgreSQL as fallback
+# Use Neon (primary) with local PostgreSQL as fallback.
+# Set USE_CHILD=true in .env to point the backend at DATABASE_URL_CHILD (child branch) instead.
 def _resolve_db_url():
     import socket
     from urllib.parse import urlparse
 
     def rewrite(url):
         return url.replace('postgres://', 'postgresql://', 1) if url.startswith('postgres://') else url
+
+    use_child = os.getenv('USE_CHILD', '').strip().lower() == 'true'
+    if use_child:
+        child = rewrite(os.getenv('DATABASE_URL_CHILD', ''))
+        if child:
+            print("DB: USE_CHILD=true — using child branch Neon DB")
+            return child
+        print("DB: USE_CHILD=true but DATABASE_URL_CHILD not set — falling through")
 
     primary  = rewrite(os.getenv('DATABASE_URL', ''))
     fallback = rewrite(os.getenv('DATABASE_URL_FALLBACK', f"sqlite:///{os.path.join(instance_dir, 'hns.db')}"))
