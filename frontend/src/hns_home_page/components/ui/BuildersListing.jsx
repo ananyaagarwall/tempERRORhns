@@ -443,168 +443,290 @@ const BuildersListing = () => {
   /* ── Main Render ── */
   return (
     <div style={{ minHeight: '100vh', background: C.bg, fontFamily: font }}>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Hero Stripe ── */
+        .bl-hero-stripe {
+          position: relative;
+          width: 100%;
+          min-height: 220px;
+          background-size: cover;
+          background-position: center;
+          background-attachment: fixed;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .bl-hero-overlay {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(135deg, rgba(34,58,95,0.88) 0%, rgba(45,78,128,0.78) 50%, rgba(34,58,95,0.85) 100%);
+        }
+        .bl-hero-content {
+          position: relative;
+          z-index: 1;
+          text-align: center;
+          padding: 2.5rem 2rem;
+          max-width: 780px;
+        }
+        .bl-hero-title {
+          font-size: clamp(1.6rem, 4vw, 2.6rem);
+          font-weight: 800;
+          color: #ffffff;
+          margin: 0 0 6px;
+          letter-spacing: -0.5px;
+          font-family: 'Abril Fatface', serif;
+          text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+        }
+        .bl-hero-accent {
+          width: 60px;
+          height: 3px;
+          background: linear-gradient(90deg, #F1D97A, #e6c75e);
+          border-radius: 2px;
+          margin: 8px auto 14px;
+          box-shadow: 0 2px 12px rgba(241,217,122,0.5);
+        }
+        .bl-hero-desc {
+          color: rgba(255,255,255,0.90);
+          font-size: 0.95rem;
+          margin: 0 auto;
+          line-height: 1.6;
+          max-width: 580px;
+          font-weight: 400;
+        }
+        .bl-hero-stats {
+          display: flex;
+          justify-content: center;
+          gap: 2.5rem;
+          flex-wrap: wrap;
+          margin-top: 1.2rem;
+        }
+        .bl-hero-stat-num {
+          font-size: 1.5rem;
+          font-weight: 800;
+          display: block;
+        }
+        .bl-hero-stat-label {
+          font-size: 0.72rem;
+          font-weight: 600;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          color: rgba(255,255,255,0.70);
+        }
+
+        /* ── Search Bar ── */
+        .bl-search-wrapper {
+          background: #f7f9ff;
+          padding: 0 24px 24px;
+          overflow: hidden;
+        }
+        .bl-search-card {
+          max-width: 1360px;
+          margin: -18px auto 0;
+          background: #ffffff;
+          border-radius: 14px;
+          border: 1.5px solid #e5e9f5;
+          box-shadow: 0 6px 24px rgba(34,58,95,0.08);
+          padding: 14px 18px;
+          box-sizing: border-box;
+          overflow: hidden;
+        }
+        .bl-search-row {
+          display: flex;
+          gap: 10px;
+          flex-wrap: wrap;
+          align-items: center;
+          width: 100%;
+        }
+        .bl-search-input-wrap {
+          flex: 1 1 220px;
+          position: relative;
+          min-width: 0;
+        }
+        .bl-search-input {
+          width: 100%;
+          padding-left: 38px;
+          height: 42px;
+          border: 1.5px solid #e5e9f5;
+          border-radius: 10px;
+          font-size: 0.88rem;
+          color: #1a2a4a;
+          outline: none;
+          background: #f7f9ff;
+          transition: all 0.2s ease;
+          box-sizing: border-box;
+        }
+        .bl-search-input:focus { border-color: #223A5F; }
+        .bl-filter-select {
+          height: 42px;
+          padding: 0 12px;
+          border: 1.5px solid #e5e9f5;
+          border-radius: 10px;
+          font-size: 0.85rem;
+          color: #1a2a4a;
+          outline: none;
+          background: #f7f9ff;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          min-width: 0;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        .bl-count-badge {
+          margin-left: auto;
+          background: rgba(34,58,95,0.08);
+          border-radius: 8px;
+          padding: 6px 12px;
+          font-size: 0.80rem;
+          color: #5a6a87;
+          font-weight: 600;
+          white-space: nowrap;
+          box-sizing: border-box;
+        }
+
+        /* ── Mobile (< 640px) ── */
+        @media (max-width: 639px) {
+          .bl-hero-stripe {
+            min-height: 140px;
+            background-attachment: scroll;
+          }
+          .bl-hero-content { padding: 1.5rem 1.2rem; }
+          .bl-hero-title { font-size: 1.4rem; margin-bottom: 4px; }
+          .bl-hero-accent { width: 40px; height: 2.5px; margin: 6px auto 10px; }
+          .bl-hero-desc { font-size: 0.78rem; line-height: 1.5; }
+          .bl-hero-stats { display: none; }
+          .bl-search-wrapper { padding: 0 10px 14px; }
+          .bl-search-card { padding: 10px; margin-top: -10px; border-radius: 12px; }
+          .bl-search-row { gap: 6px; }
+          .bl-search-input-wrap { flex: 1 1 100%; min-width: 0; }
+          .bl-search-input { height: 38px; font-size: 0.82rem; padding-left: 34px; }
+          .bl-filter-select { height: 36px; font-size: 0.78rem; flex: 1 1 calc(50% - 3px); padding: 0 8px; }
+          .bl-count-badge { margin-left: 0; width: 100%; text-align: center; padding: 5px 10px; font-size: 0.76rem; }
+        }
+
+        /* ── Tablet (640–1024px) ── */
+        @media (min-width: 640px) and (max-width: 1024px) {
+          .bl-hero-stripe { min-height: 180px; }
+          .bl-hero-content { padding: 2rem 1.5rem; }
+          .bl-hero-title { font-size: 1.8rem; }
+          .bl-hero-desc { font-size: 0.88rem; }
+          .bl-hero-stat-num { font-size: 1.3rem; }
+          .bl-hero-stats { gap: 2rem; margin-top: 1rem; }
+          .bl-search-wrapper { padding: 0 20px 24px; }
+        }
+      `}</style>
       <FooterNavBar />
       <DynamicBreadcrumb />
 
-      {/* ── Hero ── */}
-      <div style={{ background: C.white }}>
-        <div style={{ maxWidth: '1360px', margin: '0 auto', padding: '64px 32px 48px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-            <div style={{
-              width: '80px', height: '80px', borderRadius: '20px',
-              background: `linear-gradient(135deg, ${C.navy} 0%, ${C.navyLight} 100%)`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 8px 24px rgba(34,58,95,0.25)',
-              flexShrink: 0,
-            }}>
-              <Building2 size={42} style={{ color: C.gold }} />
+      {/* ── Hero Image Stripe ── */}
+      <div
+        className="bl-hero-stripe"
+        style={{
+          backgroundImage: `url("${
+            builders.find(b => b.cover_banner)?.cover_banner
+            || 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=1920&q=80'
+          }")`,
+        }}
+      >
+        <div className="bl-hero-overlay" />
+        <div className="bl-hero-content">
+          <h1 className="bl-hero-title">Our Builders</h1>
+          <div className="bl-hero-accent" />
+          <p className="bl-hero-desc">
+            The masterminds behind Navi Mumbai's skyline — vetted, verified, and building your future one floor at a time.
+          </p>
+          <div className="bl-hero-stats">
+            <div style={{ textAlign: 'center' }}>
+              <span className="bl-hero-stat-num" style={{ color: C.gold, fontFamily: font }}>
+                {builders.length}+
+              </span>
+              <span className="bl-hero-stat-label">Trusted Builders</span>
             </div>
-            <div>
-              <h1 style={{
-                fontSize: 'clamp(2rem, 4vw, 3rem)',
-                fontWeight: 800,
-                color: C.navy,
-                margin: '0 0 8px',
-                letterSpacing: '-0.5px',
-                fontFamily: "'Abril Fatface', serif",
-              }}>
-                Our Builders
-              </h1>
-              {/* Gold accent underline */}
-              <div style={{
-                width: '60px', height: '4px',
-                background: `linear-gradient(90deg, ${C.gold}, ${C.goldDark})`,
-                borderRadius: '2px', marginBottom: '12px',
-                boxShadow: '0 2px 8px rgba(241,217,122,0.4)',
-              }} />
-              <p style={{ color: C.textSecondary, fontSize: '1.02rem', margin: 0, lineHeight: 1.6, maxWidth: '600px' }}>
-                Discover trusted and verified real estate developers across Navi Mumbai.
-                Explore premium projects, detailed profiles, and find the perfect builder for your dream home.
-              </p>
+            <div style={{ textAlign: 'center' }}>
+              <span className="bl-hero-stat-num" style={{ color: C.gold, fontFamily: font }}>
+                {builders.reduce((sum, b) => sum + (b.completed_projects || 0), 0)}+
+              </span>
+              <span className="bl-hero-stat-label">Projects Delivered</span>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <span className="bl-hero-stat-num" style={{ color: C.gold, fontFamily: font }}>
+                100%
+              </span>
+              <span className="bl-hero-stat-label">RERA Verified</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* ── Filters / Search Bar ── */}
-      <div style={{ background: C.bg, padding: '0 32px 32px' }}>
-        <div style={{ maxWidth: '1360px', margin: '0 auto', marginTop: '-24px' }}>
-          <div style={{
-            background: C.white,
-            borderRadius: '16px',
-            border: `1.5px solid ${C.border}`,
-            boxShadow: '0 8px 32px rgba(34,58,95,0.10)',
-            padding: '20px 24px',
-          }}>
-            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'center' }}>
-              {/* Search Input */}
-              <div style={{ flex: '1 1 280px', position: 'relative', minWidth: '220px' }}>
-                <Search
-                  size={17}
-                  style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: C.textMuted, transition: 'color 0.2s', zIndex: 1 }}
-                />
-                <input
-                  ref={searchInputRef}
-                  type="text"
-                  placeholder="Search by builder name, project, city..."
-                  value={searchTerm}
-                  onChange={e => handleSearchChange(e.target.value)}
-                  onKeyDown={handleSearchKeyDown}
-                  autoComplete="off"
-                  style={{
-                    width: '100%',
-                    paddingLeft: '42px',
-                    paddingRight: searching ? '42px' : '16px',
-                    height: '46px',
-                    border: `1.5px solid ${searching ? C.navy : C.border}`,
-                    borderRadius: '10px',
-                    fontSize: '0.93rem',
-                    color: C.textPrimary,
-                    fontFamily: font,
-                    outline: 'none',
-                    background: '#f7f9ff',
-                    transition: 'all 0.2s ease',
-                    boxSizing: 'border-box',
-                  }}
-                />
-                {searching && (
-                  <div style={{
-                    position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
-                    width: '16px', height: '16px', borderRadius: '50%',
-                    border: `2px solid ${C.border}`, borderTopColor: C.navy,
-                    animation: 'spin 0.7s linear infinite',
-                  }} />
-                )}
-                <SuggestionsPortal />
-              </div>
-
-              {/* Type Filter */}
-              <select
-                value={filterType}
-                onChange={e => setFilterType(e.target.value)}
+      <div className="bl-search-wrapper">
+        <div className="bl-search-card">
+          <div className="bl-search-row">
+            {/* Search Input */}
+            <div className="bl-search-input-wrap">
+              <Search
+                size={15}
+                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: C.textMuted, zIndex: 1 }}
+              />
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search builders..."
+                value={searchTerm}
+                onChange={e => handleSearchChange(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                autoComplete="off"
+                className="bl-search-input"
                 style={{
-                  height: '46px',
-                  padding: '0 16px',
-                  border: `1.5px solid ${C.border}`,
-                  borderRadius: '10px',
-                  fontSize: '0.90rem',
-                  color: C.textPrimary,
+                  paddingRight: searching ? '40px' : '14px',
+                  borderColor: searching ? C.navy : C.border,
                   fontFamily: font,
-                  outline: 'none',
-                  background: '#f7f9ff',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  minWidth: '150px',
                 }}
-              >
-                <option value="all">All Types</option>
-                <option value="residential">Residential</option>
-                <option value="commercial">Commercial</option>
-                <option value="mixed">Mixed-Use</option>
-                <option value="luxury">Luxury</option>
-              </select>
+              />
+              {searching && (
+                <div style={{
+                  position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                  width: '14px', height: '14px', borderRadius: '50%',
+                  border: `2px solid ${C.border}`, borderTopColor: C.navy,
+                  animation: 'spin 0.7s linear infinite',
+                }} />
+              )}
+              <SuggestionsPortal />
+            </div>
 
-              {/* Sort */}
-              <select
-                value={sortBy}
-                onChange={e => setSortBy(e.target.value)}
-                style={{
-                  height: '46px',
-                  padding: '0 16px',
-                  border: `1.5px solid ${C.border}`,
-                  borderRadius: '10px',
-                  fontSize: '0.90rem',
-                  color: C.textPrimary,
-                  fontFamily: font,
-                  outline: 'none',
-                  background: '#f7f9ff',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s ease',
-                  minWidth: '150px',
-                }}
-              >
-                <option value="name">Sort by Name</option>
-                <option value="projects">Sort by Projects</option>
-                <option value="established">Sort by Year</option>
-              </select>
+            {/* Type Filter */}
+            <select
+              value={filterType}
+              onChange={e => setFilterType(e.target.value)}
+              className="bl-filter-select"
+              style={{ fontFamily: font }}
+            >
+              <option value="all">All Types</option>
+              <option value="residential">Residential</option>
+              <option value="commercial">Commercial</option>
+              <option value="mixed">Mixed-Use</option>
+              <option value="luxury">Luxury</option>
+            </select>
 
-              {/* Count Badge */}
-              <div style={{
-                marginLeft: 'auto',
-                background: `rgba(34,58,95,0.08)`,
-                borderRadius: '8px',
-                padding: '8px 14px',
-                fontSize: '0.83rem',
-                color: C.textSecondary,
-                fontWeight: 600,
-                whiteSpace: 'nowrap',
-              }}>
-                <span style={{ color: C.navy, fontWeight: 800 }}>{filteredBuilders.length}</span>
-                {' '}of{' '}
-                <span style={{ color: C.navy, fontWeight: 800 }}>{builders.length}</span>
-                {' '}builders
-              </div>
+            {/* Sort */}
+            <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+              className="bl-filter-select"
+              style={{ fontFamily: font }}
+            >
+              <option value="name">Sort by Name</option>
+              <option value="projects">Sort by Projects</option>
+              <option value="established">Sort by Year</option>
+            </select>
+
+            {/* Count Badge */}
+            <div className="bl-count-badge">
+              <span style={{ color: C.navy, fontWeight: 800 }}>{filteredBuilders.length}</span>
+              {' '}of{' '}
+              <span style={{ color: C.navy, fontWeight: 800 }}>{builders.length}</span>
+              {' '}builders
             </div>
           </div>
         </div>

@@ -489,45 +489,45 @@ def ask_bot():
 
     # Call RAG Service
     try:
-        # Keep a copy of previously shown IDs to determine what's newly shown
-        prev_shown = set(session_data['shown_ids'])
-
         ai_response, updated_shown_ids, all_properties, all_builders, last_intent, buffered_responses = get_chatbot_response(
-            user_message, 
-            user_id, 
+            user_message,
+            user_id,
             chat_history,
             session_shown_ids=session_data['shown_ids'],
             conversation_memory=session_data.get('memory'),
             last_intent=session_data.get('last_intent'),
             last_result_type=session_data.get('last_result_type'),
         )
-        
+
         # Save last intent for this session
         session_data['last_intent'] = last_intent
-        
+
         # Update session data with ALL results (convert to dict immediately to avoid SQLAlchemy session issues)
         session_data['shown_ids'] = updated_shown_ids
         session_data['all_properties'] = [p.to_dict() for p in all_properties]
         session_data['all_builders'] = [b.to_dict() for b in all_builders]
         session_data['current_page'] = 0  # Reset to first page
-        
-        # Determine which items were newly marked as shown by the RAG service
-        new_shown_ids = set(updated_shown_ids) - prev_shown
 
-        # Show items that were newly marked as shown. If none, fallback to the first unseen batch
-        properties_to_show = [p for p in session_data['all_properties'] if str(p.get('id')) in new_shown_ids]
-        if not properties_to_show:
-            unseen = [p for p in session_data['all_properties'] if str(p.get('id')) not in prev_shown]
-            properties_to_show = unseen[:10]
+        # For a fresh query always display the first 10 from the current result set.
+        # Filtering by shown_ids here causes previously-seen properties to be invisible
+        # even when the user has refined their search (e.g. adding a budget filter).
+        properties_to_show = session_data['all_properties'][:10]
+        builders_to_show = session_data['all_builders'][:10]
 
-        builders_to_show = [b for b in session_data['all_builders'] if str(b.get('id')) in new_shown_ids]
-        if not builders_to_show:
-            unseen_b = [b for b in session_data['all_builders'] if str(b.get('id')) not in prev_shown]
-            builders_to_show = unseen_b[:10]
+        # Reset shown_ids to reflect only the current result set so that
+        # subsequent "load more" paginates correctly from this new query.
+        session_data['shown_ids'] = set(str(p.get('id')) for p in properties_to_show)
+        session_data['shown_ids'].update(str(b.get('id')) for b in builders_to_show)
 
-        # Store last shown order for reference (e.g., 'prop 1' -> this mapping)
-        session_data['last_shown_properties'] = [p.get('id') for p in properties_to_show]
-        session_data['last_shown_builders'] = [b.get('id') for b in builders_to_show]
+        # Store last shown order for reference (e.g., 'prop 1' -> this mapping).
+        # IMPORTANT: for advisory / general intents (ASK_GENERAL) the RAG service returns
+        # no property cards — the response is a text answer about the previously-discussed
+        # properties. Do NOT overwrite last_shown_* in that case, so the next follow-up
+        # like "compare these two again" still knows what was being discussed.
+        if properties_to_show or last_intent not in ('general', 'get_details'):
+            session_data['last_shown_properties'] = [p.get('id') for p in properties_to_show]
+        if builders_to_show or last_intent not in ('general', 'get_details'):
+            session_data['last_shown_builders'] = [b.get('id') for b in builders_to_show]
         if session_data.get('memory'):
             session_data['memory'].entities['property_ids'] = [str(pid) for pid in session_data['last_shown_properties'] if pid not in (None, "")]
         # Enforce intent-specific visibility: if user asked for properties only, don't show builders and vice versa

@@ -96,7 +96,7 @@ const BuildersSection = ({ searchFilters }) => {
   return (
     <section className="landing-section bg-cream builders-section">
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <h2 style={{ 
+        <h2 style={{
           fontSize: '2.5rem',
           fontWeight: 800,
           color: '#223A5F',
@@ -106,7 +106,7 @@ const BuildersSection = ({ searchFilters }) => {
         }}>
           Near You
         </h2>
-        <span style={{ 
+        <span style={{
           display: 'block',
           width: '80px',
           height: '4px',

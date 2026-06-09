@@ -199,7 +199,8 @@ def _contains_any(msg_lower, keywords):
 def _has_compare_intent(msg_lower):
     compare_keywords = [
         'compare', 'difference', 'vs', 'versus', 'better',
-        'which one', 'between'
+        'which one', 'between', 'suggest between', 'recommend between',
+        'which is better', 'which would you', 'which should i',
     ]
     return _contains_any(msg_lower, compare_keywords)
 
@@ -237,43 +238,97 @@ def classify_intent(user_message):
     Returns: UserIntent enum
     """
     msg_lower = user_message.lower()
-    
+
     # Pattern 1: Contact/Support queries
-    contact_keywords = ['contact', 'support', 'help me', 'reach out', 'get in touch', 
+    contact_keywords = ['contact', 'support', 'help me', 'reach out', 'get in touch',
                         'phone', 'email', 'call', 'speak to']
     if _contains_any(msg_lower, contact_keywords):
         return UserIntent.CONTACT_US
-    
-    # Pattern 2: Comparison should win over search language like
-    # "compare builders" or "compare properties in thane".
+
+    # Pattern 2: Opinion / recommendation requests — must be checked BEFORE compare
+    # because phrases like "which do you think is better between them?" contain compare
+    # keywords ('better', 'between') but the user wants the LLM's opinion, not a table.
+    opinion_patterns = [
+        r'\bdo\s+you\s+think\b',
+        r'\bwhat\s+do\s+you\s+think\b',
+        r'\bin\s+your\s+opinion\b',
+        r"\bwhat('s|is)\s+your\s+(opinion|view|take|pick|choice)\b",
+        r'\bwould\s+you\s+(choose|pick|prefer|recommend|suggest)\b',
+        r'\bwhich\s+(one\s+)?do\s+you\s+(think|feel|prefer|recommend|suggest)\b',
+        r'\byour\s+(recommendation|suggestion|opinion|pick|choice)\b',
+        r'\bwhat\s+would\s+you\s+(suggest|recommend|pick|choose|prefer)\b',
+    ]
+    for pattern in opinion_patterns:
+        if re.search(pattern, msg_lower):
+            return UserIntent.ASK_GENERAL
+
+    # Pattern 3: Comparison wins over advisory/search — "suggest between X and Y"
+    # or "compare X vs Y" should show the comparison table.
     if _has_compare_intent(msg_lower):
         return UserIntent.COMPARE_PROPERTIES
 
-    # Pattern 3: Builder search
-    builder_keywords = ['builder', 'builders', 'developer', 'developers', 
+    # Pattern 3: Advisory / general knowledge questions — checked BEFORE search keywords
+    # because these phrases use words like "bhk", "budget", "property" but are asking
+    # for advice, not a property listing.
+    # NOTE: words like "suggest/recommend" that appear with compare-intent keywords are
+    # already handled above, so they only reach here in a pure advisory context
+    # (e.g. "what budget would you suggest for a 2 BHK?").
+    advisory_patterns = [
+        r'\bwhat\s+(should|is|are|would)\b',
+        r'\bhow\s+much\b',
+        r'\baverage\s+(budget|price|cost|rate)\b',
+        r'\b(budget|price|cost)\s+(for|of|range)\b',
+        r'\btell\s+me\s+(what|how|about|the)\b',
+        r'\badvise\b',
+        r'\badvice\b',
+        r'\bsuggestion\b',
+        r'\bsuggest\b',
+        r'\brecommend\b',
+        r'\btypical(ly)?\b',
+        r'\bgenerally\b',
+        r'\busually\b',
+        r'\bmarket\s+(rate|price|value)\b',
+        r'\bprice\s+trend\b',
+        r'\bguide(line)?\b',
+    ]
+    for pattern in advisory_patterns:
+        if re.search(pattern, msg_lower):
+            return UserIntent.ASK_GENERAL
+
+    # Pattern 4: Builder search
+    builder_keywords = ['builder', 'builders', 'developer', 'developers',
                         'construction company', 'who built', 'building company']
     if _contains_any(msg_lower, builder_keywords):
         return UserIntent.SEARCH_BUILDERS
-    
-    # Pattern 4: Property search
-    search_keywords = ['show', 'find', 'looking for', 'need', 'want', 'search', 
-                       'available', 'options', 'properties', 'property', 'list', 
-                       'display', 'apartment', 'flat', 'house', 'bhk', 'prop', 'props']
-    if _contains_any(msg_lower, search_keywords):
+
+    # Pattern 5: Property search — only explicit listing/search verbs trigger this.
+    # Broad nouns like 'bhk', 'house', 'apartment' alone must NOT trigger a listing
+    # because they appear in advisory questions too.
+    explicit_search_keywords = ['show', 'find', 'looking for', 'search',
+                                'available', 'list', 'display', 'prop', 'props']
+    if _contains_any(msg_lower, explicit_search_keywords):
         return UserIntent.SEARCH_PROPERTIES
 
-    # Pattern 5: Get specific details
+    # Noun-only search keywords — only classify as search if no advisory pattern matched above
+    noun_search_keywords = ['properties', 'property', 'apartment', 'flat',
+                            'house', 'bhk', 'options']
+    if _contains_any(msg_lower, noun_search_keywords):
+        # Extra guard: "need/want" with a noun is a search, but "what/how" already
+        # caught above, so safe to classify as search here.
+        return UserIntent.SEARCH_PROPERTIES
+
+    # Pattern 6: Get specific details
     detail_keywords = ['details', 'tell me more', 'about', 'info', 'specific',
                        'what is', 'explain']
     if _contains_any(msg_lower, detail_keywords):
         return UserIntent.GET_DETAILS
-    
-    # Pattern 6: Refine filters (follow-up queries)
+
+    # Pattern 7: Refine filters (follow-up queries)
     filter_keywords = ['other', 'different', 'else', 'more', 'another',
                        'cheaper', 'expensive', 'bigger', 'smaller']
     if _contains_any(msg_lower, filter_keywords):
         return UserIntent.FILTER_REFINE
-    
+
     # Default: General query
     return UserIntent.ASK_GENERAL
 
@@ -293,10 +348,10 @@ class SmartFilter:
         
         s = str(price_str).lower().replace(',', '')
         try:
-            # Check for Lac/Lakh
-            is_lakh = 'lakh' in s or 'lac' in s
-            
             import re
+            # Check for Lac/Lakh/L (standalone 'l' as used in "28 L")
+            is_lakh = 'lakh' in s or 'lac' in s or bool(re.search(r'\bl\b', s))
+
             match = re.search(r'(\d+(\.\d+)?)', s)
             if match:
                 val = float(match.group(1))
@@ -308,21 +363,49 @@ class SmartFilter:
             return 0
     
     @staticmethod
+    def parse_price_range(price_str):
+        """Return (min_price_cr, max_price_cr) from a range string like '₹72 L – ₹2.0 Cr'."""
+        if not price_str:
+            return 0, 0
+        s = str(price_str).lower().replace(',', '')
+        try:
+            parts = re.split(r'[-–—]|(?<=\d)\s+to\s+(?=\d)', s)
+            prices = []
+            for part in parts:
+                part = part.strip()
+                is_lakh = 'lakh' in part or 'lac' in part or bool(re.search(r'\bl\b', part))
+                is_cr = 'crore' in part or bool(re.search(r'\bcr\b', part))
+                m = re.search(r'(\d+(?:\.\d+)?)', part)
+                if m:
+                    val = float(m.group(1))
+                    if is_lakh:
+                        prices.append(val / 100)
+                    elif is_cr:
+                        prices.append(val)
+            if prices:
+                return min(prices), max(prices)
+        except Exception:
+            pass
+        p = SmartFilter.parse_price(price_str)
+        return p, p
+
+    @staticmethod
     def filter_by_budget(properties, user_budget, buffer_percent=20):
         """Remove properties significantly above budget"""
         if not user_budget:
             return properties
-        
+
         max_budget = user_budget * (1 + buffer_percent/100)
         filtered = []
-        
+
         for prop in properties:
-            prop_price = SmartFilter.parse_price(
+            min_price, max_price = SmartFilter.parse_price_range(
                 prop.metadata.get('price', '0')
             )
-            if prop_price <= max_budget:
+            prop_price = min_price if min_price > 0 else SmartFilter.parse_price(prop.metadata.get('price', '0'))
+            if prop_price <= max_budget and (max_price == 0 or max_price <= float(user_budget) * 1.5):
                 filtered.append(prop)
-        
+
         return filtered
     
     @staticmethod
@@ -436,28 +519,44 @@ def sync_extract_params(query):
         except:
             pass
             
-    # 3. Extract Location (Naive)
-    # Improved: Look for "in [Location]", "at [Location]", "near [Location]"
-    
-    loc_match = re.search(r'\b(in|at|near)\s+([a-zA-Z]+(\s+[a-zA-Z]+)?)', q_lower)
+    # 3. Extract Location
+    # Look for "in/at/near/from [Location]"
+    loc_match = re.search(r'\b(in|at|near|from)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+)?)', q_lower)
     if loc_match:
         ignored = ['mumbai', 'india', 'details', 'information', 'comparison', 'search', 'properties', 'builder', 'builders', 'project', 'projects']
         candidate = loc_match.group(2).strip()
         if candidate not in ignored and len(candidate) > 2:
             params['location'] = candidate
 
-    # Fallback: if query includes a known location without "in/at/near"
+    # Fallback: if query includes a known location without a preposition.
+    # Each entry is (canonical_name, [variants]) — variants are matched as
+    # whole words and the canonical name is stored so the rest of the code
+    # always sees a single consistent value.
     if not params.get('location'):
         common_locations = [
-            'ghansoli', 'airoli', 'nerul', 'vashi', 'kharghar',
-            'kopar khairane', 'belapur', 'panvel', 'seawoods',
-            'thane', 'mumbai', 'navi mumbai', 'kalyan', 'dombivli'
+            ('ghansoli',       ['ghansoli']),
+            ('airoli',         ['airoli']),
+            ('nerul',          ['nerul']),
+            ('vashi',          ['vashi']),
+            ('kharghar',       ['kharghar']),
+            ('kopar khairane', ['kopar khairane', 'koparkhairane']),
+            ('belapur',        ['belapur']),
+            ('panvel',         ['panvel']),
+            ('seawoods',       ['seawoods']),
+            ('thane',          ['thane']),
+            ('navi mumbai',    ['navi mumbai']),
+            ('mumbai',         ['mumbai']),
+            ('kalyan',         ['kalyan']),
+            ('dombivli',       ['dombivli']),
         ]
-        for loc in common_locations:
-            if re.search(rf'\b{re.escape(loc)}\b', q_lower):
-                params['location'] = loc
+        for canonical, variants in common_locations:
+            for variant in variants:
+                if re.search(rf'\b{re.escape(variant)}\b', q_lower):
+                    params['location'] = canonical
+                    break
+            if params.get('location'):
                 break
-            
+
     return params
 
 
@@ -600,78 +699,151 @@ class ConversationMemory:
 # ============================================
 
 def analyze_user_behavior(user_id):
-    """Learn from user's past actions"""
+    """
+    Build a unified preference profile from:
+      1. UserPreference rows (explicit prefs stated in past chats)
+      2. UserInteraction rows (properties the user has clicked/viewed)
+    Returns a dict the rest of the code can act on directly.
+    """
     user_id = _resolve_local_user_id(user_id)
     if not user_id:
         return None
-    
-    interactions = UserInteraction.query.filter_by(user_id=user_id)\
-                    .order_by(UserInteraction.timestamp.desc())\
-                    .limit(50).all()
-    
-    if not interactions:
-        return None
-    
-    viewed_properties = [i.property for i in interactions if i.property]
-    
-    builders = [p.Builder_Name for p in viewed_properties if p.Builder_Name]
-    preferred_builders = Counter(builders).most_common(3)
-    
-    prices = []
-    for p in viewed_properties:
-        price = SmartFilter.parse_price(p.Price_Starting_From)
-        if price > 0:
-            prices.append(price)
-    
-    if prices:
-        avg_price = sum(prices) / len(prices)
-        min_price = min(prices)
-        max_price = max(prices)
-    else:
-        avg_price = min_price = max_price = 0
-    
-    locations = [p.Location for p in viewed_properties if p.Location]
-    preferred_locations = Counter(locations).most_common(3)
-    
-    return {
-        'preferred_builders': [b[0] for b in preferred_builders],
-        'price_range': {
-            'minimum': min_price,
-            'maximum': max_price,
-            'avg': avg_price
-        },
-        'preferred_locations': [l[0] for l in preferred_locations]
+
+    profile = {
+        'preferred_builders': [],
+        'preferred_locations': [],
+        'preferred_bhk': None,
+        'price_range': {'minimum': 0, 'maximum': 0, 'avg': 0},
+        'explicit_budget': None,
+        'explicit_location': None,
+        'explicit_bhk': None,
     }
+
+    # --- 1. Explicit preferences saved from past chat sessions ---
+    try:
+        prefs = UserPreference.query.filter_by(user_id=user_id).all()
+        for p in prefs:
+            key = (p.pref_key or '').lower()
+            val = (p.pref_value or '').strip()
+            if not val:
+                continue
+            if key == 'budget':
+                try:
+                    profile['explicit_budget'] = float(val)
+                except ValueError:
+                    numbers = re.findall(r'\d+\.?\d*', val)
+                    if numbers:
+                        profile['explicit_budget'] = float(numbers[0])
+            elif key == 'location':
+                profile['explicit_location'] = val
+            elif key == 'bhk':
+                profile['explicit_bhk'] = val
+    except Exception as e:
+        print(f"analyze_user_behavior: error reading preferences: {e}")
+
+    # --- 2. Behavioral footprint from viewed/clicked properties ---
+    try:
+        interactions = UserInteraction.query.filter_by(user_id=user_id)\
+                        .order_by(UserInteraction.timestamp.desc())\
+                        .limit(50).all()
+        viewed_properties = [i.property for i in interactions if getattr(i, 'property', None)]
+
+        builders = [p.Builder_Name for p in viewed_properties if p.Builder_Name]
+        profile['preferred_builders'] = [b for b, _ in Counter(builders).most_common(3)]
+
+        locations = [p.Location for p in viewed_properties if p.Location]
+        profile['preferred_locations'] = [l for l, _ in Counter(locations).most_common(3)]
+
+        prices = [
+            SmartFilter.parse_price(p.Price_Starting_From)
+            for p in viewed_properties
+            if SmartFilter.parse_price(p.Price_Starting_From) > 0
+        ]
+        if prices:
+            profile['price_range'] = {
+                'minimum': min(prices),
+                'maximum': max(prices),
+                'avg': sum(prices) / len(prices),
+            }
+
+        # Infer preferred BHK from viewed properties
+        bhk_counts = Counter()
+        for p in viewed_properties:
+            for m in re.findall(r'(\d)\s*bhk', str(p.Existing_Configurations).lower()):
+                bhk_counts[m] += 1
+        if bhk_counts:
+            profile['preferred_bhk'] = bhk_counts.most_common(1)[0][0]
+    except Exception as e:
+        print(f"analyze_user_behavior: error reading interactions: {e}")
+
+    has_data = (
+        profile['preferred_builders']
+        or profile['preferred_locations']
+        or profile['explicit_budget']
+        or profile['explicit_location']
+        or profile['explicit_bhk']
+    )
+    return profile if has_data else None
+
+
+def get_user_search_defaults(user_id):
+    """
+    Return (location, budget, bhk) inferred from user history/preferences.
+    Used to fill in missing params when the current query doesn't specify them.
+    Explicit DB prefs take priority over behavioral footprint.
+    """
+    behavior = analyze_user_behavior(user_id)
+    if not behavior:
+        return None, None, None
+
+    location = (
+        behavior.get('explicit_location')
+        or (behavior['preferred_locations'][0] if behavior['preferred_locations'] else None)
+    )
+    budget = (
+        behavior.get('explicit_budget')
+        or (behavior['price_range'].get('avg') or None)
+    )
+    bhk = (
+        behavior.get('explicit_bhk')
+        or behavior.get('preferred_bhk')
+    )
+    return location, budget, bhk
 
 
 def enhance_context_with_behavior(user_id, context_blocks):
-    """Add behavioral insights to context"""
+    """Add behavioral insights to the LLM prompt context so it can personalise its answer."""
     if not user_id:
         return context_blocks
-    
+
     behavior = analyze_user_behavior(user_id)
-    if behavior and behavior.get('preferred_builders'):
-        price_range = behavior.get('price_range', {})
-        avg_price = price_range.get('avg', 0)
-        min_price = price_range.get('minimum', 0)
-        max_price = price_range.get('maximum', 0)
-        
-        behavior_parts = [
-            "LEARNED USER BEHAVIOR (Based on past views):",
-            f"- Frequently views: {', '.join(behavior['preferred_builders'][:2])} properties"
-        ]
-        
-        if avg_price > 0:
-            behavior_parts.append(f"- Typical budget: Rs {avg_price:.2f} Crore")
-        if min_price > 0 and max_price > 0:
-            behavior_parts.append(f"- Price range: Rs {min_price:.2f}Cr to Rs {max_price:.2f}Cr")
-        
-        if behavior.get('preferred_locations'):
-            behavior_parts.append(f"- Preferred areas: {', '.join(behavior['preferred_locations'][:2])}")
-        
-        behavior_text = "\n".join(behavior_parts)
-        context_blocks.append(behavior_text)
-    
+    if not behavior:
+        return context_blocks
+
+    parts = ["USER PROFILE (use this to personalise your answer):"]
+
+    if behavior.get('explicit_location'):
+        parts.append(f"- Preferred location (stated): {behavior['explicit_location']}")
+    elif behavior.get('preferred_locations'):
+        parts.append(f"- Frequently browses: {', '.join(behavior['preferred_locations'][:2])}")
+
+    if behavior.get('explicit_bhk'):
+        parts.append(f"- Preferred BHK (stated): {behavior['explicit_bhk']} BHK")
+    elif behavior.get('preferred_bhk'):
+        parts.append(f"- Most-viewed BHK type: {behavior['preferred_bhk']} BHK")
+
+    if behavior.get('explicit_budget'):
+        parts.append(f"- Budget (stated): Rs {behavior['explicit_budget']:.2f} Cr")
+    else:
+        pr = behavior.get('price_range', {})
+        if pr.get('avg', 0) > 0:
+            parts.append(f"- Typical budget based on views: Rs {pr['avg']:.2f} Cr "
+                         f"(range Rs {pr.get('minimum', 0):.2f}–{pr.get('maximum', 0):.2f} Cr)")
+
+    if behavior.get('preferred_builders'):
+        parts.append(f"- Builders user has shown interest in: {', '.join(behavior['preferred_builders'][:2])}")
+
+    context_blocks.append("\n".join(parts))
     return context_blocks
 
 
@@ -1237,8 +1409,12 @@ def _property_matches_filters(prop, location=None, bhk=None, budget=None):
 
     if budget:
         try:
-            price_value = SmartFilter.parse_price(getattr(prop, 'Price_Starting_From', None))
+            min_price, max_price = SmartFilter.parse_price_range(getattr(prop, 'Price_Starting_From', None))
+            price_value = min_price if min_price > 0 else SmartFilter.parse_price(getattr(prop, 'Price_Starting_From', None))
             if price_value and price_value > float(budget) * 1.25:
+                return False
+            # Exclude if the full range goes well beyond the budget
+            if max_price > 0 and max_price > float(budget) * 1.5:
                 return False
         except Exception:
             pass
@@ -1771,6 +1947,15 @@ def get_chatbot_response(user_query, user_id=None, chat_history=[], session_show
     
     # SYNC UPDATE MEMORY FIRST
     params = sync_extract_params(user_query)
+
+    # If current message has no location, try to recover one from recent chat history
+    if not params.get('location') and chat_history:
+        for past_user_msg, _ in reversed(chat_history[-5:]):
+            past_params = sync_extract_params(past_user_msg)
+            if past_params.get('location'):
+                params['location'] = past_params['location']
+                break
+
     if conversation_memory:
         conversation_memory.update_from_sync_params(params)
     
@@ -2105,9 +2290,14 @@ Our team is available to assist you with any questions or schedule property visi
         # lookups do not need an LLM round-trip.
         try:
              mem_prefs = conversation_memory.get_current_preferences() if conversation_memory else {}
-             loc = params.get('location') or mem_prefs.get('location')
-             bhk = params.get('bhk') or mem_prefs.get('bhk')
-             budget = params.get('budget') or mem_prefs.get('budget')
+
+             # Fall back to user history / saved preferences when the current query
+             # doesn't specify a param and conversation memory doesn't have one either.
+             hist_loc, hist_budget, hist_bhk = get_user_search_defaults(user_id)
+
+             loc    = params.get('location') or mem_prefs.get('location') or hist_loc
+             bhk    = params.get('bhk')      or mem_prefs.get('bhk')      or hist_bhk
+             budget = params.get('budget')   or mem_prefs.get('budget')   or hist_budget
 
              candidates = _merge_unique_records(
                  _search_properties_from_db(user_query, location=loc, bhk=bhk, budget=budget, limit=20),
@@ -2301,18 +2491,20 @@ Question: {question}
 Detailed Comparison:"""
     
     else:
-        answer_template = """You are a helpful Real Estate Assistant.
+        answer_template = """You are a helpful Real Estate Assistant with access to the user's profile and history.
 
 CRITICAL INSTRUCTIONS:
-1. Provide a helpful, conversational response (4-6 lines).
-2. You can explain things clearly, do not be too brief.
-3. NO markdown formatting.
-4. Cards will be shown separately if applicable.
+1. Read the USER PROFILE section in the context carefully — it contains the user's preferred location, BHK, budget, and builders they have shown interest in.
+2. Personalise your answer using that profile. For example, if the user asks "what should my budget be for a 2 BHK?" and their profile shows they browse properties in Ghansoli at Rs 0.80 Cr, reference that.
+3. If you are suggesting or recommending a property type, lean towards what matches their history.
+4. Provide a helpful, conversational response (4-6 lines).
+5. NO markdown formatting.
+6. Property cards will be shown separately if applicable.
 
 Context: {context}
 Question: {question}
 
-Response (4-6 lines, no formatting):"""
+Personalised Response (4-6 lines, no formatting):"""
 
     ANSWER_PROMPT = PromptTemplate(template=answer_template, input_variables=["context", "question"])
 
@@ -2410,7 +2602,9 @@ Response (4-6 lines, no formatting):"""
             session_shown_ids.add(str(rid))
     
     # Hard-filter final card results by requested location so cards match user query intent.
-    if query_location:
+    # Skip this filter for ASK_GENERAL / opinion intents — those responses are about
+    # whatever properties are in the conversation context, not tied to a specific location.
+    if query_location and intent not in (UserIntent.ASK_GENERAL, UserIntent.GET_DETAILS):
         all_properties = [
             p for p in all_properties
             if _matches_location([p.Location, p.Address], query_location)
@@ -2420,16 +2614,23 @@ Response (4-6 lines, no formatting):"""
             if _matches_location([b.city, b.location, b.corporate_address], query_location)
         ]
 
+    # For advisory / opinion intents the LLM answer IS the response — we must not
+    # attach random vector-search property cards to it.  The user is asking for the
+    # agent's opinion, not a new property listing.
+    if intent in (UserIntent.ASK_GENERAL, UserIntent.GET_DETAILS):
+        all_properties = []
+        all_builders = []
+
     print(f"Retrieved {len(all_properties)} properties, {len(all_builders)} builders")
     print(f"Will show 10 initially, {max(0, len(all_properties) - 10)} available for 'load more'")
-    
+
     # Auto-learn
     if user_id:
         extract_and_save_preferences(user_query, user_id)
-    
+
     # GENERATE BUFFERED RESPONSES
     buffered_responses = generate_buffered_responses(all_properties, all_builders, intent.value)
-    
+
     return ai_answer, session_shown_ids, all_properties, all_builders, intent.value, buffered_responses
 
 

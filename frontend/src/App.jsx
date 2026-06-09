@@ -31,6 +31,7 @@ import CartPage from './hns_cart_page/app/CartPage';
 import ChatBot from './components/ui/ChatBot';
 import AboutUs from './hns_home_page/components/ui/AboutUs';
 import BuildersListing from './hns_home_page/components/ui/BuildersListing';
+import NewBuilderListing from './hns_home_page/components/ui/NewBuilderListing';
 import ProfilePage from './ProfilePage';
 
 // Chatbot Context
@@ -113,7 +114,7 @@ const AdminRoute = ({ children }) => {
 
 const UserSync = () => {
   const { isSignedIn, isLoaded, getToken } = useAuth();
-  
+
   useEffect(() => {
     let cancelled = false;
 
@@ -183,7 +184,7 @@ const UserSync = () => {
     setAuthTokenGetter(() => getToken());
     return () => setAuthTokenGetter(null);
   }, [isLoaded, getToken]);
-  
+
   return null;
 };
 
@@ -308,7 +309,8 @@ function App() {
           <Route path="/blog/:slug" element={<BlogDetail />} />
           <Route path="/cart" element={<CartPage />} />
           <Route path="/about" element={<AboutUs />} />
-          <Route path="/builders-page" element={<BuildersListing />} />
+          <Route path="/builders-page" element={<NewBuilderListing />} />
+          <Route path="/new-builders" element={<NewBuilderListing />} />
         </Routes>
 
         {/* ChatBot rendered outside Routes but inside Context Provider */}
