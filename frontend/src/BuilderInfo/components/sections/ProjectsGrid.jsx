@@ -112,22 +112,27 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
   const { addToCart, removeFromCart, isInCart } = useCart();
 
   useEffect(() => {
+    let cancelled = false;
+
     const load = async () => {
       if (!builderId) return;
       try {
         setLoading(true);
-        // Fetch all projects; classify client-side using Project_Status / property_status / status
         const data = await fetchBuilderProjects(builderId);
-        setProjects(Array.isArray(data) ? data : []);
-        setError(null);
-      } catch (e) {
-        setError('No projects here');
+        if (!cancelled) {
+          setProjects(Array.isArray(data) ? data : []);
+          setError(null);
+        }
+      } catch {
+        if (!cancelled) setError('No projects here');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
+
     load();
-  }, [builderId, statusFilter]);
+    return () => { cancelled = true; };
+  }, [builderId]);
 
   const handleHeartClick = (project) => {
     const property = getPrimaryProperty(project);
@@ -224,8 +229,8 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
             <div className="text-sm text-red-600">{error}</div>
           )}
           {!loading && !error && filteredProjects.map((p) => {
-            const image = pickProjectImage(p, property);
             const property = getPrimaryProperty(p);
+            const image = pickProjectImage(p, property);
             const propertyId = getProjectPropertyId(p);
             return (
               <div key={p.id} className="w-[240px] xs:w-[260px] sm:w-60 md:w-72 flex-shrink-0 my-1">

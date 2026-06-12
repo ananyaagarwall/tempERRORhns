@@ -4,6 +4,18 @@ import Button from "../ui/Button";
 import { useMedia } from "../../../hooks/useMedia";
 import { buildFloorPlanCatalog, unitToPlanDetails } from "../../../utils/floorPlanUtils";
 
+import roomImg1 from "../../../assets/roomimg1.jpeg";
+import roomImg3 from "../../../assets/roomimg3.jpeg";
+import roomImg8 from "../../../assets/roomimg8.avif";
+
+const DEFAULT_ROOM_IMAGES = [
+  { src: roomImg1, label: "Living Room" },
+  { src: roomImg3, label: "Bedroom" },
+  { src: roomImg8, label: "Kitchen" },
+  { src: roomImg1, label: "Master Bedroom" },
+  { src: roomImg3, label: "Bathroom" },
+];
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 /** Horizontal peek-carousel for floor plan images.
@@ -349,13 +361,6 @@ const ExistingFloorPlansSection = ({ propertyData, projectData }) => {
   const plan = activeTypeEntry
     ? { ...unitToPlanDetails(activeTypeEntry.unit, activeTypeEntry.media), img: activeTypeEntry.image }
     : null;
-
-  const roomImages = (plan?.roomDetails || [])
-    .filter((room) => room?.room_name)
-    .map((room) => ({
-      src: activeTypeEntry?.image,
-      label: room.room_name,
-    }));
 
   const handleBHKChange = (bhkLabel) => {
     const group = catalog.find((entry) => entry.bhkLabel === bhkLabel);
@@ -1083,12 +1088,10 @@ const ExistingFloorPlansSection = ({ propertyData, projectData }) => {
 
             </div>
 
-            {/* Bottom Row: Room views spanning full width of the container */}
-            {roomImages.length > 0 && (
-              <div className="fp-bottom-row">
-                <RoomCarousel images={roomImages} />
-              </div>
-            )}
+            {/* Bottom Row: Room views — static placeholder images for now */}
+            <div className="fp-bottom-row">
+              <RoomCarousel images={DEFAULT_ROOM_IMAGES} />
+            </div>
 
           </div>
         )}
