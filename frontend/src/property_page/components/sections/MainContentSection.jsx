@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, Check, MapPin, Building2, Calendar } from "lucide-react";
 import ResultsNavBar from "../layouts/ResultsNavBar";
@@ -186,6 +186,7 @@ const MainContentSection = ({ propertyData, projectData }) => {
   const [nearbyLoading, setNearbyLoading] = React.useState(false);
   const [nearbyPois, setNearbyPois] = React.useState(null);
   const [poisLoading, setPoisLoading] = React.useState(false);
+  const [highlightedPoiType, setHighlightedPoiType] = React.useState(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -328,8 +329,8 @@ const MainContentSection = ({ propertyData, projectData }) => {
                       key={index} 
                       className={`flex justify-between items-center p-3 sm:p-4 rounded-xl bg-gray-50 border border-gray-100 ${!showAllLeftOverview && index >= 3 ? 'hidden md:flex' : 'flex'}`}
                     >
-                      <span className="text-xs sm:text-sm text-gray-500 font-medium">{item.label}</span>
-                      <span className="text-sm sm:text-base font-bold text-gray-900 text-right">{item.value}</span>
+                      <span className="text-xs sm:text-sm text-gray-500 font-medium whitespace-nowrap mr-2 flex-shrink-0">{item.label}</span>
+                      <span className="text-sm sm:text-base font-bold text-gray-900 text-right line-clamp-2 break-words overflow-hidden text-ellipsis" title={item.value}>{item.value}</span>
                     </div>
                   ))}
                 </div>
@@ -341,8 +342,8 @@ const MainContentSection = ({ propertyData, projectData }) => {
                       key={index} 
                       className={`flex justify-between items-center p-3 sm:p-4 rounded-xl bg-gray-50 border border-gray-100 ${!showAllRightOverview && index >= 3 ? 'hidden md:flex' : 'flex'}`}
                     >
-                      <span className="text-xs sm:text-sm text-gray-500 font-medium">{item.label}</span>
-                      <span className="text-sm sm:text-base font-bold text-gray-900 text-right">{item.value}</span>
+                      <span className="text-xs sm:text-sm text-gray-500 font-medium whitespace-nowrap mr-2 flex-shrink-0">{item.label}</span>
+                      <span className="text-sm sm:text-base font-bold text-gray-900 text-right line-clamp-2 break-words overflow-hidden text-ellipsis" title={item.value}>{item.value}</span>
                     </div>
                   ))}
                 </div>
@@ -402,6 +403,7 @@ const MainContentSection = ({ propertyData, projectData }) => {
                   longitude={coordinates.longitude}
                   radiusM={nearbyPois?.radius_m || 2000}
                   poisByType={nearbyPois?.pois || {}}
+                  highlightedType={highlightedPoiType}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
               </div>
@@ -418,12 +420,26 @@ const MainContentSection = ({ propertyData, projectData }) => {
                     {Object.entries(nearbyPois.pois)
                       .filter(([, list]) => Array.isArray(list) && list.length)
                       .slice(0, 6)
-                      .map(([type, list]) => (
-                        <div key={type} className="bg-white/70 border border-gray-100 rounded-lg px-2 py-1.5">
-                          <div className="font-semibold text-gray-800 capitalize">{type.replace(/_/g, " ")}</div>
-                          <div className="text-gray-500">{list.length} found</div>
-                        </div>
-                      ))}
+                      .map(([type, list]) => {
+                        const isSelected = highlightedPoiType === type;
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setHighlightedPoiType(isSelected ? null : type)}
+                            className={`text-left rounded-lg px-2 py-1.5 transition-all duration-200 cursor-pointer ${
+                              isSelected
+                                ? "bg-blue-50 border-2 border-blue-400 ring-2 ring-blue-200 shadow-sm"
+                                : "bg-white/70 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40"
+                            }`}
+                          >
+                            <div className={`font-semibold capitalize ${
+                              isSelected ? "text-blue-700" : "text-gray-800"
+                            }`}>{type.replace(/_/g, " ")}</div>
+                            <div className={isSelected ? "text-blue-500" : "text-gray-500"}>{list.length} found</div>
+                          </button>
+                        );
+                      })}
                   </div>
                 ) : null}
               </div>

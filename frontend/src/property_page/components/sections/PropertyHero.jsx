@@ -275,7 +275,7 @@ const PropertyHero = ({ propertyData, projectData }) => {
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-lg font-bold text-gray-900">{areaLabel}</p>
+                <p className="text-lg font-normal text-gray-900">{areaLabel}</p>
               </div>
             </div>
 
@@ -292,7 +292,7 @@ const PropertyHero = ({ propertyData, projectData }) => {
                 </div>
               </div>
               <div className="space-y-1">
-                <p className="text-lg font-bold text-gray-900">{propertyPrice}</p>
+                <p className="text-lg font-normal text-gray-900">{propertyPrice}</p>
                 {projectData?.price_per_sqft ? (
                   <p className="text-sm text-gray-600">Rs. {projectData.price_per_sqft}/sq.ft.</p>
                 ) : null}
