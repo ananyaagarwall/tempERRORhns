@@ -1,10 +1,10 @@
-import API_BASE_URL from '../../../config';
 import React, { useState, useRef, useEffect } from 'react';
 import { Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import { fetchBuilderProjects } from '../../../services/api';
 import { buildPropertyPath } from '../../../utils/entityRouting';
+import { pickProjectImage } from '../../../utils/projectImageUtils';
 
 const firstText = (...values) => {
   for (const value of values) {
@@ -101,45 +101,6 @@ const ProjectCard = ({ status = 'Ready-to-move', title, image, project, onHeartC
   );
 };
 
-const withBackendOrigin = (path) => {
-  if (!path) return '';
-  if (path.startsWith('http')) return path;
-  return `${API_BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
-};
-
-const normalizeUrl = (url) => {
-  if (!url) return '';
-  if (url.startsWith('http')) return url;
-  if (url.startsWith('/uploads/')) return withBackendOrigin(url);
-  return withBackendOrigin(`/uploads/${url}`);
-};
-
-const looksLikeUrl = (val) => {
-  if (!val || typeof val !== 'string') return false;
-  const s = val.trim().toLowerCase();
-  return s.startsWith('http') || s.startsWith('/uploads/') || s.includes('.') || s.includes('/');
-};
-
-const pickProjectImage = (project) => {
-  const propertyImage = getPrimaryProperty(project)?.builder_project_image;
-  if (propertyImage) return normalizeUrl(propertyImage);
-  if (project.project_image) return normalizeUrl(project.project_image);
-  if (project.image_urls) {
-    try {
-      const parsed = typeof project.image_urls === 'string' && project.image_urls.trim().startsWith('[')
-        ? JSON.parse(project.image_urls)
-        : project.image_urls.split(',');
-      const first = Array.isArray(parsed) ? parsed[0] : null;
-      if (first && looksLikeUrl(String(first))) return normalizeUrl(String(first).trim());
-    } catch { }
-  }
-  if (Array.isArray(project.floor_plans) && project.floor_plans.length > 0) {
-    const firstPlan = String(project.floor_plans[0]);
-    if (looksLikeUrl(firstPlan)) return normalizeUrl(firstPlan);
-  }
-  return '/building.webp';
-};
-
 const ProjectsGrid = ({ title, builderId, statusFilter }) => {
   const sliderRef = useRef(null);
   const navigate = useNavigate();
@@ -155,19 +116,12 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
       if (!builderId) return;
       try {
         setLoading(true);
-        let statusParam = '';
-        if (statusFilter) {
-          if (Array.isArray(statusFilter) && statusFilter.length > 0) {
-            statusParam = statusFilter[0];
-          } else if (typeof statusFilter === 'string') {
-            statusParam = statusFilter;
-          }
-        }
-        const data = await fetchBuilderProjects(builderId, statusParam);
+        // Fetch all projects; classify client-side using Project_Status / property_status / status
+        const data = await fetchBuilderProjects(builderId);
         setProjects(Array.isArray(data) ? data : []);
         setError(null);
       } catch (e) {
-        setError('Failed to load projects');
+        setError('No projects here');
       } finally {
         setLoading(false);
       }
@@ -183,7 +137,7 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
       name: property.Property_Name || project.title,
       price: property.Price_Starting_From || property.Pricing || project.price_range || 'Contact for Price',
       location: property.Location || project.location || 'Location not specified',
-      image: pickProjectImage(project),
+      image: pickProjectImage(project, property),
       availability: property.Project_Status || project.property_status || project.status || 'Available',
       bhk: property.Existing_Configurations || project.configuration || 'N/A',
       area: property.Carpet_Area || formatCarpetArea(project, property) || 'N/A',
@@ -270,7 +224,7 @@ const ProjectsGrid = ({ title, builderId, statusFilter }) => {
             <div className="text-sm text-red-600">{error}</div>
           )}
           {!loading && !error && filteredProjects.map((p) => {
-            const image = pickProjectImage(p);
+            const image = pickProjectImage(p, property);
             const property = getPrimaryProperty(p);
             const propertyId = getProjectPropertyId(p);
             return (

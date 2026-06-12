@@ -39,10 +39,15 @@ const PropertyHero = ({ propertyData, projectData }) => {
 
   // Media API — provides DB-persisted gallery images.
   // Falls back gracefully to raw project fields while the media table is empty.
+  // Use projectData.id (builder_project PK) as the canonical entity_id.
+  // Fall back to propertyData.project_id when the project fetch itself failed
+  // so the media lookup still works even in that degraded state.
+  // entity_id in media table = builder_project.id = property.project_id
+  const projectEntityId = propertyData?.project_id ?? projectData?.id ?? null;
   const { urls: mediaUrls } = useMedia(
     'project',
-    projectData?.id ?? null,
-    'gallery',  // gallery only — floor plans shown in ExistingFloorPlansSection
+    projectEntityId,
+    'gallery',
   );
 
   const configLabels = Array.from(
@@ -84,7 +89,10 @@ const PropertyHero = ({ propertyData, projectData }) => {
   ]
     .map(normalizeImageUrl)
     .filter(Boolean);
-  const merged = [...mediaUrls, ...rawFallback];
+  const merged = [
+    ...mediaUrls.map(normalizeImageUrl).filter(Boolean),
+    ...rawFallback,
+  ];
   const dedupedImages = [...new Set(merged)];
   const sliderImages = dedupedImages.length > 0 ? dedupedImages : [propertyHero];
   const slideCount = sliderImages.length;

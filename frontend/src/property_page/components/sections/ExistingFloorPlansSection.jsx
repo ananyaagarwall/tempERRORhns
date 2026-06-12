@@ -1,108 +1,8 @@
-import React, { useRef, useState, useCallback, useEffect } from "react";
+import React, { useRef, useState, useCallback, useEffect, useMemo } from "react";
 import { Check, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import Button from "../ui/Button";
 import { useMedia } from "../../../hooks/useMedia";
-
-import floorPlan2BHK from "../../../assets/floor-plan-2bhk.jpg";
-import floorPlan3BHK from "../../../assets/floor-plan-3bhk.jpg";
-import floorPlan4BHK from "../../../assets/floor-plan-4bhk.jpg";
-import roomImg1 from "../../../assets/roomimg1.jpeg";
-import roomImg3 from "../../../assets/roomimg3.jpeg";
-import roomImg8 from "../../../assets/roomimg8.avif";
-
-// ─── Data ────────────────────────────────────────────────────────────────────
-
-const floorPlanDetails = {
-  "2bhk": {
-    "type-i": {
-      title: "2 BHK – Type I",
-      builtUpArea: "850 sq. ft (79.0 m²)",
-      ceilingHeight: "2.7 – 2.8 m (approx. 9.0 ft)",
-      mainDoorFacing: "East",
-      modularKitchen: "Compact Open Kitchen",
-      img: floorPlan2BHK,
-    },
-    "type-ii": {
-      title: "2 BHK – Type II",
-      builtUpArea: "950 sq. ft (88.3 m²)",
-      ceilingHeight: "2.8 – 2.9 m (approx. 9.2 ft)",
-      mainDoorFacing: "North / North-East",
-      modularKitchen: "With Sitting Area",
-      img: floorPlan2BHK,
-    },
-    "type-iii": {
-      title: "2 BHK – Type III",
-      builtUpArea: "1,050 sq. ft (97.5 m²)",
-      ceilingHeight: "2.9 m (approx. 9.5 ft)",
-      mainDoorFacing: "West",
-      modularKitchen: "Extended Kitchen with Utility",
-      img: floorPlan2BHK,
-    },
-  },
-  "3bhk": {
-    "type-i": {
-      title: "3 BHK – Type I",
-      builtUpArea: "1,200 sq. ft (111.5 m²)",
-      ceilingHeight: "2.9 – 3.0 m (approx. 9.5 ft)",
-      mainDoorFacing: "East / North-East",
-      modularKitchen: "With Sitting Area",
-      img: floorPlan3BHK,
-    },
-    "type-ii": {
-      title: "3 BHK – Type II",
-      builtUpArea: "1,350 sq. ft (125.4 m²)",
-      ceilingHeight: "3.0 m (approx. 9.8 ft)",
-      mainDoorFacing: "South / South-East",
-      modularKitchen: "Large Island Kitchen",
-      img: floorPlan3BHK,
-    },
-    "type-iii": {
-      title: "3 BHK – Type III (Corner)",
-      builtUpArea: "1,450 sq. ft (134.7 m²)",
-      ceilingHeight: "3.0 – 3.1 m (approx. 10.0 ft)",
-      mainDoorFacing: "North-West (Corner Unit)",
-      modularKitchen: "Extended with Breakfast Counter",
-      img: floorPlan3BHK,
-    },
-  },
-  "4bhk": {
-    "type-i": {
-      title: "4 BHK – Type I",
-      builtUpArea: "1,580 sq. ft (146.8 m²)",
-      ceilingHeight: "3.0 – 3.1 m (approx. 9.8 ft)",
-      mainDoorFacing: "South-East / South",
-      modularKitchen: "With Sitting Area",
-      img: floorPlan4BHK,
-    },
-    "type-ii": {
-      title: "4 BHK – Type II (Premium)",
-      builtUpArea: "1,780 sq. ft (165.4 m²)",
-      ceilingHeight: "3.1 – 3.2 m (approx. 10.2 ft)",
-      mainDoorFacing: "East / North-East",
-      modularKitchen: "Chef's Kitchen with Island",
-      img: floorPlan4BHK,
-    },
-    "type-iii": {
-      title: "4 BHK – Type III (Penthouse)",
-      builtUpArea: "2,100 sq. ft (195.1 m²)",
-      ceilingHeight: "3.3 – 3.5 m (approx. 11.0 ft)",
-      mainDoorFacing: "All-Round View (Top Floor)",
-      modularKitchen: "Open Plan Kitchen with Bar",
-      img: floorPlan4BHK,
-    },
-  },
-};
-
-const BHK_LABELS = { "2bhk": "2 BHK", "3bhk": "3 BHK", "4bhk": "4 BHK" };
-const TYPE_LABELS  = { "type-i": "Type I", "type-ii": "Type II", "type-iii": "Type III" };
-
-const DEFAULT_ROOM_IMAGES = [
-  { src: roomImg1, label: "Living Room" },
-  { src: roomImg3, label: "Bedroom" },
-  { src: roomImg8, label: "Kitchen" },
-  { src: roomImg1, label: "Master Bedroom" },
-  { src: roomImg3, label: "Bathroom" },
-];
+import { buildFloorPlanCatalog, unitToPlanDetails } from "../../../utils/floorPlanUtils";
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -301,14 +201,14 @@ function RoomCarousel({ images }) {
 }
 
 /** Collapsible/expandable details panel. */
-function DetailsPanel({ plan, activeBHK, activeType, onTypeChange, collapsed, onToggle }) {
+function DetailsPanel({ plan, activeBhkLabel, typeOptions, activeTypeKey, onTypeChange, collapsed, onToggle }) {
   return (
     <div className={`fp-details-panel ${collapsed ? "fp-details-panel--collapsed" : "fp-details-panel--expanded"}`}>
       {/* Header with toggle */}
       <div className="fp-details-header">
         <div className="fp-details-title-group">
           <h3 className="fp-details-title">
-            {collapsed ? BHK_LABELS[activeBHK] : plan.title}
+            {collapsed ? activeBhkLabel : plan.title}
           </h3>
           {!collapsed && <div className="fp-details-accent" />}
         </div>
@@ -327,39 +227,41 @@ function DetailsPanel({ plan, activeBHK, activeType, onTypeChange, collapsed, on
       <div className={`fp-details-body${collapsed ? " fp-details-body--hidden" : ""}`}>
         {/* Unified Premium Type Switcher placed cleanly inside the panel */}
         <div className="fp-type-container">
-          {Object.keys(floorPlanDetails[activeBHK]).map((type) => (
+          {typeOptions.map((type) => (
             <button
-              key={type}
-              onClick={() => onTypeChange(type)}
-              className={`fp-type-tab${activeType === type ? " fp-type-tab--active" : ""}`}
+              key={type.typeKey}
+              onClick={() => onTypeChange(type.typeKey)}
+              className={`fp-type-tab${activeTypeKey === type.typeKey ? " fp-type-tab--active" : ""}`}
             >
-              {TYPE_LABELS[type]}
+              {type.typeLabel}
             </button>
           ))}
         </div>
 
-        {/* Compact Spec Grid */}
+        {/* Compact Spec Grid — null when unit_config has no matching row */}
         <div className="fp-spec-grid">
           <div className="fp-detail-row">
             <span className="fp-detail-label">Built-up Area</span>
-            <span className="fp-detail-value">{plan.builtUpArea}</span>
+            <span className="fp-detail-value">{plan.builtUpArea ?? ''}</span>
           </div>
           <div className="fp-detail-row">
             <span className="fp-detail-label">Ceiling Height</span>
-            <span className="fp-detail-value">{plan.ceilingHeight}</span>
+            <span className="fp-detail-value">{plan.ceilingHeight ?? ''}</span>
           </div>
           <div className="fp-detail-row">
             <span className="fp-detail-label">Main Door Facing</span>
-            <span className="fp-detail-value">{plan.mainDoorFacing}</span>
+            <span className="fp-detail-value">{plan.mainDoorFacing ?? ''}</span>
           </div>
           <div className="fp-detail-row fp-detail-row--kitchen">
             <div>
               <span className="fp-detail-label">Modular Kitchen</span>
-              <span className="fp-detail-value">{plan.modularKitchen}</span>
+              <span className="fp-detail-value">{plan.modularKitchen ?? ''}</span>
             </div>
-            <div className="fp-check-badge">
-              <Check size={12} />
-            </div>
+            {plan.modularKitchen && (
+              <div className="fp-check-badge">
+                <Check size={12} />
+              </div>
+            )}
           </div>
         </div>
 
@@ -371,16 +273,20 @@ function DetailsPanel({ plan, activeBHK, activeType, onTypeChange, collapsed, on
       </div>
 
       {/* Highly polished, compact collapsed summary badges */}
-      {collapsed && (
+      {collapsed && (plan.builtUpArea || plan.mainDoorFacing) && (
         <div className="fp-details-summary">
-          <div className="fp-summary-badge">
-            <span className="fp-summary-label">Area</span>
-            <span className="fp-summary-val">{plan.builtUpArea.split(" ")[0]} sqft</span>
-          </div>
-          <div className="fp-summary-badge">
-            <span className="fp-summary-label">Facing</span>
-            <span className="fp-summary-val">{plan.mainDoorFacing}</span>
-          </div>
+          {plan.builtUpArea && (
+            <div className="fp-summary-badge">
+              <span className="fp-summary-label">Area</span>
+              <span className="fp-summary-val">{plan.builtUpArea.split(" ")[0]} sqft</span>
+            </div>
+          )}
+          {plan.mainDoorFacing && (
+            <div className="fp-summary-badge">
+              <span className="fp-summary-label">Facing</span>
+              <span className="fp-summary-val">{plan.mainDoorFacing}</span>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -389,14 +295,44 @@ function DetailsPanel({ plan, activeBHK, activeType, onTypeChange, collapsed, on
 
 // ─── Main section ─────────────────────────────────────────────────────────────
 
-const ExistingFloorPlansSection = ({ projectData }) => {
-  const [activeBHK,  setActiveBHK]  = useState("3bhk");
-  const [activeType, setActiveType] = useState("type-i");
-  const [slideIdx,   setSlideIdx]   = useState(0);
-  const [collapsed,  setCollapsed]  = useState(false);
+const ExistingFloorPlansSection = ({ propertyData, projectData }) => {
+  const [activeBhkLabel, setActiveBhkLabel] = useState("");
+  const [activeTypeKey, setActiveTypeKey] = useState("");
+  const [slideIdx, setSlideIdx] = useState(0);
+  const [collapsed, setCollapsed] = useState(false);
   const [zoomedImage, setZoomedImage] = useState(null);
 
   const dialogRef = useRef(null);
+  const projectEntityId = propertyData?.project_id ?? projectData?.id ?? null;
+
+  const { media: floorPlanMedia, loading: mediaLoading } = useMedia(
+    "project",
+    projectEntityId,
+    "floor_plan",
+  );
+
+  const catalog = useMemo(
+    () => buildFloorPlanCatalog(projectData?.unit_configs || [], floorPlanMedia),
+    [projectData?.unit_configs, floorPlanMedia],
+  );
+
+  const activeGroup = catalog.find((group) => group.bhkLabel === activeBhkLabel) || catalog[0] || null;
+  const typeOptions = activeGroup?.types || [];
+  const activeTypeEntry = typeOptions.find((entry) => entry.typeKey === activeTypeKey) || typeOptions[0] || null;
+
+  useEffect(() => {
+    if (!catalog.length) return;
+    if (!catalog.some((group) => group.bhkLabel === activeBhkLabel)) {
+      setActiveBhkLabel(catalog[0].bhkLabel);
+      setActiveTypeKey(catalog[0].types[0]?.typeKey || "");
+      setSlideIdx(0);
+      return;
+    }
+    if (!typeOptions.some((entry) => entry.typeKey === activeTypeKey)) {
+      setActiveTypeKey(typeOptions[0]?.typeKey || "");
+      setSlideIdx(0);
+    }
+  }, [catalog, activeBhkLabel, activeTypeKey, typeOptions]);
 
   useEffect(() => {
     if (zoomedImage && dialogRef.current) {
@@ -404,74 +340,46 @@ const ExistingFloorPlansSection = ({ projectData }) => {
     }
   }, [zoomedImage]);
 
-  // Media from DB
-  const { urls: floorPlanUrls, loading: mediaLoading } = useMedia(
-    "project",
-    projectData?.id ?? null,
-    "floor_plan"
-  );
-  const hasMediaPlans = floorPlanUrls.length > 0;
+  const slides = typeOptions.map((entry) => ({
+    src: entry.image,
+    label: entry.label,
+    typeKey: entry.typeKey,
+  }));
 
-  // Group the dynamic floor plan URLs by BHK type
-  const dynamicBHKGroups = {
-    "2bhk": [],
-    "3bhk": [],
-    "4bhk": []
-  };
+  const plan = activeTypeEntry
+    ? { ...unitToPlanDetails(activeTypeEntry.unit, activeTypeEntry.media), img: activeTypeEntry.image }
+    : null;
 
-  if (hasMediaPlans) {
-    floorPlanUrls.forEach((url, index) => {
-      const urlLower = url.toLowerCase();
-      if (urlLower.includes("2bhk") || urlLower.includes("2-bhk") || urlLower.includes("2_bhk") || urlLower.includes("2 bhk")) {
-        dynamicBHKGroups["2bhk"].push({ src: url, label: `2 BHK Plan ${dynamicBHKGroups["2bhk"].length + 1}` });
-      } else if (urlLower.includes("3bhk") || urlLower.includes("3-bhk") || urlLower.includes("3_bhk") || urlLower.includes("3 bhk")) {
-        dynamicBHKGroups["3bhk"].push({ src: url, label: `3 BHK Plan ${dynamicBHKGroups["3bhk"].length + 1}` });
-      } else if (urlLower.includes("4bhk") || urlLower.includes("4-bhk") || urlLower.includes("4_bhk") || urlLower.includes("4 bhk")) {
-        dynamicBHKGroups["4bhk"].push({ src: url, label: `4 BHK Plan ${dynamicBHKGroups["4bhk"].length + 1}` });
-      } else {
-        // Fallback distribution by index
-        const bhkKeys = ["2bhk", "3bhk", "4bhk"];
-        const targetBhk = bhkKeys[index % 3];
-        dynamicBHKGroups[targetBhk].push({ src: url, label: `${BHK_LABELS[targetBhk]} Plan ${dynamicBHKGroups[targetBhk].length + 1}` });
-      }
-    });
-  }
+  const roomImages = (plan?.roomDetails || [])
+    .filter((room) => room?.room_name)
+    .map((room) => ({
+      src: activeTypeEntry?.image,
+      label: room.room_name,
+    }));
 
-  // Build slides for active BHK
-  const activeBhkDynamicSlides = hasMediaPlans ? dynamicBHKGroups[activeBHK] : [];
-  const slides = activeBhkDynamicSlides.length > 0
-    ? activeBhkDynamicSlides
-    : Object.entries(floorPlanDetails[activeBHK]).map(([key, val]) => ({
-        src: val.img,
-        label: TYPE_LABELS[key],
-      }));
-
-  const handleBHKChange = (bhk) => {
-    setActiveBHK(bhk);
-    setActiveType("type-i");
+  const handleBHKChange = (bhkLabel) => {
+    const group = catalog.find((entry) => entry.bhkLabel === bhkLabel);
+    setActiveBhkLabel(bhkLabel);
+    setActiveTypeKey(group?.types[0]?.typeKey || "");
     setSlideIdx(0);
   };
 
   const handleSlideChange = (idx) => {
     setSlideIdx(idx);
-    // Sync type selector to the visible slide (static mode or dynamic mode)
-    const typeKeys = Object.keys(floorPlanDetails[activeBHK]);
-    if (typeKeys[idx]) {
-      setActiveType(typeKeys[idx]);
+    if (typeOptions[idx]) {
+      setActiveTypeKey(typeOptions[idx].typeKey);
     }
   };
 
-  const handleTypeChange = (type) => {
-    setActiveType(type);
-    const idx = Object.keys(floorPlanDetails[activeBHK]).indexOf(type);
-    if (idx >= 0) {
-      // Limit selection index to available slides
-      const maxIdx = slides.length - 1;
-      setSlideIdx(Math.min(idx, maxIdx));
-    }
+  const handleTypeChange = (typeKey) => {
+    setActiveTypeKey(typeKey);
+    const idx = typeOptions.findIndex((entry) => entry.typeKey === typeKey);
+    if (idx >= 0) setSlideIdx(idx);
   };
 
-  const plan = floorPlanDetails[activeBHK][activeType];
+  if (!mediaLoading && catalog.length === 0) {
+    return null;
+  }
 
   return (
     <>
@@ -1129,13 +1037,13 @@ const ExistingFloorPlansSection = ({ projectData }) => {
 
         {/* ── BHK Tabs – Left aligned premium pill container ── */}
         <div className="fp-bhk-container">
-          {Object.keys(floorPlanDetails).map((bhk) => (
+          {catalog.map((group) => (
             <button
-              key={bhk}
-              onClick={() => handleBHKChange(bhk)}
-              className={`fp-bhk-tab${activeBHK === bhk ? " fp-bhk-tab--active" : ""}`}
+              key={group.bhkLabel}
+              onClick={() => handleBHKChange(group.bhkLabel)}
+              className={`fp-bhk-tab${activeBhkLabel === group.bhkLabel ? " fp-bhk-tab--active" : ""}`}
             >
-              {BHK_LABELS[bhk]}
+              {group.bhkLabel}
             </button>
           ))}
         </div>
@@ -1144,7 +1052,7 @@ const ExistingFloorPlansSection = ({ projectData }) => {
         {mediaLoading && <div className="fp-skeleton" />}
 
         {/* ── Main layout ── */}
-        {!mediaLoading && (
+        {!mediaLoading && plan && slides.length > 0 && (
           <div className="fp-main-content">
             
             {/* Top row: Floor plans and details panel */}
@@ -1164,8 +1072,9 @@ const ExistingFloorPlansSection = ({ projectData }) => {
               <div className="fp-right">
                 <DetailsPanel
                   plan={plan}
-                  activeBHK={activeBHK}
-                  activeType={activeType}
+                  activeBhkLabel={activeBhkLabel}
+                  typeOptions={typeOptions}
+                  activeTypeKey={activeTypeKey}
                   onTypeChange={handleTypeChange}
                   collapsed={collapsed}
                   onToggle={() => setCollapsed((c) => !c)}
@@ -1175,9 +1084,11 @@ const ExistingFloorPlansSection = ({ projectData }) => {
             </div>
 
             {/* Bottom Row: Room views spanning full width of the container */}
-            <div className="fp-bottom-row">
-              <RoomCarousel images={DEFAULT_ROOM_IMAGES} />
-            </div>
+            {roomImages.length > 0 && (
+              <div className="fp-bottom-row">
+                <RoomCarousel images={roomImages} />
+              </div>
+            )}
 
           </div>
         )}
