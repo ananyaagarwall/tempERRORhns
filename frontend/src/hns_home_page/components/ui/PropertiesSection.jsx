@@ -90,7 +90,7 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
         const mapped = Array.isArray(data) ? data.map(p => ({
           id: p._id || p.id || '',
           name: p.Property_Name || '',
-          address: p.Address || p.Location || '',
+          address: p.Location || p.Address || '',
           price: p.Price_Starting_From || p.Pricing || '',
           confidence: p.confidence || '',
           img: p.image || p.builder_project_image || '/Presidential Towers.jpg.png',

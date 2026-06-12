@@ -129,13 +129,17 @@ function BuilderInfoIndex() {
           </div>
 
           <div className="builder-section projects-grid-section">
-            <ProjectsGrid title="Our popular projects" builderId={builder?.rera_id} />
+            <ProjectsGrid
+              title="Our popular projects"
+              builderId={builder?.id}
+              statusFilter={['popular', 'featured', 'best seller', 'top']}
+            />
           </div>
 
           <div className="builder-section projects-grid-section">
             <ProjectsGrid
               title="Our ongoing Projects"
-              builderId={builder?.rera_id}
+              builderId={builder?.id}
               statusFilter={['under construction', 'ongoing', 'in progress']}
             />
           </div>
@@ -143,7 +147,7 @@ function BuilderInfoIndex() {
           <div className="builder-section projects-grid-section">
             <ProjectsGrid
               title="Our completed Projects"
-              builderId={builder?.rera_id}
+              builderId={builder?.id}
               statusFilter={['completed', 'ready-to-move', 'ready to move']}
             />
           </div>
@@ -151,7 +155,7 @@ function BuilderInfoIndex() {
           <div className="builder-section projects-grid-section">
             <ProjectsGrid
               title="Our upcoming Projects"
-              builderId={builder?.rera_id}
+              builderId={builder?.id}
               statusFilter={['upcoming', 'pre-launch', 'pre launch']}
             />
           </div>
@@ -161,7 +165,7 @@ function BuilderInfoIndex() {
           </div>
 
           <div className="builder-section floor-plans-section">
-            <FloorPlansSection />
+            <FloorPlansSection builder={builder} />
           </div>
 
           <div className="builder-section search-filter-section">

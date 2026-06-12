@@ -125,11 +125,8 @@ class Property(db.Model):
             if not builder_project_image and self.project.project_image:
                 builder_project_image = self.project.project_image
                 
-            # Add some basic validation for image URLs
             if builder_project_image:
-                # Check if it's a valid URL format
-                if not (builder_project_image.startswith('http://') or builder_project_image.startswith('https://')):
-                    builder_project_image = None
+                builder_project_image = str(builder_project_image).strip() or None
         
         return {
             'id': self.id,
@@ -200,7 +197,6 @@ class Review(db.Model):
 
 class Builder(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    rera_id = db.Column(db.String(50), unique=True, nullable=True)  # builder's own RERA reg number, not PK
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     company_name = db.Column(db.String(100), nullable=False)
     brand_name = db.Column(db.String(100))
@@ -231,7 +227,6 @@ class Builder(db.Model):
     def to_dict(self):
         return {
             'id': self.id,
-            'rera_id': self.rera_id,
             'user_id': self.user_id,
             'company_name': self.company_name,
             'brand_name': self.brand_name,

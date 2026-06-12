@@ -903,7 +903,7 @@ def _sync_project_amenities(project, payload=None, related_properties=None, repl
 def _sync_project_scalar_fields(project, payload=None, related_properties=None):
     payload = payload or {}
     related_properties = list(related_properties or [])
-    builder = Builder.query.filter_by(rera_id=project.builder_id).first() if project.builder_id else None
+    builder = Builder.query.get(project.builder_id) if project.builder_id else None
     primary_property = related_properties[0] if related_properties else None
 
     if not project.builder_name and builder:
@@ -1653,7 +1653,7 @@ def search_builders_by_query():
         from sqlalchemy import or_
         # Direct ILIKE match on builder fields + project titles via JOIN
         matched = Builder.query.outerjoin(
-            BuilderProject, BuilderProject.builder_id == Builder.rera_id
+            BuilderProject, BuilderProject.builder_id == Builder.id
         ).filter(
             or_(
                 Builder.company_name.ilike(f'%{q}%'),
@@ -1668,14 +1668,14 @@ def search_builders_by_query():
         # pg_trgm fuzzy fallback if no results
         if not matched and db.engine.dialect.name == 'postgresql':
             fuzzy_ids = db.session.execute(text("""
-                SELECT DISTINCT b.rera_id FROM builder b
-                LEFT JOIN builder_project bp ON bp.builder_id = b.rera_id
+                SELECT DISTINCT b.id FROM builder b
+                LEFT JOIN builder_project bp ON bp.builder_id = b.id
                 WHERE b.company_name % :q OR b.brand_name % :q
                    OR b.city % :q OR bp.title % :q
             """), {'q': q}).fetchall()
             ids = [r[0] for r in fuzzy_ids]
             if ids:
-                matched = Builder.query.filter(Builder.rera_id.in_(ids)).all()
+                matched = Builder.query.filter(Builder.id.in_(ids)).all()
 
         return jsonify([b.to_dict() for b in matched])
     except Exception as e:
@@ -1829,10 +1829,10 @@ def get_search_suggestions():
 
 
 
-@app.route('/api/builders/<rera_id>', methods=['GET'])
-def get_builder(rera_id):
+@app.route('/api/builders/<int:builder_id>', methods=['GET'])
+def get_builder(builder_id):
     try:
-        builder = Builder.query.get_or_404(rera_id)
+        builder = Builder.query.get_or_404(builder_id)
         return jsonify(builder.to_dict())
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1841,56 +1841,46 @@ def get_builder(rera_id):
 @admin_only
 def create_builder():
     try:
-        # Get user_id and rera_id from form data
         user_id = request.form.get('user_id')
-        rera_id = request.form.get('reraId')
-        
         if not user_id:
             return jsonify({'message': 'User ID is required'}), 400
-        if not rera_id:
-            return jsonify({'message': 'RERA ID is required'}), 400
 
-        # Check if builder with this RERA ID already exists
-        existing_builder = Builder.query.filter_by(rera_id=rera_id).first()
-        if existing_builder:
-            return jsonify({'message': 'Builder with this RERA ID already exists'}), 400
-
-        # Get the user to check if they are admin
         user = User.query.get(user_id)
         if not user:
             return jsonify({'message': 'User not found'}), 404
 
-        # Handle file uploads
+        # Check duplicate by company name
+        company_name = request.form.get('companyName', '').strip()
+        if company_name and Builder.query.filter(Builder.company_name.ilike(company_name)).first():
+            return jsonify({'message': 'Builder with this company name already exists'}), 400
+
+        # Handle file uploads — use a temp prefix until id is known
         builder_logo = request.files.get('builderLogo')
         cover_banner = request.files.get('coverBanner')
         certificates = request.files.getlist('certificates')
-    
-        # Save builder logo
+
         logo_path = None
         if builder_logo and allowed_file(builder_logo.filename):
-            filename = secure_filename(f"logo_{rera_id}_{builder_logo.filename}")
+            filename = secure_filename(f"logo_{builder_logo.filename}")
             logo_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             builder_logo.save(logo_path)
 
-        # Save cover banner
         banner_path = None
         if cover_banner and allowed_file(cover_banner.filename):
-            filename = secure_filename(f"banner_{rera_id}_{cover_banner.filename}")
+            filename = secure_filename(f"banner_{cover_banner.filename}")
             banner_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             cover_banner.save(banner_path)
 
-        # Save certificates
         certificate_paths = []
         for cert in certificates:
             if cert and allowed_file(cert.filename):
-                filename = secure_filename(f"cert_{rera_id}_{cert.filename}")
+                filename = secure_filename(f"cert_{cert.filename}")
                 cert_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 cert.save(cert_path)
                 certificate_paths.append(cert_path)
 
         # Create new builder
         new_builder = Builder(
-            rera_id=rera_id,
             user_id=user_id,
             company_name=request.form.get('companyName'),
             brand_name=request.form.get('brandName'),
@@ -1929,10 +1919,10 @@ def create_builder():
         print(f"Error creating builder: {str(e)}")
         return jsonify({'message': f'Error creating builder profile: {str(e)}'}), 500
 
-@app.route('/api/builders/<rera_id>', methods=['PUT'])
-def update_builder(rera_id):
+@app.route('/api/builders/<int:builder_id>', methods=['PUT'])
+def update_builder(builder_id):
     try:
-        builder = Builder.query.get_or_404(rera_id)
+        builder = Builder.query.get_or_404(builder_id)
         data = request.get_json()
 
         # Update builder fields
@@ -1950,10 +1940,10 @@ def update_builder(rera_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/builders/<rera_id>', methods=['DELETE'])
-def delete_builder(rera_id):
+@app.route('/api/builders/<int:builder_id>', methods=['DELETE'])
+def delete_builder(builder_id):
     try:
-        builder = Builder.query.get_or_404(rera_id)
+        builder = Builder.query.get_or_404(builder_id)
         db.session.delete(builder)
         db.session.commit()
         return jsonify({'message': 'Builder deleted successfully'})
@@ -1961,11 +1951,11 @@ def delete_builder(rera_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/builders/<rera_id>/projects', methods=['GET'])
-def get_builder_projects(rera_id):
+@app.route('/api/builders/<int:builder_id>/projects', methods=['GET'])
+def get_builder_projects(builder_id):
     try:
         status = request.args.get('status')
-        query = BuilderProject.query.filter_by(builder_id=rera_id)
+        query = BuilderProject.query.filter_by(builder_id=builder_id)
         if status:
             # Allow partial, case-insensitive match for status
             query = query.filter(BuilderProject.status.ilike(f"%{status}%"))
@@ -2036,18 +2026,18 @@ def _create_property_for_project(project, user_id, data):
     
 
 #-----------------STEP 1 ROUTING FETCHING DETAILS FROM FRONTEND AND PUSHING TO DATABASE------------------------
-@app.route('/api/builders/<rera_id>/projects/step1', methods=['POST'])
+@app.route('/api/builders/<int:builder_id>/projects/step1', methods=['POST'])
 @admin_only
-def create_project_step1(rera_id):
+def create_project_step1(builder_id):
     data = request.json
     title = data['title']
     location = data['location']
     builder_name = data.get('builder_name')
     if not builder_name:
-        builder = Builder.query.filter_by(rera_id=rera_id).first()
+        builder = Builder.query.get(builder_id)
         builder_name = builder.company_name if builder else None
     new_project = BuilderProject(
-        builder_id=rera_id,
+        builder_id=builder_id,
         builder_name=builder_name,
         title=title,
         description=data.get('description'),
@@ -2090,14 +2080,14 @@ def create_project_step1(rera_id):
     db.session.commit()
     return jsonify(new_project.to_dict()), 201
 
-@app.route('/api/builders/<rera_id>/projects/step2', methods=['POST'])
+@app.route('/api/builders/<int:builder_id>/projects/step2', methods=['POST'])
 @admin_only
-def create_project_step2(rera_id):
+def create_project_step2(builder_id):
     data = request.json
     project_id = data.get('project_id')
     if not project_id:
         return jsonify({'error': 'project_id is required'}), 400
-    project = BuilderProject.query.filter_by(id=project_id, builder_id=rera_id).first_or_404()
+    project = BuilderProject.query.filter_by(id=project_id, builder_id=builder_id).first_or_404()
     # Update fields for step 2
     project.total_units = data.get('totalUnits')
     project.price_range = f"{data.get('priceMin', '')} - {data.get('priceMax', '')}"
@@ -2116,9 +2106,9 @@ def create_project_step2(rera_id):
     db.session.commit()
     return jsonify(project.to_dict()), 200
 
-@app.route('/api/builders/<rera_id>/projects/step4', methods=['POST'])
+@app.route('/api/builders/<int:builder_id>/projects/step4', methods=['POST'])
 @admin_only
-def create_project_step4(rera_id):
+def create_project_step4(builder_id):
     # Handle both form data and JSON data
     if request.content_type and 'multipart/form-data' in request.content_type:
         data = request.form
@@ -2152,9 +2142,9 @@ def create_project_step4(rera_id):
     db.session.commit()
     return jsonify(project.to_dict()), 200
 
-@app.route('/api/builders/<rera_id>/projects/step5', methods=['POST'])
+@app.route('/api/builders/<int:builder_id>/projects/step5', methods=['POST'])
 @admin_only
-def create_project_step5(rera_id):
+def create_project_step5(builder_id):
     data = request.json
     project_id = data.get('project_id')
     user_id = data.get('user_id')
@@ -2228,11 +2218,11 @@ def generate_slug_with_perplexity(project, api_key):
         # Fallback to slugify
         return slugify(f"{project.title}-{project.locality}-{project.city}")
 
-@app.route('/api/builders/<rera_id>/projects/<int:project_id>', methods=['PATCH'])
-def update_project_step(rera_id, project_id):
+@app.route('/api/builders/<int:builder_id>/projects/<int:project_id>', methods=['PATCH'])
+def update_project_step(builder_id, project_id):
     try:
         data = request.json
-        project = BuilderProject.query.filter_by(id=project_id, builder_id=rera_id).first_or_404()
+        project = BuilderProject.query.filter_by(id=project_id, builder_id=builder_id).first_or_404()
         replace_unit_configs = 'unit_configs' in data or 'configuration' in data
         replace_amenities = 'project_amenities' in data or 'amenities' in data
         # Update only provided fields
@@ -2782,10 +2772,10 @@ def get_all_projects():
     projects = BuilderProject.query.all()
     return jsonify([p.to_dict() for p in projects])
 
-@app.route('/api/builders/<rera_id>/projects/upload-image', methods=['POST'])
+@app.route('/api/builders/<int:builder_id>/projects/upload-image', methods=['POST'])
 @admin_only
-def upload_project_image(rera_id):
-    print(f"Upload project image called with rera_id: {rera_id}")
+def upload_project_image(builder_id):
+    print(f"Upload project image called with builder_id: {builder_id}")
     print(f"Request form data: {request.form}")
     print(f"Request files: {request.files}")
     
