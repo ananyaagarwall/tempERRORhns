@@ -41,7 +41,8 @@ export default function PropertyMap({
       zoom={14}
       zoomControl={false}
       className="w-full h-[220px] sm:h-[350px] property-map-canvas"
-      scrollWheelZoom={false}
+      style={{ zIndex: 1 }}
+      scrollWheelZoom={true}
     >
       <ZoomControl position="topleft" />
       <TileLayer

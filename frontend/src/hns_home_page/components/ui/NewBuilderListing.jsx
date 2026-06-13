@@ -5,6 +5,10 @@ import { useSearchSuggestions } from '../../../hooks/useSearchSuggestions';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import FooterNavBar from '../layout/FooterNavBar';
 import DynamicBreadcrumb from '../../../components/ui/DynamicBreadcrumb';
+import { MapContainer, TileLayer, Circle, CircleMarker, Popup, Tooltip, ZoomControl } from 'react-leaflet';
+import { ensureLeafletDefaultIconConfigured } from '../../../components/maps/leafletIconFix';
+
+ensureLeafletDefaultIconConfigured();
 
 /* ─── Design Tokens ─── */
 const C = {
@@ -34,6 +38,118 @@ const HeartSVG = ({ filled }) => (
   </svg>
 );
 
+/* ══════════════════════════════════════════════════════════════
+   Horizontal Builder Card (Extracted to prevent remounts)
+   ══════════════════════════════════════════════════════════════ */
+const BuilderCard = ({ builder, isSaved, handleHeartClick, hoveredCard, setHoveredCard, clickedCard, setClickedCard }) => {
+  const uniqueId = builder.id || builder.company_name;
+  const hovered = hoveredCard === uniqueId;
+  const isClicked = clickedCard === uniqueId;
+  const isActive = hovered || isClicked;
+
+  return (
+    <div
+      className="nbl-card"
+      onMouseEnter={() => setHoveredCard(uniqueId)}
+      onMouseLeave={() => setHoveredCard(null)}
+      onClick={() => setClickedCard(uniqueId)}
+      style={{
+        borderColor: hovered ? C.gold : C.border,
+        boxShadow: hovered
+          ? '0 12px 40px -8px rgba(34,58,95,0.18), 0 2px 12px rgba(241,217,122,0.14)'
+          : '0 2px 16px -4px rgba(34,58,95,0.08)',
+        transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
+        cursor: 'pointer'
+      }}
+    >
+      {/* Thumbnail */}
+      <div className="nbl-card-thumb">
+        {builder.cover_banner ? (
+          <img src={builder.cover_banner} alt={builder.company_name} />
+        ) : (
+          <div className="nbl-card-thumb-fallback">
+            <Building2 size={32} style={{ color: C.navy, opacity: 0.4 }} />
+          </div>
+        )}
+        {/* Verified badge */}
+        {builder.verified && (
+          <span className="nbl-verified-badge">
+            <CheckCircle size={10} /> Verified
+          </span>
+        )}
+      </div>
+
+      {/* Details */}
+      <div className="nbl-card-body">
+        <div className="nbl-card-top">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <h3 className="nbl-card-name">{builder.company_name}</h3>
+            <div className="nbl-card-location">
+              <MapPin size={13} />
+              <span>{builder.city || 'Navi Mumbai'}, {builder.state || 'Maharashtra'}</span>
+            </div>
+          </div>
+          {/* Heart */}
+          <button
+            className="nbl-heart-btn"
+            onClick={(e) => handleHeartClick(e, builder)}
+            aria-label={isSaved ? 'Remove from saved' : 'Save builder'}
+            style={{
+              background: isSaved ? 'rgba(231,76,60,0.08)' : 'transparent',
+              borderColor: isSaved ? 'rgba(231,76,60,0.25)' : C.border,
+            }}
+          >
+            <HeartSVG filled={isSaved} />
+          </button>
+        </div>
+
+        {/* Stats row */}
+        <div className="nbl-card-stats">
+          <div className="nbl-stat">
+            <Building2 size={13} />
+            <span><strong>{builder.completed_projects || 0}</strong> Completed</span>
+          </div>
+          <div className="nbl-stat">
+            <Calendar size={13} />
+            <span><strong>{builder.ongoing_projects || 0}</strong> Ongoing</span>
+          </div>
+          {builder.established_year && (
+            <div className="nbl-stat">
+              <Calendar size={13} />
+              <span>Est. {builder.established_year}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom row */}
+        <div className="nbl-card-bottom">
+          {builder.rera_registered && (
+            <span className="nbl-rera-pill">
+              <CheckCircle size={11} /> RERA Verified
+            </span>
+          )}
+          {builder.builder_type && (
+            <span className="nbl-type-pill">{builder.builder_type}</span>
+          )}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              className="nbl-view-btn"
+              onClick={(e) => { e.stopPropagation(); window.location.href = `/builder/${builder.company_name.replace(/\\s+/g, '-')}` }}
+            >
+              View Details
+            </button>
+            {builder.website_url && builder.website_url !== 'NA' && (
+              <a href={builder.website_url} target="_blank" rel="noopener noreferrer" className="nbl-ext-link" onClick={e => e.stopPropagation()}>
+                <ExternalLink size={14} />
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 /* ═══════════════════════════════════════════════════════════════
    Component
    ═══════════════════════════════════════════════════════════════ */
@@ -45,6 +161,7 @@ const NewBuilderListing = () => {
   const [filterType, setFilterType] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [hoveredCard, setHoveredCard] = useState(null);
+  const [clickedCard, setClickedCard] = useState(null);
   const [mapExpanded, setMapExpanded] = useState(true);      // map panel visibility
   const [mapFullWidth, setMapFullWidth] = useState(false);    // map takes full width
 
@@ -114,160 +231,7 @@ const NewBuilderListing = () => {
     if (key === 'search') { handleSearchChange(''); fetchBuilders('', true); }
   };
 
-  /* ══════════════════════════════════════════════════════════════
-     Horizontal Builder Card
-     ══════════════════════════════════════════════════════════════ */
-  const BuilderCard = ({ builder }) => {
-    const saved = isBuilderSaved(builder.rera_id);
-    const hovered = hoveredCard === builder.rera_id;
 
-    return (
-      <div
-        className="nbl-card"
-        onMouseEnter={() => setHoveredCard(builder.rera_id)}
-        onMouseLeave={() => setHoveredCard(null)}
-        style={{
-          borderColor: hovered ? C.gold : C.border,
-          boxShadow: hovered
-            ? '0 12px 40px -8px rgba(34,58,95,0.18), 0 2px 12px rgba(241,217,122,0.14)'
-            : '0 2px 16px -4px rgba(34,58,95,0.08)',
-          transform: hovered ? 'translateY(-3px)' : 'translateY(0)',
-        }}
-      >
-        {/* Thumbnail */}
-        <div className="nbl-card-thumb">
-          {builder.cover_banner ? (
-            <img src={builder.cover_banner} alt={builder.company_name} />
-          ) : (
-            <div className="nbl-card-thumb-fallback">
-              <Building2 size={32} style={{ color: C.navy, opacity: 0.4 }} />
-            </div>
-          )}
-          {/* Verified badge */}
-          {builder.verified && (
-            <span className="nbl-verified-badge">
-              <CheckCircle size={10} /> Verified
-            </span>
-          )}
-        </div>
-
-        {/* Details */}
-        <div className="nbl-card-body">
-          <div className="nbl-card-top">
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <h3 className="nbl-card-name">{builder.company_name}</h3>
-              <div className="nbl-card-location">
-                <MapPin size={13} />
-                <span>{builder.city}, {builder.state}</span>
-              </div>
-            </div>
-            {/* Heart */}
-            <button
-              className="nbl-heart-btn"
-              onClick={(e) => handleHeartClick(e, builder)}
-              aria-label={saved ? 'Remove from saved' : 'Save builder'}
-              style={{
-                background: saved ? 'rgba(231,76,60,0.08)' : 'transparent',
-                borderColor: saved ? 'rgba(231,76,60,0.25)' : C.border,
-              }}
-            >
-              <HeartSVG filled={saved} />
-            </button>
-          </div>
-
-          {/* Stats row */}
-          <div className="nbl-card-stats">
-            <div className="nbl-stat">
-              <Building2 size={13} />
-              <span><strong>{builder.completed_projects || 0}</strong> Completed</span>
-            </div>
-            <div className="nbl-stat">
-              <Calendar size={13} />
-              <span><strong>{builder.ongoing_projects || 0}</strong> Ongoing</span>
-            </div>
-            {builder.established_year && (
-              <div className="nbl-stat">
-                <Calendar size={13} />
-                <span>Est. {builder.established_year}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Bottom row */}
-          <div className="nbl-card-bottom">
-            {builder.rera_registered && (
-              <span className="nbl-rera-pill">
-                <CheckCircle size={11} /> RERA Verified
-              </span>
-            )}
-            {builder.builder_type && (
-              <span className="nbl-type-pill">{builder.builder_type}</span>
-            )}
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button
-                className="nbl-view-btn"
-                onClick={() => window.location.href = `/builder/${builder.company_name.replace(/\s+/g, '-')}`}
-              >
-                View Details
-              </button>
-              {builder.website_url && builder.website_url !== 'NA' && (
-                <a href={builder.website_url} target="_blank" rel="noopener noreferrer" className="nbl-ext-link">
-                  <ExternalLink size={14} />
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  /* ══════════════════════════════════════════════════════════════
-     Map Placeholder
-     ══════════════════════════════════════════════════════════════ */
-  const MapPlaceholder = () => (
-    <div className="nbl-map-inner">
-      {/* Decorative dots */}
-      <svg width="100%" height="100%" style={{ position: 'absolute', inset: 0, opacity: 0.12 }}>
-        <defs>
-          <pattern id="mapGrid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <circle cx="20" cy="20" r="1.5" fill={C.navy} />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#mapGrid)" />
-        {/* Fake roads */}
-        <line x1="0" y1="30%" x2="100%" y2="35%" stroke={C.border} strokeWidth="2" />
-        <line x1="0" y1="60%" x2="100%" y2="55%" stroke={C.border} strokeWidth="2" />
-        <line x1="25%" y1="0" x2="30%" y2="100%" stroke={C.border} strokeWidth="2" />
-        <line x1="65%" y1="0" x2="60%" y2="100%" stroke={C.border} strokeWidth="2" />
-      </svg>
-      {/* Pins for builders */}
-      {filteredBuilders.slice(0, 6).map((b, i) => {
-        const positions = [
-          { top: '22%', left: '30%' }, { top: '35%', left: '65%' },
-          { top: '55%', left: '25%' }, { top: '48%', left: '72%' },
-          { top: '70%', left: '45%' }, { top: '28%', left: '50%' },
-        ];
-        const pos = positions[i] || positions[0];
-        return (
-          <div key={b.rera_id || i} className="nbl-map-pin" style={{ top: pos.top, left: pos.left }}>
-            <div className="nbl-map-pin-dot">{i + 1}</div>
-            <div className="nbl-map-pin-label">{b.company_name?.split(' ')[0]}</div>
-          </div>
-        );
-      })}
-      {/* Center label */}
-      <div className="nbl-map-center-label">
-        <Map size={18} style={{ marginBottom: 4 }} />
-        <span>Navi Mumbai</span>
-        <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>Interactive map coming soon</span>
-      </div>
-      {/* Go to map button */}
-      <button className="nbl-map-goto-btn">
-        <Map size={15} /> Go to map
-      </button>
-    </div>
-  );
 
   /* ══════════════════════════════════════════════════════════════
      STYLES (embedded)
@@ -1013,9 +977,21 @@ const NewBuilderListing = () => {
               <p style={{ color: C.textSecondary }}>Try adjusting your search or filters</p>
             </div>
           ) : (
-            filteredBuilders.map(builder => (
-              <BuilderCard key={builder.rera_id || builder.company_name} builder={builder} />
-            ))
+            filteredBuilders.map(builder => {
+              const uniqueId = builder.id || builder.company_name;
+              return (
+                <BuilderCard
+                  key={uniqueId}
+                  builder={builder}
+                  isSaved={isBuilderSaved(builder.rera_id)}
+                  handleHeartClick={handleHeartClick}
+                  hoveredCard={hoveredCard}
+                  setHoveredCard={setHoveredCard}
+                  clickedCard={clickedCard}
+                  setClickedCard={setClickedCard}
+                />
+              );
+            })
           )}
         </div>
 
@@ -1031,7 +1007,68 @@ const NewBuilderListing = () => {
           >
             <X size={16} />
           </button>
-          <MapPlaceholder />
+          <div className="nbl-map-inner" style={{ zIndex: 1 }}>
+            <MapContainer
+              center={[19.0330, 73.0297]}
+              zoom={11}
+              zoomControl={false}
+              style={{ width: '100%', height: '100%', zIndex: 1 }}
+            >
+              <ZoomControl position="topleft" />
+              <TileLayer
+                attribution='&copy; OpenStreetMap contributors'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <Circle
+                center={[19.0330, 73.0297]}
+                radius={8000}
+                pathOptions={{ color: '#2563eb', fillColor: '#60a5fa', fillOpacity: 0.08 }}
+              />
+              {filteredBuilders.map((b, i) => {
+                const hash = (b.company_name || '').split('').reduce((a, char) => {
+                  a = ((a << 5) - a) + char.charCodeAt(0);
+                  return a & a;
+                }, 0);
+                const latOffset = ((Math.abs(hash) % 100) / 1000) - 0.05;
+                const lngOffset = (((Math.abs(hash) >> 8) % 100) / 1000) - 0.05;
+                
+                const lat = b.latitude || (19.0330 + latOffset);
+                const lng = b.longitude || (73.0297 + lngOffset);
+                
+                const uniqueId = b.id || b.company_name;
+                const isHighlighted = clickedCard === uniqueId;
+                const isHovered = hoveredCard === uniqueId;
+                const isActive = isHighlighted || isHovered;
+
+                return (
+                  <CircleMarker
+                    key={uniqueId || i}
+                    center={[lat, lng]}
+                    radius={isActive ? 10 : 6}
+                    pathOptions={{
+                      color: isActive ? '#f59e0b' : '#1d4ed8',
+                      fillColor: isActive ? '#fbbf24' : '#3b82f6',
+                      fillOpacity: isActive ? 0.95 : 0.85,
+                      weight: isActive ? 3 : 2
+                    }}
+                    eventHandlers={{
+                      click: () => setClickedCard(uniqueId),
+                      mouseover: () => setHoveredCard(uniqueId),
+                      mouseout: () => setHoveredCard(null)
+                    }}
+                  >
+                    <Tooltip direction="top" offset={[0, -10]} permanent={isActive} opacity={1}>
+                      {b.company_name}
+                    </Tooltip>
+                    <Popup>
+                      <div style={{fontWeight: 'bold', fontSize: '14px', marginBottom: '4px'}}>{b.company_name}</div>
+                      <div style={{fontSize: '12px', color: '#555'}}>{b.city || 'Navi Mumbai'}, {b.state || 'Maharashtra'}</div>
+                    </Popup>
+                  </CircleMarker>
+                );
+              })}
+            </MapContainer>
+          </div>
         </div>
       </div>
 
