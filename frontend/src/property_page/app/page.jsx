@@ -16,7 +16,7 @@ import ExistingFloorPlansSection from '../components/sections/ExistingFloorPlans
 import ReadMoreAboutProperty from '../components/sections/ReadMoreAboutProperty';
 
 // Import API services
-import { fetchBuilderByName, fetchBuilderByReraId, fetchBuilderProjectById, fetchPropertyById } from '../../services/api';
+import { fetchBuilderByName, fetchBuilderById, fetchBuilderProjectById, fetchPropertyById } from '../../services/api';
 import { parsePropertyIdFromRouteToken } from '../../utils/entityRouting';
 
 // Import styles
@@ -61,7 +61,7 @@ const PropertyListingPage = () => {
         let builder = null;
         if (project?.builder_id) {
           try {
-            builder = await fetchBuilderByReraId(project.builder_id);
+            builder = await fetchBuilderById(project.builder_id);
           } catch (builderError) {
             console.log('Builder fetch by RERA ID failed, falling back to builder name:', builderError);
           }

@@ -21,20 +21,23 @@ export const fetchBuilderByName = async (name) => {
     }
 };
 
-export const fetchBuilderByReraId = async (reraId) => {
+export const fetchBuilderById = async (builderId) => {
     try {
-        const response = await fetch(`${API_URL}/builders/${encodeURIComponent(reraId)}`);
-        if (!response.ok) throw new Error('Failed to fetch builder by RERA ID');
+        const response = await fetch(`${API_URL}/builders/${builderId}`);
+        if (!response.ok) throw new Error('Failed to fetch builder');
         return await response.json();
     } catch (error) {
-        console.error('Error fetching builder by RERA ID:', error);
+        console.error('Error fetching builder by ID:', error);
         throw error;
     }
 };
 
-export const fetchBuilderProjects = async (reraId, status = '') => {
+// Kept for backwards compatibility — prefer fetchBuilderById
+export const fetchBuilderByReraId = fetchBuilderById;
+
+export const fetchBuilderProjects = async (builderId, status = '') => {
     try {
-        let url = `${API_URL}/builders/${encodeURIComponent(reraId)}/projects`;
+        let url = `${API_URL}/builders/${builderId}/projects`;
         if (status) {
             url += `?status=${encodeURIComponent(status)}`;
         }

@@ -3,9 +3,9 @@ import { SignedIn, SignedOut, RedirectToSignIn, UserProfile, useUser } from "@cl
 import ClerkErrorBoundary from "./components/ClerkErrorBoundary";
 
 export default function ProfilePage() {
-  const { isLoaded } = useUser();
+  const { isLoaded, isSignedIn, user } = useUser();
 
-  if (!isLoaded) return null;
+  if (!isLoaded || !isSignedIn || !user) return null;
 
   return (
     <>

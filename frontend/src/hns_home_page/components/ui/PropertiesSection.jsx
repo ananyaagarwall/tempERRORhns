@@ -90,7 +90,7 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
         const mapped = Array.isArray(data) ? data.map(p => ({
           id: p._id || p.id || '',
           name: p.Property_Name || '',
-          address: p.Address || p.Location || '',
+          address: p.Location || p.Address || '',
           price: p.Price_Starting_From || p.Pricing || '',
           confidence: p.confidence || '',
           img: p.image || p.builder_project_image || '/Presidential Towers.jpg.png',
@@ -170,6 +170,8 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
         src={getCardImage(prop)}
         alt={prop.name}
         className="property-img-custom"
+        loading="lazy"
+        decoding="async"
         onError={(e) => {
           // Fallback chain: gallery blob → builder_project_image → static default
           const tried = e.currentTarget.dataset.tried || '';
