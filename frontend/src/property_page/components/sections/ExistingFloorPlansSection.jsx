@@ -493,46 +493,57 @@ const ExistingFloorPlansSection = ({ propertyData, projectData }) => {
 
         /* ── Floor Plan Carousel ── */
         .fp-carousel-wrapper {
-          background: #f0f4ff;
-          border: 1.5px solid #c7d2fe;
-          border-radius: 1rem;
-          overflow: hidden;
-          box-shadow: 0 2px 12px rgba(30,58,138,0.08);
-          width: 100%;
-        }
-        .fp-carousel-track {
-          display: flex;
-          gap: 12px;
-          overflow-x: auto;
-          scroll-snap-type: x mandatory;
-          scrollbar-width: none;
-          padding: 1rem 1rem 0.5rem;
-          cursor: grab;
-          -webkit-overflow-scrolling: touch;
-        }
+  background: transparent;      /* ← was #f0f4ff / dark blue */
+  border: none;                  /* ← remove border */
+  border-radius: 0;
+  box-shadow: none;              /* ← remove shadow */
+  width: 100%;
+}
+
+
+
+       .fp-carousel-track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  cursor: grab;
+  -webkit-overflow-scrolling: touch;
+   padding: 0 1rem 0.5rem;   /* ← reduce top padding, no box to inset from */
+  height: 420px;
+  align-items: stretch;
+}
         .fp-carousel-track::-webkit-scrollbar { display: none; }
         .fp-carousel-track:active { cursor: grabbing; }
         .fp-slide {
-          flex: 0 0 88%;
-          scroll-snap-align: start;
-        }
-        .fp-slide-inner {
-          position: relative;
-          border-radius: 0.6rem;
-          overflow: hidden;
-          background: #1e3a8a;
-          border: 1.5px solid #3b5cc4;
-          box-shadow: 0 3px 10px rgba(0,0,0,0.18);
-          aspect-ratio: 4/3;
-        }
-        .fp-slide-img {
-          width: 100%;
-          height: 100%;
-          object-fit: contain;
-          display: block;
-          background: #1e3a8a;
-          padding: 0.5rem;
-        }
+  flex: 0 0 92%;
+  scroll-snap-align: start;
+  height: 100%;            /* ← ADD THIS */
+}
+.fp-slide-inner {
+  position: relative;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: transparent;      /* ← remove dark blue bg */
+  border: 1.5px solid #e5e7eb; /* ← light neutral border instead */
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+
+.fp-slide-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  flex-shrink: 0;
+}
         /* Type tag on top-left */
         .fp-type-tag {
           position: absolute;
@@ -547,7 +558,11 @@ const ExistingFloorPlansSection = ({ propertyData, projectData }) => {
           border-radius: 999px;
           backdrop-filter: blur(4px);
           text-transform: uppercase;
+          display: none;
         }
+.fp-layout--collapsed .fp-type-tag {
+  display: block; /* show only when details panel is collapsed */
+}
         /* Controls */
         .fp-controls {
           display: flex;
@@ -923,9 +938,9 @@ const ExistingFloorPlansSection = ({ propertyData, projectData }) => {
         }
 
         @media (max-width: 640px) {
-          .fp-section { padding: 1.5rem 0.75rem 2rem; }
-          .fp-slide { flex: 0 0 85%; }
-          .fp-slide-inner { aspect-ratio: 1.15; } /* increase length of floor plan slightly */
+   .fp-slide-img {
+    width: 90%;
+    height: 90%;
           .room-slide { flex: 0 0 52%; }
           .room-slide-img { aspect-ratio: 4/3; } /* increase length of rooms pic slightly */
           .fp-details-panel { border-radius: 0.75rem; }
