@@ -1,4 +1,4 @@
-﻿import React from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Shield, Check, MapPin, Building2, Calendar } from "lucide-react";
 import ResultsNavBar from "../layouts/ResultsNavBar";
@@ -186,6 +186,7 @@ const MainContentSection = ({ propertyData, projectData }) => {
   const [nearbyLoading, setNearbyLoading] = React.useState(false);
   const [nearbyPois, setNearbyPois] = React.useState(null);
   const [poisLoading, setPoisLoading] = React.useState(false);
+  const [highlightedPoiType, setHighlightedPoiType] = React.useState(null);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -278,17 +279,17 @@ const MainContentSection = ({ propertyData, projectData }) => {
 
   return (
     <section className="py-4 sm:py-8 lg:py-16 bg-gray-50/30">
-      <ResultsNavBar 
+      <ResultsNavBar
         amenitiesRef={amenitiesRef}
         overviewRef={overviewRef}
         floorPlansRef={floorPlansRef}
         mapRef={mapRef}
       />
-      
+
       {/* Changed px-2 to px-4 for better mobile gutters */}
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4 sm:py-6 lg:py-12">
         <div className="grid lg:grid-cols-3 gap-6 lg:gap-8">
-          
+
           {/* === Main Content Column === */}
           <div className="lg:col-span-2 space-y-6 sm:space-y-10">
 
@@ -300,7 +301,7 @@ const MainContentSection = ({ propertyData, projectData }) => {
                 </div>
                 <h2 className="text-lg sm:text-2xl font-bold text-gray-900">Key Highlights</h2>
               </div>
-              
+
               {/* Changed mobile grid to 2 columns for compactness */}
               <div className="grid grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4">
                 {highlights.map((highlight, index) => (
@@ -311,7 +312,7 @@ const MainContentSection = ({ propertyData, projectData }) => {
                 ))}
               </div>
             </div>
-            
+
             {/* Overview Section */}
             <div ref={overviewRef} id="overview" className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-gray-200">
               <div className="flex items-center gap-3 mb-5 sm:mb-6">
@@ -319,17 +320,17 @@ const MainContentSection = ({ propertyData, projectData }) => {
                   <span className="text-sm sm:text-base font-semibold">Overview</span>
                 </div>
               </div>
-              
+
               <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
                 {/* Left Column */}
                 <div className="space-y-3">
                   {overviewData.left.map((item, index) => (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       className={`flex justify-between items-center p-3 sm:p-4 rounded-xl bg-gray-50 border border-gray-100 ${!showAllLeftOverview && index >= 3 ? 'hidden md:flex' : 'flex'}`}
                     >
-                      <span className="text-xs sm:text-sm text-gray-500 font-medium">{item.label}</span>
-                      <span className="text-sm sm:text-base font-bold text-gray-900 text-right">{item.value}</span>
+                      <span className="text-xs sm:text-sm text-gray-500 font-medium whitespace-nowrap mr-2 flex-shrink-0">{item.label}</span>
+                      <span className="text-sm sm:text-base font-bold text-gray-900 text-right line-clamp-2 break-words overflow-hidden text-ellipsis" title={item.value}>{item.value}</span>
                     </div>
                   ))}
                 </div>
@@ -337,12 +338,12 @@ const MainContentSection = ({ propertyData, projectData }) => {
                 {/* Right Column */}
                 <div className="space-y-3">
                   {overviewData.right.map((item, index) => (
-                    <div 
-                      key={index} 
+                    <div
+                      key={index}
                       className={`flex justify-between items-center p-3 sm:p-4 rounded-xl bg-gray-50 border border-gray-100 ${!showAllRightOverview && index >= 3 ? 'hidden md:flex' : 'flex'}`}
                     >
-                      <span className="text-xs sm:text-sm text-gray-500 font-medium">{item.label}</span>
-                      <span className="text-sm sm:text-base font-bold text-gray-900 text-right">{item.value}</span>
+                      <span className="text-xs sm:text-sm text-gray-500 font-medium whitespace-nowrap mr-2 flex-shrink-0">{item.label}</span>
+                      <span className="text-sm sm:text-base font-bold text-gray-900 text-right line-clamp-2 break-words overflow-hidden text-ellipsis" title={item.value}>{item.value}</span>
                     </div>
                   ))}
                 </div>
@@ -364,32 +365,32 @@ const MainContentSection = ({ propertyData, projectData }) => {
               )}
             </div>
 
-	            {/* Description Section */}
-	            <div className="bg-gradient-to-br from-yellow-50/50 to-white p-5 sm:p-8 rounded-2xl shadow-sm border border-yellow-100">
-	              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
-	                <MapPin className="w-4 h-4 text-blue-600" />
-	                Address Details
-	              </h3>
-	              <div className="bg-white/80 p-4 rounded-xl border border-yellow-100/50 backdrop-blur-sm">
-	                <p className="text-sm sm:text-base text-gray-800 font-medium mb-2">{propertyAddress}</p>
-	                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed mb-3">
-	                  {shortDescription}
-	                </p>
-	                {showFullDescription && longDescription ? (
-	                  <div className="mt-3 whitespace-pre-line text-xs sm:text-sm text-gray-600 leading-relaxed">
-	                    {longDescription}
-	                  </div>
-	                ) : null}
-	                <button
-	                  type="button"
-	                  onClick={() => setShowFullDescription((prev) => !prev)}
-	                  className="text-xs sm:text-sm text-blue-600 font-bold hover:text-blue-800"
-	                  aria-expanded={showFullDescription}
-	                >
-	                  {showFullDescription ? "Show Less" : "Read Full Description"}
-	                </button>
-	              </div>
-	            </div>
+            {/* Description Section */}
+            <div className="bg-gradient-to-br from-yellow-50/50 to-white p-5 sm:p-8 rounded-2xl shadow-sm border border-yellow-100">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-blue-600" />
+                Address Details
+              </h3>
+              <div className="bg-white/80 p-4 rounded-xl border border-yellow-100/50 backdrop-blur-sm">
+                <p className="text-sm sm:text-base text-gray-800 font-medium mb-2">{propertyAddress}</p>
+                <p className="text-xs sm:text-sm text-gray-600 leading-relaxed mb-3">
+                  {shortDescription}
+                </p>
+                {showFullDescription && longDescription ? (
+                  <div className="mt-3 whitespace-pre-line text-xs sm:text-sm text-gray-600 leading-relaxed">
+                    {longDescription}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setShowFullDescription((prev) => !prev)}
+                  className="text-xs sm:text-sm text-blue-600 font-bold hover:text-blue-800"
+                  aria-expanded={showFullDescription}
+                >
+                  {showFullDescription ? "Show Less" : "Read Full Description"}
+                </button>
+              </div>
+            </div>
 
             {/* Map Section */}
             <div ref={mapRef} id="map-location" className="overflow-hidden bg-white rounded-2xl shadow-sm border border-gray-200">
@@ -402,6 +403,7 @@ const MainContentSection = ({ propertyData, projectData }) => {
                   longitude={coordinates.longitude}
                   radiusM={nearbyPois?.radius_m || 2000}
                   poisByType={nearbyPois?.pois || {}}
+                  highlightedType={highlightedPoiType}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
               </div>
@@ -418,12 +420,24 @@ const MainContentSection = ({ propertyData, projectData }) => {
                     {Object.entries(nearbyPois.pois)
                       .filter(([, list]) => Array.isArray(list) && list.length)
                       .slice(0, 6)
-                      .map(([type, list]) => (
-                        <div key={type} className="bg-white/70 border border-gray-100 rounded-lg px-2 py-1.5">
-                          <div className="font-semibold text-gray-800 capitalize">{type.replace(/_/g, " ")}</div>
-                          <div className="text-gray-500">{list.length} found</div>
-                        </div>
-                      ))}
+                      .map(([type, list]) => {
+                        const isSelected = highlightedPoiType === type;
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setHighlightedPoiType(isSelected ? null : type)}
+                            className={`text-left rounded-lg px-2 py-1.5 transition-all duration-200 cursor-pointer ${isSelected
+                                ? "bg-blue-50 border-2 border-blue-400 ring-2 ring-blue-200 shadow-sm"
+                                : "bg-white/70 border border-gray-100 hover:border-blue-200 hover:bg-blue-50/40"
+                              }`}
+                          >
+                            <div className={`font-semibold capitalize ${isSelected ? "text-blue-700" : "text-gray-800"
+                              }`}>{type.replace(/_/g, " ")}</div>
+                            <div className={isSelected ? "text-blue-500" : "text-gray-500"}>{list.length} found</div>
+                          </button>
+                        );
+                      })}
                   </div>
                 ) : null}
               </div>
@@ -433,43 +447,43 @@ const MainContentSection = ({ propertyData, projectData }) => {
 
           {/* === Sidebar / Right Column === */}
           <div className="space-y-5 sm:space-y-6">
-            
+
             {/* Main Property Card */}
             <Card className="bg-blue-900 text-white overflow-hidden rounded-2xl sm:rounded-3xl shadow-lg border-0">
-	              <CardContent className="p-0">
-		                <div className="relative group">
-		                  <img 
-		                    src={imageSources[currentImageIndex]} 
-		                    alt={propertyName} 
-		                    className="w-full h-48 sm:h-64 object-cover" 
-		                  />
-	                </div>
-		                <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-2 sm:space-y-3 md:space-y-4">
-		                  <div>
-		                    <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-white leading-tight mb-2">{propertyName}</h3>
-		                    <p className="text-xs sm:text-sm text-white/90 mb-2 sm:mb-3 md:mb-4">{propertyData?.Builder_Name || projectData?.builder_name || "Builder details on request"}</p>
-	                  </div>
-	                  <p className="text-xs sm:text-sm text-white leading-relaxed break-words">
-	                    {projectData?.description || "Project description available on request."}
-	                  </p>
-	                  <div className="space-y-2 sm:space-y-3 pt-2">
-	                    <Button className="w-full bg-yellow-400 text-blue-900 hover:bg-yellow-500 text-xs sm:text-sm px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-full font-semibold shadow-lg">Add to My List</Button>
-	                    <Button
-                        onClick={() => {
-                          const element = document.getElementById("nearby-properties");
-                          if (element) {
-                            element.scrollIntoView({ behavior: "smooth", block: "start" });
-                          }
-                        }}
-                        className="w-full bg-yellow-400 text-blue-900 hover:bg-yellow-500 text-xs sm:text-sm px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-full font-semibold shadow-lg"
-                      >
-                        Browse Nearby Listings
-                      </Button>
-	                  </div>
-	                </div>
+              <CardContent className="p-0">
+                <div className="relative group">
+                  <img
+                    src={imageSources[currentImageIndex]}
+                    alt={propertyName}
+                    className="w-full h-48 sm:h-64 object-cover"
+                  />
+                </div>
+                <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-2 sm:space-y-3 md:space-y-4">
+                  <div>
+                    <h3 className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl font-bold text-white leading-tight mb-2">{propertyName}</h3>
+                    <p className="text-xs sm:text-sm text-white/90 mb-2 sm:mb-3 md:mb-4">{propertyData?.Builder_Name || projectData?.builder_name || "Builder details on request"}</p>
+                  </div>
+                  <p className="text-xs sm:text-sm text-white leading-relaxed break-words">
+                    {projectData?.description || "Project description available on request."}
+                  </p>
+                  <div className="space-y-2 sm:space-y-3 pt-2">
+                    <Button className="w-full bg-yellow-400 text-blue-900 hover:bg-yellow-500 text-xs sm:text-sm px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-full font-semibold shadow-lg">Add to My List</Button>
+                    <Button
+                      onClick={() => {
+                        const element = document.getElementById("nearby-properties");
+                        if (element) {
+                          element.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }
+                      }}
+                      className="w-full bg-yellow-400 text-blue-900 hover:bg-yellow-500 text-xs sm:text-sm px-3 sm:px-4 md:px-6 py-2 sm:py-3 rounded-full font-semibold shadow-lg"
+                    >
+                      Browse Nearby Listings
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
-            </Card>            
-         
+            </Card>
+
             {/* Action Card: Schedule Tour */}
             <Card className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
               <CardContent className="p-4 sm:p-5 space-y-4">
@@ -483,9 +497,9 @@ const MainContentSection = ({ propertyData, projectData }) => {
                   </div>
                 </div>
                 <div className="space-y-2.5">
-                    <button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-black hover:from-blue-700 hover:to-blue-800 rounded-xl font-semibold py-3 text-sm shadow-md">
-                      Request Site Visit
-                    </button>
+                  <button className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-black hover:from-blue-700 hover:to-blue-800 rounded-xl font-semibold py-3 text-sm shadow-md">
+                    Request Site Visit
+                  </button>
                   <button className="w-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-50 rounded-xl font-semibold py-3 text-sm">
                     View 3D Plan <span className="text-[10px] ml-1 text-gray-400 font-normal">(Coming Soon)</span>
                   </button>
@@ -504,66 +518,66 @@ const MainContentSection = ({ propertyData, projectData }) => {
                     ? "No nearby properties found."
                     : "Enable location on the landing page to see nearby properties."}
                 </div>
-	              ) : (
-	                nearbyProperties.map((prop, index) => {
-	                  const nearbyPropertyId =
-	                    prop?.id ?? prop?.property_id ?? prop?.propertyId ?? prop?.Property_ID ?? "";
-	                  const destination = buildPropertyPath(nearbyPropertyId);
+              ) : (
+                nearbyProperties.map((prop, index) => {
+                  const nearbyPropertyId =
+                    prop?.id ?? prop?.property_id ?? prop?.propertyId ?? prop?.Property_ID ?? "";
+                  const destination = buildPropertyPath(nearbyPropertyId);
 
-	                  return (
-	                    <Card
-	                      key={String(nearbyPropertyId || prop?.Property_Name || index)}
-	                      className="bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer group"
-	                      onClick={() => navigate(destination)}
-	                      role="link"
-	                      tabIndex={0}
-	                      onKeyDown={(event) => {
-	                        if (event.key === "Enter" || event.key === " ") {
-	                          event.preventDefault();
-	                          navigate(destination);
-	                        }
-	                      }}
-	                      aria-label={prop?.Property_Name ? `Open ${prop.Property_Name}` : "Open property"}
-	                    >
-	                      <CardContent className="p-3">
-	                        <div className="flex items-center gap-3">
-	                          <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200 relative">
-	                            <div className="absolute inset-0 bg-gray-300 animate-pulse group-hover:hidden" />
-	                            <img
-	                              src={pickPropertyImage(prop)}
-	                              alt={prop?.Property_Name || "Property"}
-	                              className="w-full h-full object-cover relative z-10"
-	                              onError={(e) => {
-	                                e.target.src = "/Pimg9.jpg";
-	                              }}
-	                            />
-	                          </div>
+                  return (
+                    <Card
+                      key={String(nearbyPropertyId || prop?.Property_Name || index)}
+                      className="bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                      onClick={() => navigate(destination)}
+                      role="link"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          navigate(destination);
+                        }
+                      }}
+                      aria-label={prop?.Property_Name ? `Open ${prop.Property_Name}` : "Open property"}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0 bg-gray-200 relative">
+                            <div className="absolute inset-0 bg-gray-300 animate-pulse group-hover:hidden" />
+                            <img
+                              src={pickPropertyImage(prop)}
+                              alt={prop?.Property_Name || "Property"}
+                              className="w-full h-full object-cover relative z-10"
+                              onError={(e) => {
+                                e.target.src = "/Pimg9.jpg";
+                              }}
+                            />
+                          </div>
 
-	                          <div className="flex-1 min-w-0">
-	                            <h2 className="text-sm font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-	                              {prop?.Property_Name || "Property"}
-	                            </h2>
-	                            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
-	                              <Building2 className="w-3 h-3" />
-	                              <span className="truncate">{prop?.Location || "Location on request"}</span>
-	                            </div>
-	                            <p className="text-[11px] text-gray-400 mt-1 truncate">
-	                              {prop?.Pricing || prop?.Price_Starting_From || "Price on request"}
-	                            </p>
-	                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h2 className="text-sm font-bold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                              {prop?.Property_Name || "Property"}
+                            </h2>
+                            <div className="flex items-center gap-1 text-xs text-gray-500 mt-0.5">
+                              <Building2 className="w-3 h-3" />
+                              <span className="truncate">{prop?.Location || "Location on request"}</span>
+                            </div>
+                            <p className="text-[11px] text-gray-400 mt-1 truncate">
+                              {prop?.Pricing || prop?.Price_Starting_From || "Price on request"}
+                            </p>
+                          </div>
 
-	                          <div className="flex-shrink-0 self-center">
-	                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
-	                              <span className="text-gray-400 group-hover:text-blue-600">›</span>
-	                            </div>
-	                          </div>
-	                        </div>
-	                      </CardContent>
-	                    </Card>
-	                  );
-	                })
-	              )}
-	</div>
+                          <div className="flex-shrink-0 self-center">
+                            <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center group-hover:bg-blue-50 transition-colors">
+                              <span className="text-gray-400 group-hover:text-blue-600">›</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
 
           </div>
         </div>

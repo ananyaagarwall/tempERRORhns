@@ -56,10 +56,10 @@ const ResultsNavBar = ({ overviewRef, floorPlansRef, amenitiesRef, mapRef }) => 
       const triggerPoint = mainNavbarHeight + navHeight + 50;
       
       const sections = [
-        { ref: overviewRef, name: 'overview' },
-        { ref: floorPlansRef, id: 'floor-plans', name: 'floor-plans' },
-        { ref: amenitiesRef, name: 'amenities' },
-        { ref: mapRef, name: 'map' }
+        { ref: amenitiesRef, id: 'amenities', name: 'amenities' },
+        { ref: overviewRef, id: 'overview', name: 'overview' },
+        { ref: mapRef, id: 'map-location', name: 'map' },
+        { ref: floorPlansRef, id: 'floor-plans', name: 'floor-plans' }
       ];
 
       // Check for "Read More" section first
