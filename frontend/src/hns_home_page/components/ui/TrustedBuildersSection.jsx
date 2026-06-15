@@ -1,6 +1,7 @@
 import API_BASE_URL from '../../../config';
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
+import { normalizeImageUrl } from '../../../utils/imageUtils';
 import "../../home_page_css/TrustedBuildersSection.css";
 import '../../home_page_css/PropertiesSection.css';
 
@@ -13,30 +14,58 @@ const HeartIcon = ({ filled }) => (
 
 
 const BORDER_RADIUS = 12;
+const FALLBACK_BUILDER_IMAGE = '/palm.jpg';
+
+const readResponseBody = async (response) => {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    return response.json();
+  }
+  return response.text();
+};
 
 const TrustedBuildersSection = ({ location }) => {
   const [builders, setBuilders] = useState([]);
-  const [activeIdx, setActiveIdx] = useState(2);
+  const [activeIdx, setActiveIdx] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const { addToCart, removeFromCart, isInCart } = useCart();
 
   useEffect(() => {
     const fetchBuilders = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/projects`);
-        const data = await response.json();
-        const formattedData = data.map(project => ({
-          id: project._id || project.id || `builder-${project.title}-${project.location}`,
-          img: project.project_image ? `${API_BASE_URL}${project.project_image}` : '/palm.jpg',
-          logo: '',
-          name: project.title,
-          subtitle: project.location,
-          price: project.price_range,
-        }));
+        setLoading(true);
+        setError('');
+        const response = await fetch(`${API_BASE_URL}/api/builders`);
+        const data = await readResponseBody(response);
+
+        if (!response.ok) {
+          const message = typeof data === 'object'
+            ? data?.error || data?.message || `Failed to fetch builders (${response.status})`
+            : data?.slice(0, 160) || `Failed to fetch builders (${response.status})`;
+          throw new Error(message);
+        }
+
+        const formattedData = (Array.isArray(data) ? data : []).map(builder => ({
+          id: builder._id || builder.id || `builder-${builder.company_name}-${builder.location || builder.city}`,
+          img: normalizeImageUrl(builder.cover_banner) || normalizeImageUrl(builder.builder_logo) || normalizeImageUrl(builder.project_image) || FALLBACK_BUILDER_IMAGE,
+          logo: normalizeImageUrl(builder.builder_logo) || '',
+          name: builder.company_name || builder.brand_name || 'Trusted Builder',
+          subtitle: builder.location || [builder.city, builder.state].filter(Boolean).join(', '),
+          price: [
+            builder.project_count !== null && builder.project_count !== undefined ? `${builder.project_count} Projects` : '',
+            builder.completed_projects !== null && builder.completed_projects !== undefined ? `${builder.completed_projects} Completed` : '',
+            builder.ongoing_projects !== null && builder.ongoing_projects !== undefined ? `${builder.ongoing_projects} Ongoing` : '',
+          ].filter(Boolean).join(' • '),
+        })).filter(builder => builder.name || builder.subtitle);
         setBuilders(formattedData);
       } catch (error) {
         console.error('Error fetching builders:', error);
+        setError(error.message || 'Unable to load builder projects.');
+      } finally {
+        setLoading(false);
       }
     };
     fetchBuilders();
@@ -68,9 +97,10 @@ const TrustedBuildersSection = ({ location }) => {
   };
 
   // Filter builders by location if provided
-  const filteredBuilders = location && location.trim() ?
+  const locationFilteredBuilders = location && location.trim() ?
     builders.filter(b => b.subtitle && b.subtitle.toLowerCase().includes(location.toLowerCase())) :
     builders;
+  const filteredBuilders = locationFilteredBuilders.length > 0 ? locationFilteredBuilders : builders;
   const sectionTitle = location && location.trim()
     ? `Explore Trusted Builders in ${location}`
     : 'Explore Trusted Builders in Area';
@@ -132,6 +162,13 @@ const TrustedBuildersSection = ({ location }) => {
         <div className="mobile-cards-container">
           {/* Simple scrollable row of cards */}
           <div className="mobile-cards-row">
+            {(loading || error || filteredBuilders.length === 0) && (
+              <div className="trusted-builders-state mobile">
+                {loading
+                  ? 'Loading trusted builders...'
+                  : error || 'No trusted builder projects found yet.'}
+              </div>
+            )}
 
             {/* Show all cards in a scrollable row */}
             {filteredBuilders.map((builder, idx) => (
@@ -243,7 +280,16 @@ const TrustedBuildersSection = ({ location }) => {
           boxSizing: 'border-box',
         }}
       >
+        {(loading || error || filteredBuilders.length === 0) && (
+          <div className="trusted-builders-state">
+            {loading
+              ? 'Loading trusted builders...'
+              : error || 'No trusted builder projects found yet.'}
+          </div>
+        )}
+
         {/* Navigation Buttons */}
+        {filteredBuilders.length > 0 && (
         <button 
           onClick={handlePrevious}
           className="carousel-nav-button prev-button"
@@ -277,7 +323,9 @@ const TrustedBuildersSection = ({ location }) => {
             <path d="M15 18L9 12L15 6" stroke="#223A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
+        )}
         
+        {filteredBuilders.length > 0 && (
         <button 
           onClick={handleNext}
           className="carousel-nav-button next-button"
@@ -311,6 +359,7 @@ const TrustedBuildersSection = ({ location }) => {
             <path d="M9 6L15 12L9 18" stroke="#223A5F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
         </button>
+        )}
         {/* Carousel Container */}
         <div
           style={{
