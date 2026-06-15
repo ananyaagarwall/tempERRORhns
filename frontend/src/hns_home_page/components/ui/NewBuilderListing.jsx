@@ -895,7 +895,10 @@ const NewBuilderListing = () => {
             </div>
             <div style={{ textAlign: 'center' }}>
               <span className="bl-hero-stat-num" style={{ color: C.gold, fontFamily: font }}>
-                100%
+                {/* rera_registered is a boolean on the Builder model — count verified builders */}
+                {builders.length > 0
+                  ? `${Math.round((builders.filter(b => b.rera_registered).length / builders.length) * 100)}%`
+                  : '100%'}
               </span>
               <span className="bl-hero-stat-label">RERA Verified</span>
             </div>

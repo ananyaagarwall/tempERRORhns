@@ -158,31 +158,34 @@ def _resolve_db_url():
     def rewrite(url):
         return url.replace('postgres://', 'postgresql://', 1) if url.startswith('postgres://') else url
 
-    use_child = os.getenv('USE_CHILD', '').strip().lower() == 'true'
-    if use_child:
-        child = rewrite(os.getenv('DATABASE_URL_CHILD', ''))
-        if child:
-            print("DB: USE_CHILD=true — using child branch Neon DB")
-            return child
-        print("DB: USE_CHILD=true but DATABASE_URL_CHILD not set — falling through")
-
-    primary  = rewrite(os.getenv('DATABASE_URL', ''))
-    fallback = rewrite(os.getenv('DATABASE_URL_FALLBACK', f"sqlite:///{os.path.join(instance_dir, 'hns.db')}"))
-
-    if primary:
+    def is_reachable(url, label):
         try:
-            parsed = urlparse(primary)
+            parsed = urlparse(url)
             host = parsed.hostname
             port = parsed.port or 5432
-            # TCP connect test (3 s timeout) — catches DNS failures, paused projects, firewall blocks
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(3)
             sock.connect((host, port))
             sock.close()
-            print(f"DB: Neon reachable — using primary  host={host}")
-            return primary
+            print(f"DB: {label} reachable — using host={host}")
+            return True
         except (socket.gaierror, socket.timeout, OSError):
-            print("DB: Neon unreachable — falling back to local PostgreSQL")
+            print(f"DB: {label} unreachable — falling back")
+            return False
+
+    use_child = os.getenv('USE_CHILD', '').strip().lower() == 'true'
+    if use_child:
+        child = rewrite(os.getenv('DATABASE_URL_CHILD', ''))
+        if child and is_reachable(child, "child Neon"):
+            return child
+        if not child:
+            print("DB: USE_CHILD=true but DATABASE_URL_CHILD not set — falling through")
+
+    primary  = rewrite(os.getenv('DATABASE_URL', ''))
+    fallback = rewrite(os.getenv('DATABASE_URL_FALLBACK', f"sqlite:///{os.path.join(instance_dir, 'hns.db')}"))
+
+    if primary and is_reachable(primary, "primary Neon"):
+        return primary
 
     return fallback
 
@@ -1062,6 +1065,35 @@ def _ensure_schema_compatibility():
             "ON media (entity_type, entity_id, media_type)"
         ))
 
+    if inspector.has_table('unit_config'):
+        unit_config_columns = [
+            ('unit_type', 'VARCHAR(30)'),
+            ('wing', 'VARCHAR(20)'),
+            ('floor_range_raw', 'VARCHAR(100)'),
+            ('balcony_area', 'FLOAT'),
+            ('enclosed_balcony_area', 'FLOAT'),
+            ('service_area', 'FLOAT'),
+            ('ceiling_height', 'VARCHAR(50)'),
+            ('main_door_facing', 'VARCHAR(50)'),
+            ('modular_kitchen', 'BOOLEAN'),
+            ('kitchen_type', 'VARCHAR(50)'),
+            ('is_combination', 'BOOLEAN'),
+        ]
+        for column_name, column_type in unit_config_columns:
+            _add_column_if_missing('unit_config', column_name, column_type)
+
+    if inspector.has_table('unit_room_detail'):
+        unit_room_detail_columns = [
+            ('room_name', 'VARCHAR(50)'),
+            ('length', 'FLOAT'),
+            ('width', 'FLOAT'),
+            ('area', 'FLOAT'),
+            ('area_unit', 'VARCHAR(10)'),
+            ('notes', 'TEXT'),
+        ]
+        for column_name, column_type in unit_room_detail_columns:
+            _add_column_if_missing('unit_room_detail', column_name, column_type)
+
     if dialect == 'postgresql' and inspector.has_table('favorite'):
         _dedupe_favorite_rows()
         db.session.flush()
@@ -1631,15 +1663,95 @@ def get_property_pois(id):
 
 @app.route('/api/builders', methods=['GET'])
 def get_builders():
+    builder_columns = set()
     try:
-        print("Fetching builders...")  # Debug log
-        builders = Builder.query.all()
-        print(f"Found {len(builders)} builders")  # Debug log
-        
-        builders_data = [builder.to_dict() for builder in builders]
-        return jsonify(builders_data)
+        inspector = inspect(db.engine)
+        if inspector.has_table('builder'):
+            builder_columns = {column['name'] for column in inspector.get_columns('builder')}
     except Exception as e:
-        print(f"Error in get_builders: {str(e)}")  # Debug log
+        print(f"Error inspecting builder schema: {str(e)}")
+        db.session.rollback()
+
+    if 'id' in builder_columns:
+        try:
+            print("Fetching builders...")  # Debug log
+            builders = Builder.query.all()
+            print(f"Found {len(builders)} builders")  # Debug log
+
+            builders_data = [builder.to_dict() for builder in builders]
+            return jsonify(builders_data)
+        except Exception as e:
+            print(f"Error in get_builders with ORM: {str(e)}")  # Debug log
+            db.session.rollback()
+
+    try:
+        legacy_rows = db.session.execute(text("""
+            SELECT
+                b.rera_id AS id,
+                b.rera_id,
+                b.user_id,
+                b.company_name,
+                b.brand_name,
+                b.established_year,
+                b.builder_type,
+                b.rera_registered,
+                b.corporate_address,
+                b.city,
+                b.state,
+                b.pin_code,
+                b.contact_email,
+                b.contact_number,
+                b.website_url,
+                b.builder_logo,
+                b.cover_banner,
+                b.certificates,
+                COALESCE(b.location, MIN(bp.location)) AS location,
+                b.short_description,
+                b.detailed_description,
+                b.completed_projects,
+                b.ongoing_projects,
+                b.awards,
+                b.verified,
+                MIN(bp.project_image) AS project_image,
+                COUNT(bp.id) AS project_count
+            FROM builder b
+            LEFT JOIN builder_project bp ON bp.builder_id = b.rera_id
+            GROUP BY
+                b.rera_id, b.user_id, b.company_name, b.brand_name, b.established_year,
+                b.builder_type, b.rera_registered, b.corporate_address, b.city, b.state,
+                b.pin_code, b.contact_email, b.contact_number, b.website_url, b.builder_logo,
+                b.cover_banner, b.certificates, b.location, b.short_description,
+                b.detailed_description, b.completed_projects, b.ongoing_projects,
+                b.awards, b.verified
+            ORDER BY b.company_name
+        """)).mappings().all()
+
+        if legacy_rows:
+            return jsonify([dict(row) for row in legacy_rows])
+    except Exception as e:
+        print(f"Error in get_builders legacy fallback: {str(e)}")
+        db.session.rollback()
+
+    try:
+        project_rows = db.session.execute(text("""
+            SELECT
+                bp.builder_id AS id,
+                bp.builder_id AS rera_id,
+                COALESCE(NULLIF(bp.builder_name, ''), bp.builder_id) AS company_name,
+                COALESCE(NULLIF(bp.builder_name, ''), bp.builder_id) AS brand_name,
+                MIN(bp.location) AS location,
+                MIN(bp.project_image) AS project_image,
+                COUNT(bp.id) AS project_count
+            FROM builder_project bp
+            WHERE bp.builder_id IS NOT NULL
+            GROUP BY bp.builder_id, bp.builder_name
+            ORDER BY company_name
+        """)).mappings().all()
+
+        return jsonify([dict(row) for row in project_rows])
+    except Exception as e:
+        print(f"Error in get_builders project fallback: {str(e)}")
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/builders/search', methods=['GET'])
@@ -2769,8 +2881,16 @@ def get_property_by_slug(slug):
 
 @app.route('/api/projects', methods=['GET'])
 def get_all_projects():
-    projects = BuilderProject.query.all()
-    return jsonify([p.to_dict() for p in projects])
+    try:
+        projects = BuilderProject.query.all()
+        return jsonify([p.to_dict() for p in projects])
+    except Exception as exc:
+        app.logger.exception("Failed to fetch projects")
+        db.session.rollback()
+        return jsonify({
+            'error': 'Failed to fetch projects',
+            'details': str(exc) if app.debug else None
+        }), 500
 
 @app.route('/api/builders/<int:builder_id>/projects/upload-image', methods=['POST'])
 @admin_only
