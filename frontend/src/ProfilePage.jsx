@@ -21,7 +21,7 @@ export default function ProfilePage() {
           }
         >
           <div style={{ padding: 16 }}>
-            <UserProfile routing="virtual" />
+            <UserProfile routing="path" path="/profile" />
           </div>
         </ClerkErrorBoundary>
       </SignedIn>

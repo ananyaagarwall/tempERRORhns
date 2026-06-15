@@ -324,6 +324,16 @@ class BuilderProject(db.Model):
     project_amenities = db.relationship('ProjectAmenity', backref='project', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
+        def _safe_json_loads(value, default=None):
+            if value is None:
+                return default
+            if isinstance(value, (list, dict)):
+                return value
+            try:
+                return json.loads(value)
+            except Exception:
+                return default
+
         primary_property = None
         property_ids = []
         try:
@@ -383,13 +393,13 @@ class BuilderProject(db.Model):
             'image_urls': self.image_urls,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'primary_slug': self.primary_slug,
-            'alias_slugs': json.loads(self.alias_slugs) if self.alias_slugs else [],
+            'alias_slugs': _safe_json_loads(self.alias_slugs, []),
             'form_status': self.form_status,
             'property_type': self.property_type,
             'sub_type': self.sub_type,
             'property_status': self.property_status,
             'possession_date': self.possession_date.isoformat() if self.possession_date else None,
-            'configuration': json.loads(self.configuration) if self.configuration else None,
+            'configuration': _safe_json_loads(self.configuration),
             'flat_number': self.flat_number,
             'price_per_sqft': self.price_per_sqft,
             'carpet_area_min': self.carpet_area_min,
@@ -406,16 +416,16 @@ class BuilderProject(db.Model):
             'towers': self.towers,
             'floors_per_tower': self.floors_per_tower,
             'construction_status': self.construction_status,
-            'floor_plans': json.loads(self.floor_plans) if self.floor_plans else [],
-            'amenities': json.loads(self.amenities) if self.amenities else [],
+            'floor_plans': _safe_json_loads(self.floor_plans, []),
+            'amenities': _safe_json_loads(self.amenities, []),
             'project_image': self.project_image,
             # ── New fields ──────────────────────────────────────────────────
             'development_group':    self.development_group,
             'elevation':            self.elevation,
             'structure_description': self.structure_description,
-            'jodi_options':  json.loads(self.jodi_options) if self.jodi_options else [],
-            'usps':          json.loads(self.usps) if self.usps else [],
-            'highlights':    json.loads(self.highlights) if self.highlights else [],
+            'jodi_options':  _safe_json_loads(self.jodi_options, []),
+            'usps':          _safe_json_loads(self.usps, []),
+            'highlights':    _safe_json_loads(self.highlights, []),
             'unit_configs':       [uc.to_dict() for uc in self.unit_configs],
             'project_amenities':  [pa.to_dict() for pa in self.project_amenities],
         }
