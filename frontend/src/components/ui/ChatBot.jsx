@@ -91,7 +91,7 @@ const buildBuilderComparisonRows = (builders = []) => [
   { label: "Builder Type", values: builders.map((item) => formatComparisonValue(item.builder_type)) },
   { label: "Completed Projects", values: builders.map((item) => formatComparisonValue(item.completed_projects, "0")) },
   { label: "Ongoing Projects", values: builders.map((item) => formatComparisonValue(item.ongoing_projects, "0")) },
-  { label: "RERA ID", values: builders.map((item) => formatComparisonValue(item.rera_id || item.id)) },
+  { label: "Builder ID", values: builders.map((item) => formatComparisonValue(item.id)) },
   { label: "RERA Registered", values: builders.map((item) => item.rera_registered ? "Yes" : "No") },
   { label: "Verified", values: builders.map((item) => item.verified ? "Yes" : "No") },
 ];
@@ -106,7 +106,7 @@ const ComparisonTable = ({ kind, items }) => {
 
   const headers = safeItems.map((item) =>
     kind === "builder"
-      ? (item.company_name || item.brand_name || item.rera_id || "Builder")
+      ? (item.company_name || item.brand_name || item.id || "Builder")
       : (item.Property_Name || `Property ${item.id || ""}`.trim())
   );
 
@@ -147,19 +147,17 @@ const GENERAL_RESPONSES = {
     payload: {
       response: "I'd be happy to help you find a property! Here are some of our top-featured listings to get you started. To narrow down the search, could you tell me which Location or BHK you are interested in?",
       properties: [
-        { id: 101, Property_Name: "Skyline Residency", Location: "Thane West, Mumbai", Price_Starting_From: "₹1.2 Cr", Existing_Configurations: "2, 3 BHK", Project_Status: "Ready to Move" },
-        { id: 102, Property_Name: "Green Valley Estates", Location: "Kharghar, Navi Mumbai", Price_Starting_From: "₹85 Lacs", Existing_Configurations: "1, 2 BHK", Project_Status: "Under Construction" },
-        { id: 103, Property_Name: "Sea View Towers", Location: "Worli, Mumbai", Price_Starting_From: "₹4.5 Cr", Existing_Configurations: "3, 4 BHK", Project_Status: "Ready to Move" },
-        { id: 104, Property_Name: "Urban Heights", Location: "Andheri East, Mumbai", Price_Starting_From: "₹1.5 Cr", Existing_Configurations: "2 BHK", Project_Status: "Ready to Move" },
-        { id: 105, Property_Name: "Palm Grove", Location: "Panvel, Navi Mumbai", Price_Starting_From: "₹65 Lacs", Existing_Configurations: "1, 2 BHK", Project_Status: "Under Construction" },
-        { id: 106, Property_Name: "Grand Central", Location: "Mulund, Mumbai", Price_Starting_From: "₹1.8 Cr", Existing_Configurations: "2, 3 BHK", Project_Status: "Near Completion" },
-        { id: 107, Property_Name: "Silicon Valley", Location: "Ghansoli, Navi Mumbai", Price_Starting_From: "₹95 Lacs", Existing_Configurations: "2 BHK", Project_Status: "Ready to Move" },
-        { id: 108, Property_Name: "Regal Enclave", Location: "Bandra, Mumbai", Price_Starting_From: "₹5.2 Cr", Existing_Configurations: "3, 4, 5 BHK", Project_Status: "Ready to Move" },
-        { id: 109, Property_Name: "Park View", Location: "Kandivali, Mumbai", Price_Starting_From: "₹1.1 Cr", Existing_Configurations: "1, 2 BHK", Project_Status: "Under Construction" },
-        { id: 110, Property_Name: "Rivera Estate", Location: "Kalyan, Thane", Price_Starting_From: "₹55 Lacs", Existing_Configurations: "1, 2 BHK", Project_Status: "Under Construction" }
-      ],
-      all_properties: Array.from({length: 20}, (_, i) => ({ id: 101 + i, Property_Name: `Property ${101+i}`, Location: "Mumbai", Price_Starting_From: "₹1 Cr", Existing_Configurations: "2 BHK", Project_Status: "Ready" })), // Dummy set for "Show More" demo
-      builders: [],
+      { id: 36, Property_Name: "The Trellis", Location: "Koparkhairane", Price_Starting_From: "2.11 Cr All Inclusive", Existing_Configurations: "2 BHK, 3 BHK", Project_Status: "Under-Construction" },
+      { id: 41, Property_Name: "Aurum Q Islands R7", Location: "Ghansoli", Price_Starting_From: "₹2.06Cr - ₹3.42Cr", Existing_Configurations: "2/4.5 BHK", Project_Status: "Ongoing" },
+      { id: 42, Property_Name: "Palm President", Location: "Ghansoli", Price_Starting_From: "1.84 Cr", Existing_Configurations: "2 BHK, 3 BHK", Project_Status: "Under Construction" },
+      { id: 40, Property_Name: "Aurum Q Islands R6", Location: "Ghansoli", Price_Starting_From: "₹2.15 Cr + Taxes", Existing_Configurations: "2 BHK", Project_Status: "Ongoing" }
+    ],
+    all_properties: [
+      { id: 36, Property_Name: "The Trellis", Location: "Koparkhairane", Price_Starting_From: "2.11 Cr All Inclusive", Existing_Configurations: "2 BHK, 3 BHK", Project_Status: "Under-Construction" },
+      { id: 41, Property_Name: "Aurum Q Islands R7", Location: "Ghansoli", Price_Starting_From: "₹2.06Cr - ₹3.42Cr", Existing_Configurations: "2/4.5 BHK", Project_Status: "Ongoing" },
+      { id: 42, Property_Name: "Palm President", Location: "Ghansoli", Price_Starting_From: "1.84 Cr", Existing_Configurations: "2 BHK, 3 BHK", Project_Status: "Under Construction" },
+      { id: 40, Property_Name: "Aurum Q Islands R6", Location: "Ghansoli", Price_Starting_From: "₹2.15 Cr + Taxes", Existing_Configurations: "2 BHK", Project_Status: "Ongoing" }
+    ],      builders: [],
       last_intent: "search_properties",
       has_more: true,
       total_results: { properties: 50, builders: 0 },
@@ -173,18 +171,11 @@ const GENERAL_RESPONSES = {
       response: "I can definitely help you find the right developer! Here are some of the most reputable builders currently active. Do you have a specific builder name in mind?",
       properties: [],
       builders: [
-        { rera_id: "B001", company_name: "Godrej Properties", cities: "Mumbai, Pune, Bangalore", completed_projects: 45, ongoing_projects: 12 },
-        { rera_id: "B002", company_name: "Lodha Group", cities: "Mumbai, Thane, London", completed_projects: 80, ongoing_projects: 25 },
-        { rera_id: "B003", company_name: "Hiranandani Developers", cities: "Thane, Powai, Panvel", completed_projects: 60, ongoing_projects: 10 },
-        { rera_id: "B004", company_name: "Oberoi Realty", cities: "Mumbai", completed_projects: 30, ongoing_projects: 8 },
-        { rera_id: "B005", company_name: "Tata Housing", cities: "Pan India", completed_projects: 50, ongoing_projects: 15 },
-        { rera_id: "B006", company_name: "Kalpataru Group", cities: "Thane, Mumbai", completed_projects: 40, ongoing_projects: 12 },
-        { rera_id: "B007", company_name: "Rustomjee", cities: "Mumbai, Virar", completed_projects: 35, ongoing_projects: 7 },
-        { rera_id: "B008", company_name: "Indiabulls Real Estate", cities: "Mumbai, Gurgaon", completed_projects: 25, ongoing_projects: 5 },
-        { rera_id: "B009", company_name: "Piramal Realty", cities: "Mumbai, Thane", completed_projects: 15, ongoing_projects: 6 },
-        { rera_id: "B010", company_name: "Sunteck Realty", cities: "Mumbai", completed_projects: 20, ongoing_projects: 9 }
-      ],
-      all_builders: Array.from({length: 20}, (_, i) => ({ rera_id: `B${101+i}`, company_name: `Builder ${i+1}`, cities: "Mumbai", completed_projects: 10, ongoing_projects: 2 })),
+      { id: 12, company_name: "Aurum Ventures", city: "Navi Mumbai", completed_projects: 0, ongoing_projects: 2 },
+      { id: 9, company_name: "Maithili Developers", city: "Navi Mumbai", completed_projects: 0, ongoing_projects: 1 },
+      { id: 10, company_name: "Neelkanth Infratech", city: "Navi Mumbai", completed_projects: 0, ongoing_projects: 0 }
+    ],
+        all_builders: Array.from({length: 20}, (_, i) => ({ rera_id: `B${101+i}`, company_name: `Builder ${i+1}`, cities: "Mumbai", completed_projects: 10, ongoing_projects: 2 ,verified: true})),
       last_intent: "search_builders",
       has_more: true,
       total_results: { properties: 0, builders: 20 },
@@ -246,7 +237,7 @@ const ChatBot = () => {
       setMessages([
         {
           id: 1,
-          text: "Welcome to HouseNseeK! You must be signed in to use our AI Assistant for property and builder searches.",
+          text: "Welcome to HouseNseeK! You must be signed in to use our AI Assistant <b> Seeku </b> for property and builder searches.",
           sender: "bot",
           timestamp: new Date(),
           isTypingEffect: false,
@@ -922,7 +913,7 @@ const ChatBot = () => {
                   <div className="chatbot-property-cards-horizontal">
                     {message.builders.map((builder, idx) => (
                       <div
-                        key={builder.rera_id || idx}
+                        key={builder.id || idx}
                         className="chatbot-property-card-item"
                       >
                         <ChatbotBuilderCard
@@ -1159,8 +1150,8 @@ const LegacyChatbotBuilderCard = ({ builder, navigate }) => {
   const getBuilderImage = () => {
     if (builder.logo) return builder.logo;
     // Generate a pseudo-random index from builder name or ID
-    const seed = builder.rera_id ? 
-      parseInt(builder.rera_id.replace(/\D/g, '') || 0) : 
+    const seed = builder.id ? 
+      parseInt(builder.id.replace(/\D/g, '') || 0) : 
       (builder.company_name ? builder.company_name.length : 0);
     return getRandomImage(seed);
   };
@@ -1168,7 +1159,7 @@ const LegacyChatbotBuilderCard = ({ builder, navigate }) => {
   const builderImage = getBuilderImage();
 
   const handleCardClick = () => {
-    if (builder.rera_id) {
+    if (builder.id) {
       const slug = builder.company_name
   ?.toLowerCase()
   .replace(/\s+/g, '-')
@@ -1193,8 +1184,8 @@ const LegacyChatbotBuilderCard = ({ builder, navigate }) => {
         onError={(e) => {
           e.target.onerror = null;
           // Fallback to random image if logo load fails
-          const seed = builder.rera_id ? 
-            parseInt(builder.rera_id.replace(/\D/g, '') || 0) : 
+          const seed = builder.id ? 
+            parseInt(builder.id.replace(/\D/g, '') || 0) : 
             (builder.company_name ? builder.company_name.length : 0);
           e.target.src = getRandomImage(seed);
         }}
@@ -1203,8 +1194,8 @@ const LegacyChatbotBuilderCard = ({ builder, navigate }) => {
         <h3 className="chatbot-builder-name">
           {builder.company_name || builder.name || "Builder"}
         </h3>
-        {builder.rera_id && (
-          <p className="chatbot-builder-rera">RERA ID: {builder.rera_id}</p>
+        {builder.id && (
+          <p className="chatbot-builder-rera">RERA ID: {builder.id}</p>
         )}
         {(builder.completed_projects !== undefined ||
           builder.ongoing_projects !== undefined) && (

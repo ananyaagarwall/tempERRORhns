@@ -31,7 +31,7 @@ const CartBuilderCard = ({ builder, onRemove }) => {
       <button
         onClick={(e) => {
           e.stopPropagation();
-          onRemove(builder.rera_id);
+          onRemove(builder.id);
         }}
         className="cart-builder-remove-button"
         aria-label="Remove builder"

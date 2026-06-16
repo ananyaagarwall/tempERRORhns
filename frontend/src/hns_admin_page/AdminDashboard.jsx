@@ -599,7 +599,7 @@ const AdminDashboard = () => {
                                             </div>
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700">RERA ID</label>
-                                                <p className="mt-1 text-gray-900 font-medium">{selectedUser.rera_id}</p>
+                                                <p className="mt-1 text-gray-900 font-medium">{selectedUser.id}</p>
                                             </div>
                                         </div>
                                     </div>

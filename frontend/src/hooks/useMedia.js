@@ -5,7 +5,7 @@ import { fetchEntityMedia } from '../services/mediaService';
  * Fetch Media records for an entity from the /api/media endpoint.
  *
  * @param {string}         entityType  'builder' | 'project' | 'property' | 'blog'
- * @param {string|number}  entityId    RERA ID (string) or numeric DB id
+ * @param {string|number}  entityId    ID (string) or numeric DB id
  * @param {string|null}    mediaType   optional filter ('gallery', 'floor_plan', …)
  *
  * @returns {{
@@ -19,7 +19,7 @@ import { fetchEntityMedia } from '../services/mediaService';
  *   const { urls, loading } = useMedia('project', projectData?.id, 'gallery');
  *
  * Usage (featured image):
- *   const { featuredUrl } = useMedia('builder', builderData?.rera_id, 'logo');
+ *   const { featuredUrl } = useMedia('builder', builderData?.id, 'logo');
  */
 export function useMedia(entityType, entityId, mediaType = null) {
   const [media,   setMedia]   = useState([]);

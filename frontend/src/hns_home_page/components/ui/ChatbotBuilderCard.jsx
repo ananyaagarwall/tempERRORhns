@@ -26,8 +26,8 @@ const ChatbotBuilderCard = ({ builder }) => {
       return;
     }
 
-    if (builder.rera_id) {
-      navigate(`/builder/${builder.rera_id}`);
+    if (builder.id) {
+      navigate(`/builder/${builder.id}`);
       return;
     }
 
@@ -39,7 +39,7 @@ const ChatbotBuilderCard = ({ builder }) => {
       <img src={builderImage} alt={builder.company_name || builder.name || "Builder"} className="chatbot-builder-img" />
       <div className="chatbot-builder-info">
         <h3 className="chatbot-builder-name">{builder.company_name || builder.name}</h3>
-        {builder.rera_id && <p className="chatbot-builder-rera">RERA ID: {builder.rera_id}</p>}
+        {builder.id && <p className="chatbot-builder-rera">Builder  ID: {builder.id}</p>}
         {(builder.completed_projects !== undefined || builder.ongoing_projects !== undefined) && (
           <div className="chatbot-builder-projects-row">
             {builder.completed_projects !== undefined && (

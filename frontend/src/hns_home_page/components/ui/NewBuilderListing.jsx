@@ -134,7 +134,7 @@ const BuilderCard = ({ builder, isSaved, handleHeartClick, hoveredCard, setHover
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px', alignItems: 'center' }}>
             <button
               className="nbl-view-btn"
-              onClick={(e) => { e.stopPropagation(); window.location.href = `/builder/${builder.company_name.replace(/\\s+/g, '-')}` }}
+              onClick={(e) => { e.stopPropagation(); window.location.href = `/builder/${builder.id}` }}
             >
               View Details
             </button>
@@ -215,7 +215,7 @@ const NewBuilderListing = () => {
 
   const handleHeartClick = (e, builder) => {
     e.stopPropagation();
-    if (isBuilderSaved(builder.rera_id)) removeBuilder(builder.rera_id);
+    if (isBuilderSaved(builder.id)) removeBuilder(builder.id);
     else addBuilder(builder);
   };
 
@@ -864,7 +864,6 @@ const NewBuilderListing = () => {
       <FooterNavBar />
       <DynamicBreadcrumb />
 
-      {/* ── Hero Blob ── */}
       {/* ── Hero Image Stripe ── */}
       <div
         className="bl-hero-stripe"
@@ -986,7 +985,7 @@ const NewBuilderListing = () => {
                 <BuilderCard
                   key={uniqueId}
                   builder={builder}
-                  isSaved={isBuilderSaved(builder.rera_id)}
+                  isSaved={isBuilderSaved(builder.id)}
                   handleHeartClick={handleHeartClick}
                   hoveredCard={hoveredCard}
                   setHoveredCard={setHoveredCard}

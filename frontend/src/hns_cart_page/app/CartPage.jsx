@@ -347,7 +347,7 @@ const CartPage = () => {
                 if (item._type === 'builder') {
                   return (
                     <CartBuilderCard
-                      key={item.rera_id}
+                      key={item.id}
                       builder={item}
                       onRemove={removeBuilder}
                     />

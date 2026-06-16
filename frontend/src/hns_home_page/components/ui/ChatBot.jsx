@@ -143,7 +143,7 @@ const ChatBot = () => {
 	                        builders: [fetchedBuilder],
 	                        suggestions: [
 	                            { text: "Search more builders", action: "find_builders" },
-	                            { text: "View builder projects", action: "view_builder_projects", payload: fetchedBuilder.rera_id }
+	                            { text: "View builder projects", action: "view_builder_projects", payload: fetchedBuilder.id }
 	                        ],
 	                        isTypingEffect: true
 	                    };
@@ -236,49 +236,71 @@ const ChatBot = () => {
     }, typingDuration + 500); // Add a small delay after typing
   };
 
+    
   const handleSuggestionClick = (action, payload) => {
-    // Implement logic based on the action
     console.log(`Suggestion clicked: ${action}`, payload);
-    let simulatedInput = '';
+    const navigate = useNavigate();
+
+    let simulatedInput = "";
+
     switch (action) {
       case "search_property":
         simulatedInput = "show properties";
         break;
+
       case "find_builders":
         simulatedInput = "find builders";
         break;
+
       case "explore_blogs":
-        navigate('/blogs'); // Navigate to blog page
-        setIsOpen(false); // Close chatbot after navigation
+        navigate("/blogs");
+        setIsOpen(false);
         return;
+
       case "contact_support":
-        simulatedInput = "I need support"; // Placeholder for actual support flow
+        simulatedInput = "I need support";
         break;
+
       case "retry_last_search":
-        // Logic to re-run the last search. For now, just a message.
         simulatedInput = "Can you try searching again?";
         break;
-	      case "view_builder_projects":
-	        const reraId = String(payload || '').trim();
-	        navigate(reraId ? `/builder/${reraId}` : '/builders-page');
-	        setIsOpen(false);
-	        return;
+
+      case "view_builder_projects": {
+        const builderId = payload?.builder_id || payload?.id || payload;
+
+        navigate(
+          builderId
+            ? `/builder/${builderId}`
+            : "/builders-page"
+        );
+
+        setIsOpen(false);
+        return;
+      }
+
       case "help":
         simulatedInput = "What can you do?";
         break;
+
       case "help_builders":
         simulatedInput = "How do I search for a builder?";
         break;
+
       case "show_all_builders":
         simulatedInput = "show all builders";
         break;
+
       default:
-        simulatedInput = `Tell me more about ${action}`; // Generic fallback
+        simulatedInput = `Tell me more about ${action}`;
     }
-    // Simulate sending a message from the user
+
     setInputMessage(simulatedInput);
-    handleSendMessage({ preventDefault: () => {} }); // Call with a mock event object
+    handleSendMessage(
+      { preventDefault: () => {} },
+      simulatedInput
+    );
   };
+
 
   const formatTime = (date) => {
     return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -344,7 +366,7 @@ const ChatBot = () => {
                 {message.builders && message.builders.length > 0 && (
 	                  <div className="chatbot-properties-carousel">
 	                    {message.builders.map(builder => (
-	                      <ChatbotBuilderCard key={builder.rera_id || builder.company_name} builder={builder} />
+	                      <ChatbotBuilderCard key={builder.id || builder.company_name} builder={builder} />
 	                    ))}
 	                  </div>
 	                )}
