@@ -457,11 +457,13 @@ def ask_bot():
                 builders_payload = []
             else:
                 for item in compare_items:
-                    session_data['shown_ids'].add(str(item.rera_id))
+                    session_data['shown_ids'].add(str(item.id))
+
                 session_data['all_properties'] = []
                 session_data['all_builders'] = [item.to_dict() for item in compare_items]
                 session_data['last_shown_properties'] = []
-                session_data['last_shown_builders'] = [item.rera_id for item in compare_items]
+                session_data['last_shown_builders'] = [item.id for item in compare_items]
+
                 properties_payload = []
                 builders_payload = [item.to_dict() for item in compare_items]
 

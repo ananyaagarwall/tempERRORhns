@@ -86,12 +86,12 @@ export const CartProvider = ({ children }) => {
   // Builder Functions
   const addBuilder = (builder) => {
     setSavedBuilders(prev => {
-      const exists = prev.find(item => item.rera_id === builder.rera_id);
+      const exists = prev.find(item => item.id === builder.id);
       if (exists) {
         return prev;
       }
       return [...prev, {
-        rera_id: builder.rera_id,
+        id: builder.id,
         company_name: builder.company_name,
         brand_name: builder.brand_name,
         builder_logo: builder.builder_logo,
@@ -112,17 +112,14 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  const removeBuilder = (reraId) => {
-    setSavedBuilders(prev => prev.filter(item => item.rera_id !== reraId));
+  const removeBuilder = (builderId) => {
+    setSavedBuilders(prev => prev.filter(item => item.id !== builderId));
   };
 
-  const isBuilderSaved = (reraId) => {
-    return savedBuilders.some(item => item.rera_id === reraId);
+  const isBuilderSaved = (builderId) => {
+    return savedBuilders.some(item => item.id === builderId);
   };
 
-  const clearBuilders = () => {
-    setSavedBuilders([]);
-  };
 
   return (
     <CartContext.Provider value={{

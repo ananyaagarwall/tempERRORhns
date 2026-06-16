@@ -90,18 +90,18 @@ const BuildersListing = () => {
 
   const handleHeartClick = (e, builder) => {
     e.stopPropagation();
-    if (isBuilderSaved(builder.rera_id)) removeBuilder(builder.rera_id);
+    if (isBuilderSaved(builder.id)) removeBuilder(builder.id);
     else addBuilder(builder);
   };
 
   /* ── Builder Card ── */
   const BuilderCard = ({ builder }) => {
-    const saved = isBuilderSaved(builder.rera_id);
-    const hovered = hoveredCard === builder.rera_id;
+    const saved = isBuilderSaved(builder.id);
+    const hovered = hoveredCard === builder.id;
 
     return (
       <div
-        onMouseEnter={() => setHoveredCard(builder.rera_id)}
+        onMouseEnter={() => setHoveredCard(builder.id)}
         onMouseLeave={() => setHoveredCard(null)}
         style={{
           background: C.cardBg,
@@ -329,7 +329,7 @@ const BuildersListing = () => {
             }}>
               <CheckCircle size={14} style={{ color: C.success, flexShrink: 0 }} />
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#15803d' }}>
-                RERA: {builder.rera_id}
+                RERA: {builder.id}
               </span>
             </div>
           )}
@@ -752,7 +752,7 @@ const BuildersListing = () => {
                 gap: '28px',
               }}>
                 {filteredBuilders.map(builder => (
-                  <BuilderCard key={builder.rera_id || builder.company_name} builder={builder} />
+                  <BuilderCard key={builder.id || builder.company_name} builder={builder} />
                 ))}
               </div>
             )}

@@ -982,8 +982,8 @@ Amenities: {", ".join(amenity_names) if amenity_names else clean_json_field(reco
 Description: {record.description}"""
 
     elif isinstance(record, Builder):
-        unique_id = f"builder_{record.rera_id}"
-        metadata = {"id": str(record.rera_id), "type": "builder", "city": record.city or "Unknown"}
+        unique_id = f"builder_{record.id}"
+        metadata = {"id": str(record.id), "type": "builder", "city": record.city or "Unknown"}
         content = f"""Type: Builder Profile
 Company: {record.company_name} (Brand: {record.brand_name})
 Established: {record.established_year}
@@ -1651,7 +1651,7 @@ def _resolve_specific_builder_candidates(user_query, location=None, limit=5):
         best_builder = None
         best_score = 0
         for builder in builders:
-            builder_id = getattr(builder, 'rera_id', None)
+            builder_id = getattr(builder, 'id', None)
             if not builder_id or builder_id in used_ids:
                 continue
 
@@ -1665,7 +1665,7 @@ def _resolve_specific_builder_candidates(user_query, location=None, limit=5):
                 best_builder = builder
 
         if best_builder and best_score >= 60:
-            used_ids.add(best_builder.rera_id)
+            used_ids.add(best_builder.id)
             resolved.append(best_builder)
             if len(resolved) >= limit:
                 break
@@ -1755,8 +1755,9 @@ def _search_builders_from_vector(user_query, location=None, limit=20, search_k=2
         if not builder:
             continue
 
-        rera_id = getattr(builder, 'rera_id', None)
-        if not rera_id or rera_id in seen:
+        builder_id = getattr(builder, 'id', None)
+
+        if not builder_id or builder_id in seen:
             continue
 
         if location and not _matches_location(
@@ -1765,7 +1766,7 @@ def _search_builders_from_vector(user_query, location=None, limit=20, search_k=2
         ):
             continue
 
-        seen.add(rera_id)
+        seen.add(builder_id)
         results.append(builder)
         if len(results) >= limit:
             break
@@ -1841,15 +1842,18 @@ def _search_builders_from_db(user_query, location=None, limit=10):
             getattr(item[1], 'company_name', '') or '',
         )
     )
-
     results = []
     seen = set()
+
     for _, builder in scored:
-        bid = getattr(builder, 'rera_id', None)
+        bid = getattr(builder, 'id', None)
+
         if not bid or bid in seen:
             continue
+
         seen.add(bid)
         results.append(builder)
+
         if len(results) >= limit:
             break
 
@@ -2146,7 +2150,7 @@ Our team is available to assist you with any questions or schedule property visi
 
             if best_builder and best_builder_score >= 1:
                 detailed = format_builder_details(best_builder)
-                session_shown_ids.add(str(best_builder.rera_id))
+                session_shown_ids.add(str(best_builder.id))
                 if user_id:
                     extract_and_save_preferences(user_query, user_id)
                 return detailed, session_shown_ids, [], [best_builder], intent.value, []
@@ -2177,7 +2181,7 @@ Our team is available to assist you with any questions or schedule property visi
                         db_best_b_score, db_best_b = s, b
                 if db_best_b and db_best_b_score >= 2:
                     detailed = format_builder_details(db_best_b)
-                    session_shown_ids.add(str(db_best_b.rera_id))
+                    session_shown_ids.add(str(db_best_b.id))
                     if user_id:
                         extract_and_save_preferences(user_query, user_id)
                     return detailed, session_shown_ids, [], [db_best_b], intent.value, []
@@ -2232,7 +2236,7 @@ Our team is available to assist you with any questions or schedule property visi
                 if len(explicit_builder_matches) >= 2:
                     comparison = compare_builders(explicit_builder_matches)
                     for builder in explicit_builder_matches:
-                        session_shown_ids.add(str(builder.rera_id))
+                        session_shown_ids.add(str(builder.id))
                     if user_id:
                         extract_and_save_preferences(user_query, user_id)
                     return comparison, session_shown_ids, [], explicit_builder_matches, intent.value, []
@@ -2250,14 +2254,14 @@ Our team is available to assist you with any questions or schedule property visi
                 builder_candidates = _merge_unique_records(
                     _search_builders_from_db(user_query, location=loc, limit=10),
                     _search_builders_from_vector(user_query, location=loc, limit=10, search_k=10, fetch_k=30),
-                    key_func=lambda builder: getattr(builder, 'rera_id', None),
+                    key_func=lambda builder: getattr(builder, 'id', None),
                     limit=5,
                 )
 
                 if len(builder_candidates) >= 2:
                     comparison = compare_builders(builder_candidates)
                     for builder in builder_candidates:
-                        session_shown_ids.add(str(builder.rera_id))
+                        session_shown_ids.add(str(builder.id))
                     if user_id:
                         extract_and_save_preferences(user_query, user_id)
                     return comparison, session_shown_ids, [], builder_candidates, intent.value, []
@@ -2387,8 +2391,8 @@ Our team is available to assist you with any questions or schedule property visi
 
             if builders_from_vector:
                 for builder in builders_from_vector[:10]:
-                    if getattr(builder, 'rera_id', None):
-                        session_shown_ids.add(str(builder.rera_id))
+                    if getattr(builder, 'id', None):
+                        session_shown_ids.add(str(builder.id))
 
                 if user_id:
                     extract_and_save_preferences(user_query, user_id)
@@ -2406,8 +2410,8 @@ Our team is available to assist you with any questions or schedule property visi
 
             if builders_from_db:
                 for builder in builders_from_db[:10]:
-                    if getattr(builder, 'rera_id', None):
-                        session_shown_ids.add(str(builder.rera_id))
+                    if getattr(builder, 'id', None):
+                        session_shown_ids.add(str(builder.id))
 
                 if user_id:
                     extract_and_save_preferences(user_query, user_id)
@@ -2797,10 +2801,10 @@ Personalised Response (4-6 lines, no formatting):"""
     for prop in all_properties[:10]:
         session_shown_ids.add(str(prop.id))
     for b in all_builders[:10]:
-        # Builders use rera_id as primary key
-        rid = getattr(b, 'rera_id', None)
-        if rid:
-            session_shown_ids.add(str(rid))
+        # Builders use id as primary key
+        bid = getattr(b, 'id', None)
+        if bid:
+            session_shown_ids.add(str(bid))
     
     # Hard-filter final card results by requested location so cards match user query intent.
     # Skip this filter for ASK_GENERAL / opinion intents — those responses are about

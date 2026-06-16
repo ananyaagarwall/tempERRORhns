@@ -12,7 +12,7 @@ const ChatbotBuilderCard = ({ builder }) => {
   const builderImage = builder.builder_logo || builder.logo || FALLBACK_BUILDING_IMAGE;
 
   const handleCardClick = () => {
-    if (builder.rera_id) {
+    if (builder.id) {
       const slug = builder.company_name
         ?.toLowerCase()
         .replace(/\s+/g, '-')
@@ -45,8 +45,8 @@ const ChatbotBuilderCard = ({ builder }) => {
         <h3 className="chatbot-builder-name">
           {builder.company_name || builder.name || 'Builder'}
         </h3>
-        {builder.rera_id && (
-          <p className="chatbot-builder-rera">RERA ID: {builder.rera_id}</p>
+        {builder.id && (
+          <p className="chatbot-builder-rera">Builders ID: {builder.id}</p>
         )}
         {(builder.completed_projects !== undefined || builder.ongoing_projects !== undefined) && (
           <div className="chatbot-builder-projects-row">

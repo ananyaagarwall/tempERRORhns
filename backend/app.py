@@ -1693,8 +1693,8 @@ def get_builders():
     try:
         legacy_rows = db.session.execute(text("""
             SELECT
-                b.rera_id AS id,
-                b.rera_id,
+                b.id AS id,
+                b.id AS rera_id,
                 b.user_id,
                 b.company_name,
                 b.brand_name,
@@ -1721,19 +1721,38 @@ def get_builders():
                 MIN(bp.project_image) AS project_image,
                 COUNT(bp.id) AS project_count
             FROM builder b
-            LEFT JOIN builder_project bp ON bp.builder_id = b.rera_id
+            LEFT JOIN builder_project bp ON bp.builder_id = b.id
             GROUP BY
-                b.rera_id, b.user_id, b.company_name, b.brand_name, b.established_year,
-                b.builder_type, b.rera_registered, b.corporate_address, b.city, b.state,
-                b.pin_code, b.contact_email, b.contact_number, b.website_url, b.builder_logo,
-                b.cover_banner, b.certificates, b.location, b.short_description,
-                b.detailed_description, b.completed_projects, b.ongoing_projects,
-                b.awards, b.verified
+                b.id,
+                b.user_id,
+                b.company_name,
+                b.brand_name,
+                b.established_year,
+                b.builder_type,
+                b.rera_registered,
+                b.corporate_address,
+                b.city,
+                b.state,
+                b.pin_code,
+                b.contact_email,
+                b.contact_number,
+                b.website_url,
+                b.builder_logo,
+                b.cover_banner,
+                b.certificates,
+                b.location,
+                b.short_description,
+                b.detailed_description,
+                b.completed_projects,
+                b.ongoing_projects,
+                b.awards,
+                b.verified
             ORDER BY b.company_name
         """)).mappings().all()
 
         if legacy_rows:
             return jsonify([dict(row) for row in legacy_rows])
+
     except Exception as e:
         print(f"Error in get_builders legacy fallback: {str(e)}")
         db.session.rollback()
@@ -1743,8 +1762,8 @@ def get_builders():
             SELECT
                 bp.builder_id AS id,
                 bp.builder_id AS rera_id,
-                COALESCE(NULLIF(bp.builder_name, ''), bp.builder_id) AS company_name,
-                COALESCE(NULLIF(bp.builder_name, ''), bp.builder_id) AS brand_name,
+                COALESCE(NULLIF(bp.builder_name, ''), CAST(bp.builder_id AS TEXT)) AS company_name,
+                COALESCE(NULLIF(bp.builder_name, ''), CAST(bp.builder_id AS TEXT)) AS brand_name,
                 MIN(bp.location) AS location,
                 MIN(bp.project_image) AS project_image,
                 COUNT(bp.id) AS project_count
@@ -1755,6 +1774,7 @@ def get_builders():
         """)).mappings().all()
 
         return jsonify([dict(row) for row in project_rows])
+
     except Exception as e:
         print(f"Error in get_builders project fallback: {str(e)}")
         db.session.rollback()

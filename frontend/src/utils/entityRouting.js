@@ -51,14 +51,14 @@ const sortBuildersForRouting = (builders = []) =>
     if (byName !== 0) {
       return byName;
     }
-    return String(left?.rera_id || "").localeCompare(String(right?.rera_id || ""));
+    return String(left?.id || "").localeCompare(String(right?.id || ""));
   });
 
 export const normalizeBuildersForRouting = (builders = []) =>
   sortBuildersForRouting(builders).map((builder, index) => ({
     ...builder,
     route_code: `${BUILDER_ROUTE_PREFIX}${index + 1}`,
-    route_slug: normalizeBuilderSlug(builder?.company_name || builder?.brand_name || builder?.rera_id),
+    route_slug: normalizeBuilderSlug(builder?.company_name || builder?.brand_name || builder?.id),
   }));
 
 const isSameBuilder = (left, right) => {
@@ -66,7 +66,7 @@ const isSameBuilder = (left, right) => {
     return false;
   }
 
-  if (left.rera_id && right.rera_id && String(left.rera_id) === String(right.rera_id)) {
+  if (left.id && right.id && String(left.id) === String(right.id)) {
     return true;
   }
 
@@ -85,7 +85,7 @@ export const buildBuilderPathFromCollection = (builder, builders = []) => {
     return `/builder/${matchedBuilder.route_code}`;
   }
 
-  const fallbackSlug = normalizeBuilderSlug(builder.company_name || builder.brand_name || builder.rera_id);
+  const fallbackSlug = normalizeBuilderSlug(builder.company_name || builder.brand_name || builder.id);
   return fallbackSlug ? `/builder/${fallbackSlug}` : "/builders-page";
 };
 
@@ -98,7 +98,7 @@ export const buildBuilderPath = async (builder) => {
     const builders = await fetchBuilders();
     return buildBuilderPathFromCollection(builder, Array.isArray(builders) ? builders : []);
   } catch (error) {
-    const fallbackSlug = normalizeBuilderSlug(builder.company_name || builder.brand_name || builder.rera_id);
+    const fallbackSlug = normalizeBuilderSlug(builder.company_name || builder.brand_name || builder.id);
     return fallbackSlug ? `/builder/${fallbackSlug}` : "/builders-page";
   }
 };
@@ -120,7 +120,7 @@ export const resolveBuilderFromRouteToken = async (token) => {
   const slugToken = normalizeBuilderSlug(normalizedToken);
   const builder =
     normalizedBuilders.find((candidate) => candidate.route_slug === slugToken) ||
-    normalizedBuilders.find((candidate) => String(candidate.rera_id || "").toLowerCase() === normalizedToken.toLowerCase()) ||
+    normalizedBuilders.find((candidate) => String(candidate.id || "").toLowerCase() === normalizedToken.toLowerCase()) ||
     normalizedBuilders.find((candidate) => normalizeBuilderSlug(candidate.company_name) === slugToken);
 
   return {

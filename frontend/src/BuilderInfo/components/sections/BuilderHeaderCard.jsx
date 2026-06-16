@@ -11,10 +11,10 @@ const BuilderHeaderCard = ({ builder }) => {
   const { addBuilder, removeBuilder, isBuilderSaved } = useCart();
 
   const handleHeartClick = () => {
-    if (!builder || !builder.rera_id) return;
+    if (!builder || !builder.id) return;
 
-    if (isBuilderSaved(builder.rera_id)) {
-      removeBuilder(builder.rera_id);
+    if (isBuilderSaved(builder.id)) {
+      removeBuilder(builder.id);
     } else {
       addBuilder(builder);
     }
@@ -30,7 +30,7 @@ const BuilderHeaderCard = ({ builder }) => {
     );
   }
 
-  const isSaved = isBuilderSaved(builder.rera_id);
+  const isSaved = isBuilderSaved(builder.id);
 
   return (
     <div className="bg-white rounded-none md:rounded-2xl shadow-sm border-0 md:border md:border-gray-100 relative">

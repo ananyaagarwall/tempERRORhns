@@ -85,8 +85,8 @@ _PROJECT_FOLDER_MAP = {
 }
 
 # Cached lookup tables (populated inside app_context)
-_builder_by_rera   = {}   # rera_id.lower() → rera_id
-_builder_by_slug   = {}   # slug            → rera_id
+_builder_by_id   = {}   # id.lower() → id
+_builder_by_slug   = {}   # slug            → id
 _project_by_id     = {}   # str(id)         → id
 _blog_by_slug      = {}   # slug            → id
 
@@ -99,18 +99,18 @@ def _slugify(text: str) -> str:
 
 def _load_lookups():
     for b in Builder.query.all():
-        _builder_by_rera[b.rera_id.lower()] = b.rera_id
-        _builder_by_slug[_slugify(b.company_name or '')] = b.rera_id
+        _builder_by_id[str(b.id).lower()] = str(b.id)
+        _builder_by_slug[_slugify(b.company_name or '')] = str(b.id)
         if b.brand_name:
-            _builder_by_slug[_slugify(b.brand_name)] = b.rera_id
+            _builder_by_slug[_slugify(b.brand_name)] = str(b.id)
     for p in BuilderProject.query.all():
-        _project_by_id[str(p.id)] = p.id
+        _project_by_id[str(p.id)] = str(p.id)
         if p.primary_slug:
-            _project_by_id[_slugify(p.primary_slug)] = p.id
+            _project_by_id[_slugify(p.primary_slug)] = str(p.id)
         if p.title:
-            _project_by_id[_slugify(p.title)] = p.id
+            _project_by_id[_slugify(p.title)] = str(p.id)
     for blog in Blog.query.all():
-        _blog_by_slug[str(blog.id)] = blog.id
+        _blog_by_slug[str(blog.id)] = str(blog.id)
         if blog.slug:
             _blog_by_slug[_slugify(blog.slug)] = blog.id
 
@@ -128,13 +128,13 @@ def _parse(blob_name: str):
     # ── builders/ ──────────────────────────────────────────────────────────────
     if top in ('builders', 'builder') and len(parts) >= 2:
         raw_id = parts[1]
-        rera_id = (_builder_by_rera.get(raw_id.lower())
+        id = (_builder_by_id.get(raw_id.lower())
                    or _builder_by_slug.get(_slugify(raw_id)))
-        if not rera_id:
+        if not id:
             return None
         folder = parts[2].lower() if len(parts) >= 3 else 'gallery'
         mt = _BUILDER_FOLDER_MAP.get(folder, 'gallery')
-        return ('builder', rera_id, mt)
+        return ('builder', id, mt)
 
     # ── projects/ ──────────────────────────────────────────────────────────────
     if top in ('projects', 'project') and len(parts) >= 2:
@@ -168,8 +168,8 @@ def _is_featured(blob_name: str, mt: str) -> bool:
 def list_entities():
     with app.app_context():
         print("\n── Builders ─────────────────────────────────")
-        for b in Builder.query.order_by(Builder.rera_id).all():
-            print(f"  rera_id={b.rera_id!r:40s}  name={b.company_name or b.brand_name!r}")
+        for b in Builder.query.order_by(Builder.id).all():
+            print(f"  id={b.id!r:40s}  name={b.company_name or b.brand_name!r}")
         print("\n── Projects ─────────────────────────────────")
         for p in BuilderProject.query.order_by(BuilderProject.id).all():
             print(f"  id={p.id:<6}  title={p.title!r}")
@@ -204,7 +204,7 @@ def run(dry_run=False, prefix='', backfill=False, assignments_file=''):
 
     with app.app_context():
         _load_lookups()
-        print(f"Loaded {len(_builder_by_rera)} builders, "
+        print(f"Loaded {len(_builder_by_id)} builders, "
               f"{len(_project_by_id)} project keys, "
               f"{len(_blog_by_slug)} blog keys from DB.\n")
 
@@ -291,8 +291,8 @@ def _backfill_entity_fields():
     changed = 0
 
     for b in Builder.query.all():
-        logo   = media_service.get_featured('builder', b.rera_id, 'logo')
-        cover  = media_service.get_featured('builder', b.rera_id, 'cover')
+        logo   = media_service.get_featured('builder', b.id, 'logo')
+        cover  = media_service.get_featured('builder', b.id, 'cover')
         if logo   and b.builder_logo  != logo.blob_url:
             b.builder_logo  = logo.blob_url;  changed += 1
         if cover  and b.cover_banner  != cover.blob_url:
@@ -329,7 +329,7 @@ if __name__ == '__main__':
     parser.add_argument('--backfill',      action='store_true',
                         help='Copy featured Media URLs back to entity fields after import.')
     parser.add_argument('--list-entities', action='store_true',
-                        help='Print all builder RERA IDs and project IDs then exit.')
+                        help='Print all builder IDs and project IDs then exit.')
     parser.add_argument('--assignments',   default='',
                         help='Path to a JSON file mapping flat blob names to entities.')
     args = parser.parse_args()
