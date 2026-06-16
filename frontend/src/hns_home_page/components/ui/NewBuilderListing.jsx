@@ -864,7 +864,6 @@ const NewBuilderListing = () => {
       <FooterNavBar />
       <DynamicBreadcrumb />
 
-      {/* ── Hero Blob ── */}
       {/* ── Hero Image Stripe ── */}
       <div
         className="bl-hero-stripe"
