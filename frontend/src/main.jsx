@@ -11,6 +11,11 @@ const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
 if (!PUBLISHABLE_KEY) {
 	throw new Error("Missing Publishable Key")
 }
+if (window.location.hostname === 'ashy-wave-040cecb00.4.azurestaticapps.net') {
+  window.location.replace(
+    'https://www.housenseek.com' + window.location.pathname + window.location.search
+  );
+}
 
 function ClerkProviderWithRouter({ children }) {
   const navigate = useNavigate();
