@@ -38,12 +38,7 @@ AZURE_OPENAI_ENDPOINT = (
     or ""
 ).strip()
 AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-10-21")
-AZURE_OPENAI_CHAT_DEPLOYMENT = (
-    os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT")
-    or os.getenv("AZURE_OPENAI_DEPLOYMENT")
-    or os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-    or ""
-).strip()
+
 AZURE_OPENAI_MODEL = (os.getenv("AZURE_OPENAI_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-4o-mini").strip()
 
 
@@ -53,8 +48,8 @@ def get_azure_openai_health():
         missing.append("AZURE_OPENAI_KEY")
     if not AZURE_OPENAI_ENDPOINT:
         missing.append("AZURE_OPENAI_ENDPOINT")
-    if not AZURE_OPENAI_CHAT_DEPLOYMENT:
-        missing.append("AZURE_OPENAI_CHAT_DEPLOYMENT")
+    if not  AZURE_OPENAI_MODEL:
+        missing.append(" AZURE_OPENAI_MODEL")
 
     return {
         "provider": "azure_openai",
@@ -62,7 +57,7 @@ def get_azure_openai_health():
         "sdk_installed": AzureChatOpenAI is not None,
         "missing": missing,
         "endpoint_configured": bool(AZURE_OPENAI_ENDPOINT),
-        "deployment": AZURE_OPENAI_CHAT_DEPLOYMENT or None,
+        "deployment": AZURE_OPENAI_MODEL or None,
         "model": AZURE_OPENAI_MODEL or None,
         "api_version": AZURE_OPENAI_API_VERSION or None,
     }
@@ -88,7 +83,7 @@ def _create_chat_llm(*, temperature, max_output_tokens):
         azure_endpoint=AZURE_OPENAI_ENDPOINT,
         api_key=AZURE_OPENAI_KEY,
         api_version=AZURE_OPENAI_API_VERSION,
-        azure_deployment=AZURE_OPENAI_CHAT_DEPLOYMENT,
+        azure_deployment= AZURE_OPENAI_MODEL,
         model=AZURE_OPENAI_MODEL,
         temperature=temperature,
         max_tokens=max_output_tokens,
