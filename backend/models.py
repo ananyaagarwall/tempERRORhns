@@ -1,5 +1,6 @@
 from datetime import datetime
 from extensions import db
+from sqlalchemy.orm import selectinload, joinedload
 import json
 
 class User(db.Model):
@@ -82,7 +83,7 @@ class Property(db.Model):
     
     # Relationships
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    project_id = db.Column(db.Integer, db.ForeignKey('builder_project.id'), nullable=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('builder_project.id'), nullable=True, index=True)
     enquiries = db.relationship('Enquiry', backref='property', lazy=True)
     reviews = db.relationship('Review', backref='property', lazy=True)
     poi_cache = db.relationship(
@@ -92,6 +93,13 @@ class Property(db.Model):
         uselist=False,
         cascade='all, delete-orphan',
     )
+    @classmethod
+    def eager_query(cls):
+        """Avoids per-row lazy load of self.project in to_dict()."""
+        return cls.query.options(
+        selectinload(cls.project)
+     )
+
 
     def to_dict(self):
         # Helper to safely parse JSON fields that might contain
@@ -323,53 +331,55 @@ class BuilderProject(db.Model):
     unit_configs      = db.relationship('UnitConfig', backref='project', lazy=True, cascade='all, delete-orphan')
     project_amenities = db.relationship('ProjectAmenity', backref='project', lazy=True, cascade='all, delete-orphan')
 
-    def to_dict(self):
-        def _safe_json_loads(value, default=None):
-            if value is None:
-                return default
-            if isinstance(value, (list, dict)):
-                return value
-            try:
-                return json.loads(value)
-            except Exception:
-                return default
+    @classmethod
+    def eager_query(cls):
+        """Use instead of BuilderProject.query for any list/bulk endpoint."""
+        return cls.query.options(
+            selectinload(cls.unit_configs),
+            selectinload(cls.project_amenities),
+            selectinload(cls.properties),
+            joinedload(cls.builder),
+        )
 
+    def to_dict(self, resolve_missing_properties=True):
         primary_property = None
         property_ids = []
         try:
             sorted_properties = sorted(self.properties, key=lambda prop: prop.id or 0)
-            title_key = (self.title or "").strip().lower()
-            location_key = (self.location or "").strip().lower()
-            builder_label = self.builder_name or (self.builder.company_name if self.builder else None)
-            builder_key = (builder_label or "").strip().lower()
 
-            if not sorted_properties and title_key:
-                fallback_query = Property.query.filter(
-                    db.func.lower(db.func.trim(Property.Property_Name)) == title_key
-                )
-                if builder_key:
-                    fallback_query = fallback_query.filter(
-                        db.func.lower(db.func.trim(Property.Builder_Name)) == builder_key
+            if not sorted_properties and resolve_missing_properties:
+                title_key = (self.title or "").strip().lower()
+                location_key = (self.location or "").strip().lower()
+                builder_label = self.builder_name or (self.builder.company_name if self.builder else None)
+                builder_key = (builder_label or "").strip().lower()
+
+                if title_key:
+                    fallback_query = Property.query.filter(
+                        db.func.lower(db.func.trim(Property.Property_Name)) == title_key
                     )
-                sorted_properties = fallback_query.order_by(Property.id.asc()).all()
+                    if builder_key:
+                        fallback_query = fallback_query.filter(
+                            db.func.lower(db.func.trim(Property.Builder_Name)) == builder_key
+                        )
+                    sorted_properties = fallback_query.order_by(Property.id.asc()).all()
 
-            if not sorted_properties and title_key and location_key:
-                sorted_properties = (
-                    Property.query
-                    .filter(db.func.lower(db.func.trim(Property.Property_Name)) == title_key)
-                    .filter(db.func.lower(db.func.trim(Property.Location)) == location_key)
-                    .order_by(Property.id.asc())
-                    .all()
-                )
+                if not sorted_properties and title_key and location_key:
+                    sorted_properties = (
+                        Property.query
+                        .filter(db.func.lower(db.func.trim(Property.Property_Name)) == title_key)
+                        .filter(db.func.lower(db.func.trim(Property.Location)) == location_key)
+                        .order_by(Property.id.asc())
+                        .all()
+                    )
 
-            if not sorted_properties and self.builder_id and location_key:
-                sorted_properties = (
-                    Property.query
-                    .filter(db.func.lower(db.func.trim(Property.RERA_ID)) == str(self.builder_id).strip().lower())
-                    .filter(db.func.lower(db.func.trim(Property.Location)) == location_key)
-                    .order_by(Property.id.asc())
-                    .all()
-                )
+                if not sorted_properties and self.builder_id and location_key:
+                    sorted_properties = (
+                        Property.query
+                        .filter(db.func.lower(db.func.trim(Property.RERA_ID)) == str(self.builder_id).strip().lower())
+                        .filter(db.func.lower(db.func.trim(Property.Location)) == location_key)
+                        .order_by(Property.id.asc())
+                        .all()
+                    )
             property_ids = [prop.id for prop in sorted_properties]
             primary_property = sorted_properties[0].to_dict() if sorted_properties else None
         except Exception:
@@ -826,4 +836,3 @@ class Favorite(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
-

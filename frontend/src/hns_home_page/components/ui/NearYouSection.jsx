@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import "../../home_page_css/NearYouSection.css";
+import { pickProjectImage } from '../../../utils/projectImageUtils';
 
 // Fallback tabs if API fails or user location not detected
 // Note: Rabale, Juinagar, Kharghar, Khandeshwar are excluded from Near You section
@@ -52,12 +53,14 @@ function parsePriceInCr(priceStr) {
 const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) => {
     const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 700 : false);
     const [tabs, setTabs] = useState(FALLBACK_TABS);
-    const [activeTab, setActiveTab] = useState("thane");
+    const [activeTab, setActiveTab] = useState(null);
     const [properties, setProperties] = useState([]);
     const [loading, setLoading] = useState(false);
     const [locationsLoading, setLocationsLoading] = useState(true);
     const [error, setError] = useState(null);
     const [nearestNodes, setNearestNodes] = useState([]);
+    const selectedTab = tabs.find(t => t.key === activeTab);
+    const locationName = selectedTab?.label ?? activeTab;
 
     const tabRowRef = useRef(null);
     const cardsRowRef = useRef(null);
@@ -92,10 +95,22 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
 
                 if (data.nearestNodes && Array.isArray(data.nearestNodes) && data.nearestNodes.length > 0) {
                     // Transform nodes into tab format
-                    const locationTabs = data.nearestNodes.map(loc => ({
-                        label: loc,
-                        key: loc.toLowerCase().replace(/\s+/g, ''),
-                    }));
+                const allowedLocations = [
+                "koparkhairane",
+                "airoli",
+                "ghansoli",
+                "vashi",
+                ];
+
+                const normalize = str =>
+                str.toLowerCase().replace(/[\s-]/g, "");
+
+                const locationTabs = data.nearestNodes
+                .filter(loc => allowedLocations.includes(normalize(loc)))
+                .map(loc => ({
+                    label: loc,
+                    key: normalize(loc),
+                }));
                     setTabs(locationTabs);
                     setNearestNodes(data.nearestNodes);
                     // Set first location as active
@@ -111,6 +126,7 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
                 // Keep fallback tabs if API fails
                 setTabs(FALLBACK_TABS);
                 setNearestNodes(FALLBACK_TABS.map(t => t.label));
+                setActiveTab(FALLBACK_TABS[0].key); 
             } finally {
                 setLocationsLoading(false);
             }
@@ -118,51 +134,57 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
         fetchNearestNodes();
     }, [userLocation]);
 
-    // Fetch properties whenever activeTab changes
-    useEffect(() => {
-        const fetchProperties = async () => {
-            setLoading(true);
-            try {
-                // Find the actual location name for the active tab
-                const selectedTab = tabs.find(t => t.key === activeTab);
-                const locationName = selectedTab ? selectedTab.label : activeTab;
+   // Fetch properties whenever activeTab changes
 
-                const res = await fetch(
-                    `${API_BASE_URL}/api/properties/location/${encodeURIComponent(locationName)}`
-                );
-                if (!res.ok) throw new Error('Failed to fetch properties');
-                const data = await res.json();
+useEffect(() => {
+    if (!activeTab) return;
 
-                // Map API response to component data structure
-                const mapped = data.map((p, idx) => ({
-                    id: p.id,
-                    name: p.Property_Name,
-                    img: p.image && p.image !== "/fallback.png" ? p.image : getFallbackImage(p.id, idx),
-                    projects: p.projects || "N/A Projects",
-                    price: p.Price_Starting_From || "N/A",
-                    Existing_Configurations: p.Existing_Configurations || [],
-                    location: p.Location || locationName,
-                }));
-                setProperties(mapped);
-                setError(null);
+    const fetchProperties = async () => {
+        setLoading(true);
+        try {
+            // Find the actual location name for the active tab
+            const selectedTab = tabs.find(t => t.key === activeTab);
+            const locationName = selectedTab ? selectedTab.label : activeTab;
 
-                // Notify parent of location change if callback provided
-                if (onLocationChange) {
-                    onLocationChange(locationName);
-                }
-            } catch (err) {
-                console.error("Error fetching properties:", err);
-                setError("Failed to fetch properties");
-                setProperties([]);
-            } finally {
-                setLoading(false);
+            const res = await fetch(
+            `${API_BASE_URL}/api/properties/location/${encodeURIComponent(locationName)}`
+        );
+
+        if (!res.ok) throw new Error("Failed to fetch properties");
+
+        const data = await res.json();
+
+            const mapped = data.map((p, idx) => ({
+            id: p.id,
+            name: p.Property_Name,
+            img:
+                pickProjectImage(
+                    { id: p.project_id, builder_project_image: p.builder_project_image },
+                    p
+                ) || getFallbackImage(p.id, idx),
+            projects: p.projects || "N/A Projects",
+            price: p.Price_Starting_From || "N/A",
+            Existing_Configurations: p.Existing_Configurations || [],
+            location: p.Location || locationName,
+        }));
+
+            setProperties(mapped);
+            setError(null);
+
+            if (onLocationChange) {
+                onLocationChange(locationName);
             }
-        };
-
-        if (activeTab) {
-            fetchProperties();
+        } catch (err) {
+            console.error("Error fetching properties:", err);
+            setError("Failed to fetch properties");
+            setProperties([]);
+        } finally {
+            setLoading(false);
         }
-    }, [activeTab, tabs, onLocationChange]);
+    };
+
+    fetchProperties();
+}, [activeTab, onLocationChange]);
 
     const handleTabClick = (tabKey) => {
         setActiveTab(tabKey);
