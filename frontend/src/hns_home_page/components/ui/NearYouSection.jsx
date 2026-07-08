@@ -83,12 +83,16 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
 
     // Fetch nearest nodes when userLocation changes
     useEffect(() => {
+        const controller = new AbortController();
         const fetchNearestNodes = async () => {
             setLocationsLoading(true);
             try {
                 // Use userLocation if available, otherwise fetch default
                 const locationToUse = userLocation || "Thane";
-                const res = await fetch(`${API_BASE_URL}/api/nearest-nodes/${encodeURIComponent(locationToUse)}`);
+                const res = await fetch(
+                    `${API_BASE_URL}/api/nearest-nodes/${encodeURIComponent(locationToUse)}`,
+                    { signal: controller.signal }
+                );
 
                 if (!res.ok) throw new Error('Failed to fetch nearest nodes');
                 const data = await res.json();
@@ -122,7 +126,7 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
                     setActiveTab(FALLBACK_TABS[0].key);
                 }
             } catch (err) {
-                console.error("Error fetching nearest nodes:", err);
+                if (err.name === 'AbortError') return;
                 // Keep fallback tabs if API fails
                 setTabs(FALLBACK_TABS);
                 setNearestNodes(FALLBACK_TABS.map(t => t.label));
@@ -132,6 +136,7 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
             }
         };
         fetchNearestNodes();
+        return () => controller.abort();
     }, [userLocation]);
 
    // Fetch properties whenever activeTab changes
@@ -139,6 +144,7 @@ const NearYouSection = ({ searchFilters = {}, onLocationChange, userLocation }) 
 useEffect(() => {
     if (!activeTab) return;
 
+    const controller = new AbortController();
     const fetchProperties = async () => {
         setLoading(true);
         try {
@@ -147,7 +153,8 @@ useEffect(() => {
             const locationName = selectedTab ? selectedTab.label : activeTab;
 
             const res = await fetch(
-            `${API_BASE_URL}/api/properties/location/${encodeURIComponent(locationName)}`
+            `${API_BASE_URL}/api/properties/location/${encodeURIComponent(locationName)}`,
+            { signal: controller.signal }
         );
 
         if (!res.ok) throw new Error("Failed to fetch properties");
@@ -175,7 +182,7 @@ useEffect(() => {
                 onLocationChange(locationName);
             }
         } catch (err) {
-            console.error("Error fetching properties:", err);
+            if (err.name === 'AbortError') return;
             setError("Failed to fetch properties");
             setProperties([]);
         } finally {
@@ -184,7 +191,11 @@ useEffect(() => {
     };
 
     fetchProperties();
-}, [activeTab, onLocationChange]);
+    return () => controller.abort();
+// onLocationChange intentionally omitted — it's a function prop that may be
+// recreated on every parent render; activeTab is the only real trigger.
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [activeTab]);
 
     const handleTabClick = (tabKey) => {
         setActiveTab(tabKey);

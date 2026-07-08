@@ -27,18 +27,20 @@ const readResponseBody = async (response) => {
 const TrustedBuildersSection = ({ location }) => {
   const [builders, setBuilders] = useState([]);
   const [activeIdx, setActiveIdx] = useState(0);
-  const [isMobile, setIsMobile] = useState(false);
-  const [isTablet, setIsTablet] = useState(false);
+  // Lazy initializers prevent layout flash on first mobile render
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  const [isTablet, setIsTablet] = useState(() => window.innerWidth <= 1024 && window.innerWidth > 768);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { addToCart, removeFromCart, isInCart } = useCart();
 
   useEffect(() => {
+    const controller = new AbortController();
     const fetchBuilders = async () => {
       try {
         setLoading(true);
         setError('');
-        const response = await fetch(`${API_BASE_URL}/api/builders`);
+        const response = await fetch(`${API_BASE_URL}/api/builders`, { signal: controller.signal });
         const data = await readResponseBody(response);
 
         if (!response.ok) {
@@ -61,14 +63,16 @@ const TrustedBuildersSection = ({ location }) => {
           ].filter(Boolean).join(' • '),
         })).filter(builder => builder.name || builder.subtitle);
         setBuilders(formattedData);
-      } catch (error) {
-        console.error('Error fetching builders:', error);
-        setError(error.message || 'Unable to load builder projects.');
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        console.error('Error fetching builders:', err);
+        setError(err.message || 'Unable to load builder projects.');
       } finally {
         setLoading(false);
       }
     };
     fetchBuilders();
+    return () => controller.abort();
   }, []);
 
   const handleHeartClick = (e, builder) => {

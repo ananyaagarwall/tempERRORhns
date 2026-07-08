@@ -73,7 +73,6 @@ const LandingPage = () => {
   /* ---------- Search Filter Listener Effect ---------- */
   useEffect(() => {
     const handleFilter = (e) => {
-      console.log('LandingPage: Received filterLandingPage event', e.detail);
       setSearchFilters({
         location: e.detail.location || '',
         priceRange: e.detail.priceRange ?? 0,
@@ -96,14 +95,14 @@ const LandingPage = () => {
   const [showStickyFooterNav, setShowStickyFooterNav] = useState(false);
 
   useEffect(() => {
-    const handleScroll = () => {
-      if (!triggerRef.current) return;
-      const rect = triggerRef.current.getBoundingClientRect();
-      setShowStickyFooterNav(rect.bottom <= 0);
-    };
-    window.addEventListener('scroll', handleScroll);
-    handleScroll(); // initial check
-    return () => window.removeEventListener('scroll', handleScroll);
+    const el = triggerRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowStickyFooterNav(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
   }, []);
 
   return (

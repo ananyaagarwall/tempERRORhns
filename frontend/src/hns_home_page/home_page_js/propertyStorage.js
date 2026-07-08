@@ -12,7 +12,6 @@ export const getLastClickedProperty = () => {
     const propertyData = localStorage.getItem('lastClickedProperty');
     return propertyData ? JSON.parse(propertyData) : null;
   } catch (error) {
-    console.error('Error retrieving last clicked property:', error);
     return null;
   }
 };
@@ -26,7 +25,6 @@ export const getRecentlyViewedProperties = () => {
     const recentlyViewed = localStorage.getItem('recentlyViewedProperties');
     return recentlyViewed ? JSON.parse(recentlyViewed) : [];
   } catch (error) {
-    console.error('Error retrieving recently viewed properties:', error);
     return [];
   }
 };
@@ -38,8 +36,7 @@ export const clearPropertyData = () => {
   try {
     localStorage.removeItem('lastClickedProperty');
     localStorage.removeItem('recentlyViewedProperties');
-    console.log('Property data cleared from localStorage');
   } catch (error) {
-    console.error('Error clearing property data:', error);
+    // silent fail
   }
 };

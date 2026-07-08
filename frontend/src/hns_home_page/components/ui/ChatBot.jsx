@@ -7,6 +7,7 @@ import ChatbotBuilderCard from './ChatbotBuilderCard';
 import './ChatBot.css';
 
 const ChatBot = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
     { id: 1, text: "Hello! I'm here to help you with any questions you have. How can I assist you today?", sender: 'bot', timestamp: new Date(), isTypingEffect: false }
@@ -238,8 +239,6 @@ const ChatBot = () => {
 
     
   const handleSuggestionClick = (action, payload) => {
-    console.log(`Suggestion clicked: ${action}`, payload);
-    const navigate = useNavigate();
 
     let simulatedInput = "";
 

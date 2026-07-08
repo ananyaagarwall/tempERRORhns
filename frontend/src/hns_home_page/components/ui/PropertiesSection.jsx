@@ -71,6 +71,10 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // Stable keys for array deps — avoids JSON.stringify on every render
+  const bhkKey = (searchFilters.bhkTypes || []).join(',');
+  const amenitiesKey = (searchFilters.amenities || []).join(',');
+
   // Re-fetch whenever any search filter changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -111,16 +115,15 @@ const PropertiesSection = ({ searchFilters = { location: '', priceRange: 0, minB
         if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
-  // JSON.stringify makes array dep safe without causing infinite re-renders
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     searchFilters.location,
     searchFilters.priceRange,
     searchFilters.minBudget,
     searchFilters.maxBudget,
-    JSON.stringify(searchFilters.bhkTypes),
+    bhkKey,
     searchFilters.bhkSearch,
-    JSON.stringify(searchFilters.amenities),
+    amenitiesKey,
   ]);
 
   const scrollCards = (direction) => {

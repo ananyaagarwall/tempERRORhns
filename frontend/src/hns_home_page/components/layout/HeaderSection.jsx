@@ -60,7 +60,6 @@ const HeaderSection = () => {
     // User wants range from 50L, so if they move past 0, snap to 50
     if (value > 0 && value < 50) value = 50;
     setPriceRange(value);
-    console.log('Price range changed to:', value); // Debug log
   };
 
   const updateBhkDropdownPosition = () => {

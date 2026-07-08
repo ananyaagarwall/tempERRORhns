@@ -9,7 +9,7 @@ const initPropertyCardHandlers = () => {
   
   // Add click event listener to each card
   propertyCards.forEach((card, index) => {
-    card.addEventListener('click', (event) => {
+    card.addEventListener('click', () => {
       // Get property information from the card
       const propertyName = card.querySelector('.property-info-custom h2')?.textContent || 'Unknown Property';
       const propertyAddress = card.querySelector('.property-address-custom')?.textContent || 'Unknown Address';
@@ -48,18 +48,9 @@ const initPropertyCardHandlers = () => {
       
       // Save back to localStorage
       localStorage.setItem('recentlyViewedProperties', JSON.stringify(recentlyViewed));
-      
-      // Log property information to console
-      console.log('Property Card Clicked and stored in localStorage:', propertyData);
     });
   });
 };
-
-// Initialize handlers when DOM is fully loaded
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('Property Cards JS initialized');
-  initPropertyCardHandlers();
-});
 
 // Export the initialization function for use in other files
 export default initPropertyCardHandlers;

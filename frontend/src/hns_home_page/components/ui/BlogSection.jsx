@@ -49,11 +49,11 @@ const BlogSection = () => {
   const handleFeaturedClick = () => {
     // Navigate to article page - sample route for now
     // navigate('/article/featured');
-    console.log('Featured article clicked - navigation commented out');
   };
 
   const handleArticleClick = (article) => {
-    console.log(`Article clicked: ${article.title}`);
+    // Navigate to article detail when routes are ready
+    void article;
   };
 
   return (

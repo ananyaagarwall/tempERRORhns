@@ -1212,19 +1212,20 @@ def get_properties_by_location(loc):
     return jsonify([property.to_dict() for property in properties])
 
 # --------------------------------------------- PAGINATION PARAMETERS ---------------------------------------------
-page = request.args.get('page', 1, type=int)
-limit = request.args.get('limit', 20, type=int)
-
-page = max(page, 1)
-limit = min(max(limit, 1), 100)
 
 @app.route('/api/properties', methods=['GET'])
 def get_properties():
+    page = request.args.get('page', 1, type=int)
+    limit = request.args.get('limit', 20, type=int)
+
+    page = max(page, 1)
+    limit = min(max(limit, 1), 100)
+
     pagination = Property.eager_query().paginate(
-    page=page,
-    per_page=limit,
-    error_out=False
-)
+        page=page,
+        per_page=limit,
+        error_out=False
+    )
     properties = pagination.items
     return jsonify({
     "items": [p.to_dict() for p in properties],

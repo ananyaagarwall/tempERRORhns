@@ -2,6 +2,18 @@ from datetime import datetime
 from extensions import db
 from sqlalchemy.orm import selectinload, joinedload
 import json
+def _safe_json_loads(value, default=None):
+    if value is None:
+        return default
+    # If it's already a list/dict, return as-is
+    if isinstance(value, (list, dict)):
+        return value
+    try:
+        return json.loads(value)
+    except Exception:
+        # Fallback: return original value or default so that
+        # serialization never crashes the API.
+        return default if default is not None else value
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -102,20 +114,6 @@ class Property(db.Model):
 
 
     def to_dict(self):
-        # Helper to safely parse JSON fields that might contain
-        # malformed JSON or already-parsed Python objects.
-        def _safe_json_loads(value, default=None):
-            if value is None:
-                return default
-            # If it's already a list/dict, return as-is
-            if isinstance(value, (list, dict)):
-                return value
-            try:
-                return json.loads(value)
-            except Exception:
-                # Fallback: return original value or default so that
-                # serialization never crashes the API.
-                return default if default is not None else value
         # Get builder project image if available
         builder_project_image = None
         
