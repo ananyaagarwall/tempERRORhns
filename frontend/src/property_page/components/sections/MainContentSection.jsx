@@ -13,6 +13,8 @@ import { fetchNearestNodes, fetchPropertiesByMultipleLocations, fetchPropertyPoi
 import { buildPropertyPath } from "../../../utils/entityRouting";
 import PropertyMap from "../../../components/maps/PropertyMap";
 
+const EMPTY_OBJECT = {};
+
 const normalizeConfigLabel = (config) => {
   if (!config) return "";
   if (typeof config === "string") return config;
@@ -402,7 +404,7 @@ const MainContentSection = ({ propertyData, projectData }) => {
                   latitude={coordinates.latitude}
                   longitude={coordinates.longitude}
                   radiusM={nearbyPois?.radius_m || 2000}
-                  poisByType={nearbyPois?.pois || {}}
+                  poisByType={nearbyPois?.pois || EMPTY_OBJECT}
                   highlightedType={highlightedPoiType}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
@@ -548,7 +550,10 @@ const MainContentSection = ({ propertyData, projectData }) => {
                               alt={prop?.Property_Name || "Property"}
                               className="w-full h-full object-cover relative z-10"
                               onError={(e) => {
-                                e.target.src = "/Pimg9.jpg";
+                                if (!e.currentTarget.dataset.errorResolved) {
+                                  e.currentTarget.dataset.errorResolved = "true";
+                                  e.currentTarget.src = "/Pimg9.jpg";
+                                }
                               }}
                             />
                           </div>

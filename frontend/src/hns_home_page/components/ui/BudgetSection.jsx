@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import API_BASE_URL from '../../../config';
 import '../../home_page_css/BudgetSection.css';
+import { usePropertiesBudget } from '../../../queries/properties';
 
 // ---------------------------------------------------------------------------
 // Budget bracket definitions — only images/labels/price bounds are hardcoded.
@@ -90,57 +90,26 @@ function getBracketIndex(priceLakhs) {
 const BudgetSection = () => {
   const navigate = useNavigate();
 
-  // locations[bracketIndex] = Set of unique location strings
-  const [bracketLocations, setBracketLocations] = useState([[], [], [], []]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
+  // usePropertiesBudget uses TanStack Query with `select` to expose only
+  // {Price_Starting_From, Location} — no re-renders from unrelated fields.
+  // Shares cache key with useProperties({}) so no duplicate network call.
+  const { data: priceLocationList = [], isLoading: loading, isError } = usePropertiesBudget();
 
-  useEffect(() => {
-    const controller = new AbortController();
+  // Classify properties into budget brackets using useMemo — only recomputes
+  // when priceLocationList changes.
+  const bracketLocations = useMemo(() => {
+    const sets = [new Set(), new Set(), new Set(), new Set()];
+    priceLocationList.forEach((prop) => {
+      const priceLakhs = parsePriceToLakhs(prop.Price_Starting_From);
+      if (priceLakhs === null) return;
+      const loc = (prop.Location || '').trim();
+      if (!loc) return;
+      sets[getBracketIndex(priceLakhs)].add(loc);
+    });
+    return sets.map((s) => Array.from(s).sort());
+  }, [priceLocationList]);
 
-    const fetchAndClassify = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/properties`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error('Failed to fetch');
-
-        const properties = await res.json();
-
-        // Build 4 Sets, one per bracket
-        const sets = [new Set(), new Set(), new Set(), new Set()];
-
-        (Array.isArray(properties) ? properties : []).forEach((prop) => {
-          // Try Price_Starting_From first, then Pricing as fallback
-          const priceStr = prop.Price_Starting_From || prop.Pricing;
-          const priceLakhs = parsePriceToLakhs(priceStr);
-
-          if (priceLakhs === null) return; // no parseable price — skip
-
-          const loc = (prop.Location || '').trim();
-          if (!loc) return; // skip properties with no location
-
-          const idx = getBracketIndex(priceLakhs);
-          sets[idx].add(loc);
-        });
-
-        setBracketLocations(sets.map((s) => Array.from(s).sort()));
-        setFetchError(false);
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.warn('[BudgetSection] Could not load properties:', err);
-          setFetchError(true);
-          // Keep empty arrays — pills are simply empty on error
-          setBracketLocations([[], [], [], []]);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAndClassify();
-    return () => controller.abort();
-  }, []);
+  const fetchError = isError;
 
   const handleOptionClick = (bracket, locations) => {
     navigate('/properties', {

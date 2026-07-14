@@ -23,7 +23,10 @@ const LatestBlog = ({ filteredBlogs }) => {
                     alt={filteredBlogs[0].featured_image_alt || filteredBlogs[0].title}
                     className="featured-img"
                     onError={(e) => {
-                      e.target.src = "/news.jpg";
+                      if (!e.currentTarget.dataset.errorResolved) {
+                        e.currentTarget.dataset.errorResolved = "true";
+                        e.currentTarget.src = "/news.jpg";
+                      }
                     }}
                   />
                   <span className="latest-badge">Latest</span>
@@ -56,7 +59,10 @@ const LatestBlog = ({ filteredBlogs }) => {
                   alt={blog.featured_image_alt || blog.title}
                   className="side-img"
                   onError={(e) => {
-                    e.target.src = "/news.jpg";
+                    if (!e.currentTarget.dataset.errorResolved) {
+                      e.currentTarget.dataset.errorResolved = "true";
+                      e.currentTarget.src = "/news.jpg";
+                    }
                   }}
                 />
                 <div className="side-content">

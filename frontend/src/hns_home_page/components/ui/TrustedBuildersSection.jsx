@@ -1,9 +1,9 @@
-import API_BASE_URL from '../../../config';
 import React, { useState, useEffect } from 'react';
 import { useCart } from '../../../hns_cart_page/js/CartContent.jsx';
 import { normalizeImageUrl } from '../../../utils/imageUtils';
-import "../../home_page_css/TrustedBuildersSection.css";
+import '../../home_page_css/TrustedBuildersSection.css';
 import '../../home_page_css/PropertiesSection.css';
+import { useBuilders } from '../../../queries/builders';
 
 // Heart Icon Component
 const HeartIcon = ({ filled }) => (
@@ -14,66 +14,33 @@ const HeartIcon = ({ filled }) => (
 
 
 const BORDER_RADIUS = 12;
-const FALLBACK_BUILDER_IMAGE = '/palm.jpg';
 
-const readResponseBody = async (response) => {
-  const contentType = response.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    return response.json();
-  }
-  return response.text();
-};
 
 const TrustedBuildersSection = ({ location }) => {
-  const [builders, setBuilders] = useState([]);
   const [activeIdx, setActiveIdx] = useState(0);
-  // Lazy initializers prevent layout flash on first mobile render
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   const [isTablet, setIsTablet] = useState(() => window.innerWidth <= 1024 && window.innerWidth > 768);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const { addToCart, removeFromCart, isInCart } = useCart();
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchBuilders = async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const response = await fetch(`${API_BASE_URL}/api/builders`, { signal: controller.signal });
-        const data = await readResponseBody(response);
+  // ── TanStack Query — 10 min staleTime, cached per session ──────────────
+  const { data: rawBuilders = [], isLoading: loading, isError } = useBuilders();
 
-        if (!response.ok) {
-          const message = typeof data === 'object'
-            ? data?.error || data?.message || `Failed to fetch builders (${response.status})`
-            : data?.slice(0, 160) || `Failed to fetch builders (${response.status})`;
-          throw new Error(message);
-        }
+  const FALLBACK_BUILDER_IMAGE = '/palm.jpg';
 
-        const formattedData = (Array.isArray(data) ? data : []).map(builder => ({
-          id: builder._id || builder.id || `builder-${builder.company_name}-${builder.location || builder.city}`,
-          img: normalizeImageUrl(builder.cover_banner) || normalizeImageUrl(builder.builder_logo) || normalizeImageUrl(builder.project_image) || FALLBACK_BUILDER_IMAGE,
-          logo: normalizeImageUrl(builder.builder_logo) || '',
-          name: builder.company_name || builder.brand_name || 'Trusted Builder',
-          subtitle: builder.location || [builder.city, builder.state].filter(Boolean).join(', '),
-          price: [
-            builder.project_count !== null && builder.project_count !== undefined ? `${builder.project_count} Projects` : '',
-            builder.completed_projects !== null && builder.completed_projects !== undefined ? `${builder.completed_projects} Completed` : '',
-            builder.ongoing_projects !== null && builder.ongoing_projects !== undefined ? `${builder.ongoing_projects} Ongoing` : '',
-          ].filter(Boolean).join(' • '),
-        })).filter(builder => builder.name || builder.subtitle);
-        setBuilders(formattedData);
-      } catch (err) {
-        if (err.name === 'AbortError') return;
-        console.error('Error fetching builders:', err);
-        setError(err.message || 'Unable to load builder projects.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchBuilders();
-    return () => controller.abort();
-  }, []);
+  const builders = rawBuilders.map((builder) => ({
+    id: builder._id || builder.id || `builder-${builder.company_name}-${builder.location || builder.city}`,
+    img: normalizeImageUrl(builder.cover_banner) || normalizeImageUrl(builder.builder_logo) || normalizeImageUrl(builder.project_image) || FALLBACK_BUILDER_IMAGE,
+    logo: normalizeImageUrl(builder.builder_logo) || '',
+    name: builder.company_name || builder.brand_name || 'Trusted Builder',
+    subtitle: builder.location || [builder.city, builder.state].filter(Boolean).join(', '),
+    price: [
+      builder.project_count !== null && builder.project_count !== undefined ? `${builder.project_count} Projects` : '',
+      builder.completed_projects !== null && builder.completed_projects !== undefined ? `${builder.completed_projects} Completed` : '',
+      builder.ongoing_projects !== null && builder.ongoing_projects !== undefined ? `${builder.ongoing_projects} Ongoing` : '',
+    ].filter(Boolean).join(' • '),
+  })).filter((builder) => builder.name || builder.subtitle);
+
+  const error = isError ? 'Unable to load builder projects.' : '';
 
   const handleHeartClick = (e, builder) => {
     e.stopPropagation();

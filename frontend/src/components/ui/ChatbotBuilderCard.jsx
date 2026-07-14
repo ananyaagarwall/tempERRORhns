@@ -38,7 +38,10 @@ const ChatbotBuilderCard = ({ builder }) => {
         alt={builder.company_name || builder.name || "Builder"} 
         className="chatbot-builder-img"
         onError={(e) => {
-          e.target.src = FALLBACK_BUILDING_IMAGE;
+          if (!e.currentTarget.dataset.errorResolved) {
+            e.currentTarget.dataset.errorResolved = "true";
+            e.currentTarget.src = FALLBACK_BUILDING_IMAGE;
+          }
         }}
       />
       <div className="chatbot-builder-info">

@@ -11,7 +11,10 @@ const MobileIntro = ({ blog }) => {
             alt={blog.featured_image_alt || blog.title}
             className="w-full object-cover rounded-lg mb-2"
             onError={(e) => {
-              e.target.src = "/news.jpg";
+              if (!e.currentTarget.dataset.errorResolved) {
+                e.currentTarget.dataset.errorResolved = "true";
+                e.currentTarget.src = "/news.jpg";
+              }
             }}
           />
         )}

@@ -2,7 +2,8 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { SignedIn, SignedOut, RedirectToSignIn, useAuth } from '@clerk/clerk-react';
-import { CartProvider } from './hns_cart_page/js/CartContent'; // Import CartProvider
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { CartProvider } from './hns_cart_page/js/CartContent';
 import Login from './hns_admin_page/Login';
 import Signup from './hns_admin_page/Signup';
 import AdminSetup from './hns_admin_page/AdminSetup';
@@ -10,7 +11,6 @@ import AdminDashboard from './hns_admin_page/AdminDashboard';
 import BuilderDashboard from './hns_admin_page/BuilderDashboard';
 import './App.css';
 import api, { getOrCreateGuestId, setAuthTokenGetter } from './services/apiInstance';
-
 import AddBuilder from './Builder.jsx/addBuilder';
 import BlogManagement from './hns_admin_page/BlogManagement';
 import AdminBlog from './hns_admin_page/AdminBlog';
@@ -33,6 +33,19 @@ import AboutUs from './hns_home_page/components/ui/AboutUs';
 import BuildersListing from './hns_home_page/components/ui/BuildersListing';
 import NewBuilderListing from './hns_home_page/components/ui/NewBuilderListing';
 import ProfilePage from './ProfilePage';
+
+// ─── QueryClient ─────────────────────────────────────────────────────────────
+// Instantiated once outside the component to avoid re-creation on re-renders.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 2,
+      refetchOnWindowFocus: false,
+      staleTime: 0,              // Each query overrides with its own staleTime
+      gcTime: 5 * 60 * 1000,    // 5 min default garbage collection
+    },
+  },
+});
 
 // Chatbot Context
 export const ChatbotContext = createContext();
@@ -197,6 +210,7 @@ function App() {
   }, [location.pathname]);
 
   return (
+    <QueryClientProvider client={queryClient}>
     <CartProvider>
       <UserSync />
       <ChatbotContext.Provider value={{ isChatbotOpen, setIsChatbotOpen }}>
@@ -317,6 +331,7 @@ function App() {
         <ChatBot />
       </ChatbotContext.Provider>
     </CartProvider>
+    </QueryClientProvider>
   );
 }
 

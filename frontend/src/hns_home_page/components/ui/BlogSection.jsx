@@ -1,100 +1,117 @@
+// src/hns_home_page/components/ui/BlogSection.jsx
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useBlogsLanding } from '../../../queries/blogs';
 
-const featured = {
+// Fallback featured article shown while API loads or on error
+const FEATURED_FALLBACK = {
   img: '/building.webp',
   title: 'Real Estate Market Update: Q2 Trends & Insights',
   subtitle: 'A snapshot of current property prices, demand, and buyer behavior.',
   tagline: 'Stay ahead of the curve with every curve!',
-  button: 'View Article',
+  slug: null,
 };
 
-const articles = [
-  {
-    img: '/kalpa.jpg',
-    title: 'Paperwork During Buying Property',
-    subtitle: '10 Documents You Need for Property Purchase',
-    icon: '→',
-  },
-  {
-    img: 'palm.jpg',
-    title: "Home Buying 101: A Beginner's Guide",
-    subtitle: 'Start smart, buy smarter',
-  },
-  {
-    img: 'presidental.jpeg',
-    title: 'Down Payment Demystified',
-    subtitle: 'How much down payment is ideal, and how it impacts your loan burden.',
-  },
-  {
-    img: 'rustomujee.jpg',
-    title: 'What is CIBIL Score and Why It Matters?',
-    subtitle: 'Learn how your credit score impacts your home loan approval.',
-  },
-  {
-    img: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=800&q=80',
-    title: 'Why Green Homes Are the New Standard',
-    subtitle: 'Explore how eco-friendly features are becoming non-negotiable.',
-  },
-  {
-    img: 'lodha.jpg',
-    title: 'Top 7 Questions to ask a Builder before Booking',
-    subtitle: 'Don\'t fall for the brochure—know what really matters.',
-  },
+// Fallback articles shown when API returns no data
+const ARTICLES_FALLBACK = [
+  { img: '/kalpa.jpg', title: 'Paperwork During Buying Property', subtitle: '10 Documents You Need for Property Purchase', slug: null },
+  { img: '/palm.jpg', title: "Home Buying 101: A Beginner's Guide", subtitle: 'Start smart, buy smarter', slug: null },
+  { img: '/presidental.jpeg', title: 'Down Payment Demystified', subtitle: 'How much down payment is ideal, and how it impacts your loan burden.', slug: null },
+  { img: '/rustomujee.jpg', title: 'What is CIBIL Score and Why It Matters?', subtitle: 'Learn how your credit score impacts your home loan approval.', slug: null },
+  { img: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=800&q=80', title: 'Why Green Homes Are the New Standard', subtitle: 'Explore how eco-friendly features are becoming non-negotiable.', slug: null },
+  { img: '/lodha.jpg', title: 'Top 7 Questions to ask a Builder before Booking', subtitle: "Don't fall for the brochure—know what really matters.", slug: null },
 ];
 
 const BlogSection = () => {
   const navigate = useNavigate();
 
+  // TanStack Query — 1 hr staleTime, select limits fields to {id,title,slug,subtitle,img}
+  const { data: blogs = [], isLoading, isError } = useBlogsLanding();
+
+  // Use first blog as featured if available, otherwise fallback
+  const featured = blogs.length > 0
+    ? { ...FEATURED_FALLBACK, ...blogs[0] }
+    : FEATURED_FALLBACK;
+
+  // Remaining blogs as articles grid; fall back to static data when API empty
+  const articles = blogs.length > 1 ? blogs.slice(1, 7) : ARTICLES_FALLBACK;
+
   const handleFeaturedClick = () => {
-    // Navigate to article page - sample route for now
-    // navigate('/article/featured');
+    if (featured.slug) navigate(`/blog/${featured.slug}`);
   };
 
   const handleArticleClick = (article) => {
-    // Navigate to article detail when routes are ready
-    void article;
+    if (article.slug) navigate(`/blog/${article.slug}`);
   };
 
   return (
     <section className="blog-section">
       <div className="section-header">
-        <h2 className="section-title">
-          Know Before You Buy
-        </h2>
+        <h2 className="section-title">Know Before You Buy</h2>
         <span className="section-underline" />
       </div>
 
       {/* Featured Article Card */}
-      <div className="featured-card">
-        <img src={featured.img} alt={featured.title} className="featured-image" />
+      <div className="featured-card" onClick={handleFeaturedClick} style={featured.slug ? { cursor: 'pointer' } : { cursor: 'default' }}>
+        <img
+          src={featured.img || '/building.webp'}
+          alt={featured.title}
+          className="featured-image"
+          loading="lazy"
+        />
         <div className="featured-overlay" />
         <div className="latest-badge">LATEST</div>
         <div className="featured-content">
-          <h2 className="featured-title">{featured.title}</h2>
-          <p className="featured-subtitle">{featured.subtitle}</p>
-          <p className="featured-tagline">{featured.tagline}</p>
-          <button className="featured-button" onClick={handleFeaturedClick}>
-            VIEW ARTICLE
-          </button>
+          <h2 className="featured-title">{isLoading ? 'Loading...' : featured.title}</h2>
+          {!isLoading && <p className="featured-subtitle">{featured.subtitle}</p>}
+          {!isLoading && <p className="featured-tagline">{featured.tagline || ''}</p>}
+          {featured.slug && (
+            <button className="featured-button">VIEW ARTICLE</button>
+          )}
         </div>
       </div>
 
-      {/* Grid of Other Articles */}
+      {/* Grid of Articles */}
       <div className="articles-grid">
-        {articles.map((article, idx) => (
-          <button
-            key={idx}
-            className="article-card"
-            onClick={() => handleArticleClick(article)}
-          >
-            <img src={article.img} alt={article.title} className="article-image" />
-            <div className="article-content">
-              <h3 className="article-title">{article.title}</h3>
-              <p className="article-subtitle">{article.subtitle}</p>
-            </div>
-          </button>
-        ))}
+        {isLoading
+          ? Array.from({ length: 6 }).map((_, idx) => (
+              <div key={idx} className="article-card" style={{ background: '#e8edf5', opacity: 0.6 }} />
+            ))
+          : isError
+          ? ARTICLES_FALLBACK.map((article, idx) => (
+              <button
+                key={idx}
+                className="article-card"
+                onClick={() => handleArticleClick(article)}
+                disabled={!article.slug}
+              >
+                <img src={article.img} alt={article.title} className="article-image" loading="lazy" />
+                <div className="article-content">
+                  <h3 className="article-title">{article.title}</h3>
+                  <p className="article-subtitle">{article.subtitle}</p>
+                </div>
+              </button>
+            ))
+          : articles.map((article, idx) => (
+              <button
+                key={article.id || idx}
+                className="article-card"
+                onClick={() => handleArticleClick(article)}
+                disabled={!article.slug}
+              >
+                <img
+                  src={article.img || '/building.webp'}
+                  alt={article.title}
+                  className="article-image"
+                  loading="lazy"
+                  onError={(e) => { e.currentTarget.src = '/building.webp'; }}
+                />
+                <div className="article-content">
+                  <h3 className="article-title">{article.title}</h3>
+                  <p className="article-subtitle">{article.subtitle}</p>
+                </div>
+              </button>
+            ))}
       </div>
 
       <style>{`
@@ -125,7 +142,7 @@ const BlogSection = () => {
           border-radius: 2px;
           box-shadow: 0 2px 4px rgba(241, 217, 122, 0.3);
         }
-        
+
         /* --- Featured Card Styles --- */
         .featured-card {
           width: 100%;
@@ -134,7 +151,6 @@ const BlogSection = () => {
           overflow: hidden;
           position: relative;
           display: block;
-          cursor: pointer;
           transition: transform 0.3s ease, box-shadow 0.3s ease;
           text-align: left;
           margin-bottom: 48px;
@@ -150,9 +166,7 @@ const BlogSection = () => {
           object-fit: cover;
           transition: transform 0.4s ease;
         }
-        .featured-card:hover .featured-image {
-          transform: scale(1.05);
-        }
+        .featured-card:hover .featured-image { transform: scale(1.05); }
         .featured-overlay {
           position: absolute;
           inset: 0;
@@ -161,8 +175,7 @@ const BlogSection = () => {
         }
         .latest-badge {
           position: absolute;
-          left: 0;
-          top: 0;
+          left: 0; top: 0;
           z-index: 3;
           background: #F9D87A;
           color: #223A5F;
@@ -176,8 +189,7 @@ const BlogSection = () => {
         }
         .featured-content {
           position: absolute;
-          left: 32px;
-          top: 50%;
+          left: 32px; top: 50%;
           transform: translateY(-50%);
           right: 32px;
           z-index: 3;
@@ -226,7 +238,7 @@ const BlogSection = () => {
           box-shadow: 0 4px 12px rgba(249, 216, 122, 0.4);
         }
 
-        /* --- Articles Grid (Desktop First) --- */
+        /* --- Articles Grid --- */
         .articles-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
@@ -247,22 +259,17 @@ const BlogSection = () => {
           transition: transform 0.3s ease, box-shadow 0.3s ease;
           background: #223A5F;
         }
-        .article-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 8px 24px rgba(34, 58, 95, 0.15);
-        }
+        .article-card:disabled { cursor: default; }
+        .article-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(34, 58, 95, 0.15); }
         .article-image {
           position: absolute;
           top: 0; left: 0;
-          width: 100%;
-          height: 100%;
+          width: 100%; height: 100%;
           object-fit: cover;
           z-index: 1;
           transition: transform 0.4s ease;
         }
-        .article-card:hover .article-image {
-          transform: scale(1.05);
-        }
+        .article-card:hover .article-image { transform: scale(1.05); }
         .article-content {
           padding: 20px;
           color: #fff;
@@ -286,143 +293,50 @@ const BlogSection = () => {
           text-shadow: 0 1px 2px rgba(0,0,0,0.6);
         }
 
-        /* --- Tablet Responsiveness (426px - 1024px) --- */
+        /* --- Tablet (426px - 1024px) --- */
         @media (min-width: 426px) and (max-width: 1024px) {
-          .featured-card {
-            height: 380px;
-            margin-bottom: 40px;
-          }
-          .featured-content {
-            left: 24px;
-            bottom: 24px;
-            right: 24px;
-          }
-          .featured-title {
-            font-size: 1.6rem;
-          }
-          .featured-subtitle {
-            font-size: 1rem;
-          }
-          .featured-tagline {
-            font-size: 0.95rem;
-            margin-bottom: 20px;
-          }
-          .latest-badge {
-            font-size: 12px;
-            padding: 8px 16px;
-          }
-          .articles-grid {
-            grid-template-columns: repeat(2, 1fr);
-          }
-          .article-card:first-child {
-            height: 280px;
-          }
-          .article-card:first-child .article-title {
-            font-size: 1.2rem;
-          }
+          .featured-card { height: 380px; margin-bottom: 40px; }
+          .featured-content { left: 24px; bottom: 24px; right: 24px; }
+          .featured-title { font-size: 1.6rem; }
+          .featured-subtitle { font-size: 1rem; }
+          .featured-tagline { font-size: 0.95rem; margin-bottom: 20px; }
+          .latest-badge { font-size: 12px; padding: 8px 16px; }
+          .articles-grid { grid-template-columns: repeat(2, 1fr); }
+          .article-card:first-child { height: 280px; }
+          .article-card:first-child .article-title { font-size: 1.2rem; }
         }
 
-        /* --- Mobile Responsiveness (<= 425px) --- */
+        /* --- Mobile (<= 425px) --- */
         @media (max-width: 425px) {
-          .section-title {
-            font-size: 2rem;
-          }
-          .section-header {
-            margin-bottom: 40px;
-          }
-          .featured-card {
-            height: 320px;
-            margin-bottom: 32px;
-            border-radius: 18px;
-          }
-          .featured-content {
-            left: 20px;
-            bottom: 20px;
-            right: 20px;
-          }
-          .featured-title {
-            font-size: 1.3rem;
-            margin-bottom: 8px;
-          }
-          .featured-subtitle {
-            font-size: 0.9rem;
-            margin-bottom: 6px;
-          }
-          .featured-tagline {
-            font-size: 0.85rem;
-            margin-bottom: 16px;
-          }
-          .featured-button {
-            font-size: 12px;
-            padding: 10px 20px;
-          }
-          .latest-badge {
-            font-size: 11px;
-            padding: 8px 14px;
-            border-radius: 0 0 12px 0;
-          }
-          .articles-grid {
-            grid-template-columns: 1fr;
-            gap: 16px;
-          }
+          .section-title { font-size: 2rem; }
+          .section-header { margin-bottom: 40px; }
+          .featured-card { height: 320px; margin-bottom: 32px; border-radius: 18px; }
+          .featured-content { left: 20px; bottom: 20px; right: 20px; }
+          .featured-title { font-size: 1.3rem; margin-bottom: 8px; }
+          .featured-subtitle { font-size: 0.9rem; margin-bottom: 6px; }
+          .featured-tagline { font-size: 0.85rem; margin-bottom: 16px; }
+          .featured-button { font-size: 12px; padding: 10px 20px; }
+          .latest-badge { font-size: 11px; padding: 8px 14px; border-radius: 0 0 12px 0; }
+          .articles-grid { grid-template-columns: 1fr; gap: 16px; }
           .article-card {
-            flex-direction: row;
-            height: auto;
-            min-height: 120px;
-            background: #ffffff;
-            border: 1px solid #e0e0e0;
+            flex-direction: row; height: auto; min-height: 120px;
+            background: #ffffff; border: 1px solid #e0e0e0;
           }
-          .article-card:hover {
-             box-shadow: 0 4px 12px rgba(34, 58, 95, 0.1);
-          }
-          .article-image {
-            position: relative;
-            width: 100px;
-            height: auto;
-            flex-shrink: 0;
-            object-fit: cover;
-          }
-          .article-card:hover .article-image {
-            transform: none;
-          }
-          .article-content {
-            color: #223A5F;
-            background: none;
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-          }
-          .article-title {
-            font-size: 1rem;
-            text-shadow: none;
-          }
-          .article-subtitle {
-            font-size: 0.85rem;
-            color: #556278;
-            opacity: 1;
-            text-shadow: none;
-          }
+          .article-card:hover { box-shadow: 0 4px 12px rgba(34, 58, 95, 0.1); }
+          .article-image { position: relative; width: 100px; height: auto; flex-shrink: 0; object-fit: cover; }
+          .article-card:hover .article-image { transform: none; }
+          .article-content { color: #223A5F; background: none; padding: 16px; display: flex; flex-direction: column; justify-content: center; }
+          .article-title { font-size: 1rem; text-shadow: none; }
+          .article-subtitle { font-size: 0.85rem; color: #556278; opacity: 1; text-shadow: none; }
         }
 
         /* --- Extra Small Mobile (<= 375px) --- */
         @media (max-width: 375px) {
-          .featured-card {
-            height: 280px;
-          }
-          .featured-title {
-            font-size: 1.15rem;
-          }
-          .featured-subtitle {
-            font-size: 0.85rem;
-          }
-          .featured-tagline {
-            font-size: 0.8rem;
-          }
-          .latest-badge {
-            font-size: 10px;
-            padding: 6px 12px;
-          }
+          .featured-card { height: 280px; }
+          .featured-title { font-size: 1.15rem; }
+          .featured-subtitle { font-size: 0.85rem; }
+          .featured-tagline { font-size: 0.8rem; }
+          .latest-badge { font-size: 10px; padding: 6px 12px; }
         }
       `}</style>
     </section>

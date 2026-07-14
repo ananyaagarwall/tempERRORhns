@@ -16,7 +16,7 @@ const TYPE_COLORS = {
 
 const DEFAULT_DOT = { color: '#6b7280', fill: '#9ca3af' }
 
-export default function PropertyMap({
+export default React.memo(function PropertyMap({
   latitude,
   longitude,
   radiusM = 2000,
@@ -31,7 +31,7 @@ export default function PropertyMap({
     )
   }
 
-  const center = [latitude, longitude]
+  const center = React.useMemo(() => [latitude, longitude], [latitude, longitude])
   const hasPois = poisByType && Object.values(poisByType).some((list) => Array.isArray(list) && list.length > 0)
 
   return (
@@ -100,4 +100,4 @@ export default function PropertyMap({
         : null}
     </MapContainer>
   )
-}
+})

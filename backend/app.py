@@ -2858,7 +2858,6 @@ def create_blog():
 
 # API to list all blogs (for admin dashboard)
 @app.route('/api/blogs', methods=['GET'])
-@jwt_required()
 def list_blogs():
     blogs = Blog.query.order_by(Blog.created_at.desc()).all()
     print(f"Found {len(blogs)} blogs")
@@ -2868,14 +2867,12 @@ def list_blogs():
 
 # Get a single blog by ID
 @app.route('/api/blogs/<int:blog_id>', methods=['GET'])
-@jwt_required()
 def get_blog(blog_id):
     blog = Blog.query.get_or_404(blog_id)
     return jsonify(blog.to_dict())
 
 # Get a single blog by slug
 @app.route('/api/blogs/slug/<slug>', methods=['GET'])
-@jwt_required()
 def get_blog_by_slug(slug):
     print(f"Fetching blog with slug: {slug}")
     blog = Blog.query.filter_by(slug=slug).first()

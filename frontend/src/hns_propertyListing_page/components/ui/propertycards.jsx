@@ -324,12 +324,13 @@ const SearchResults = ({
           const azureGallery = projectId
             ? `https://hnsblob001.blob.core.windows.net/hns-media/projects/${projectId}/gallery/img1.jpg`
             : null;
+          const primaryImg = p.builder_project_image || p.image;
           return {
             id: p.id || p._id,
             name: p.Property_Name || '',
             status: p.Project_Status || '',
-            img: azureGallery || p.builder_project_image || p.image || '',
-            imgFallback: p.builder_project_image || p.image || '',
+            img: primaryImg || azureGallery || '',
+            imgFallback: primaryImg ? azureGallery : '',
             price: p.Pricing || p.Price_Starting_From || '',
             pricePerSqft: '',
             carpetArea: p.Carpet_Area || '',

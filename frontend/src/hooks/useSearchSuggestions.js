@@ -60,7 +60,7 @@ export function useSearchSuggestions({ onSelect, onChange, onFilter } = {}) {
       return;
     }
     debounceRef.current = setTimeout(async () => {
-      // Always fire real-time filter with the raw typed value
+      // Fire filter after debounce — prevents per-keystroke property API calls
       onFilter?.(val.trim());
       try {
         const res = await fetch(`${API_BASE}/api/search/suggest?q=${encodeURIComponent(val.trim())}`);

@@ -1,6 +1,6 @@
-import API_BASE_URL from '../../config';
 // src/hns_home_page/app/LandingPage.jsx
 import React, { useRef, useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import HeaderSection from '../components/layout/HeaderSection';
 import TrustedBuildersSection from '../components/ui/TrustedBuildersSection';
 import PropertiesSection from '../components/ui/PropertiesSection';
@@ -12,15 +12,17 @@ import ConsultingSection from '../components/ui/ConsultingSection';
 import FooterSection from '../components/layout/FooterSection';
 import FooterNavBar from '../components/layout/FooterNavBar';
 import MobileFooter from '../../components/ui/MobileFooter';
-import ChatBot from '../components/ui/ChatBot';               // <-- always rendered
+import ChatBot from '../components/ui/ChatBot';
 import '../home_page_css/LandingPage.css';
 import { getCookie, setCookie } from '../../utils/cookieUtils';
-
-
+import { reverseGeocode } from '../../services/api';
+import { propertyKeys, fetchProperties } from '../../queries/properties';
+import { builderKeys, fetchBuilders } from '../../queries/builders';
 
 const LandingPage = () => {
+  const queryClient = useQueryClient();
   const [geoStatus, setGeoStatus] = useState('');
-  const [userLocation, setUserLocation] = useState(null); // District from geolocation
+  const [userLocation, setUserLocation] = useState(null);
   const [searchFilters, setSearchFilters] = useState({
     location: '',
     priceRange: 0,
@@ -31,37 +33,50 @@ const LandingPage = () => {
     amenities: [],
   });
 
+  /* ---------- Prefetch warm-up on mount ---------- */
+  // Fire prefetch calls immediately so child components find warm cache
+  useEffect(() => {
+    // Default property search (no filters) — shared cache key with BudgetSection
+    queryClient.prefetchQuery({
+      queryKey: propertyKeys.search({}),
+      queryFn: () => fetchProperties({}),
+      staleTime: 2 * 60 * 1000,
+    });
+    // Builders list — shared cache key with TrustedBuildersSection
+    queryClient.prefetchQuery({
+      queryKey: builderKeys.list(''),
+      queryFn: () => fetchBuilders(''),
+      staleTime: 10 * 60 * 1000,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /* ---------- Geolocation Effect ---------- */
   useEffect(() => {
-    // Check if location is already stored in cookies
+    // Use cookie cache first — avoids repeated geolocation prompts
     const storedLocation = getCookie('user_location');
     if (storedLocation) {
       setUserLocation(storedLocation);
-      setGeoStatus('');
-      return; 
+      return;
     }
 
-    // Geolocation
     if ('geolocation' in navigator) {
       setGeoStatus('Requesting location permission...');
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           setGeoStatus('');
           const { latitude, longitude } = position.coords;
-          fetch(`${API_BASE_URL}/api/geolocation`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ latitude, longitude }),
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              let locValue = data.received?.district || data.received?.full_address || null;
-              if (locValue) {
-                setUserLocation(locValue);
-                setCookie('user_location', locValue, 7);
-              }
-            })
-            .catch(() => { });
+          try {
+            // Routed through axios instance — auth/guest headers included
+            const data = await reverseGeocode({ latitude, longitude });
+            const locValue = data.received?.district || data.received?.full_address || null;
+            if (locValue) {
+              setUserLocation(locValue);
+              setCookie('user_location', locValue, 7);
+            }
+          } catch {
+            // Silently fail — geolocation is a nice-to-have
+          }
         },
         () => setGeoStatus('')
       );
@@ -70,7 +85,7 @@ const LandingPage = () => {
     }
   }, []);
 
-  /* ---------- Search Filter Listener Effect ---------- */
+  /* ---------- Search Filter Listener ---------- */
   useEffect(() => {
     const handleFilter = (e) => {
       setSearchFilters({
@@ -125,10 +140,7 @@ const LandingPage = () => {
       <HeaderSection />
 
       {/* Trigger for sticky nav */}
-      <div
-        ref={triggerRef}
-        style={{ height: '1px', width: '100%', margin: 0, padding: 0 }}
-      />
+      <div ref={triggerRef} style={{ height: '1px', width: '100%', margin: 0, padding: 0 }} />
 
       {/* Sticky top nav when scrolled past header */}
       {showStickyFooterNav && (

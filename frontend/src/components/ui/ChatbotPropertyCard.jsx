@@ -69,7 +69,10 @@ const ChatbotPropertyCard = ({ property, sessionId, userId }) => {
         alt={property.Property_Name || 'Property'} 
         className="chatbot-property-img" 
         onError={(e) => {
-          e.target.src = FALLBACK_BUILDING_IMAGE;
+          if (!e.currentTarget.dataset.errorResolved) {
+            e.currentTarget.dataset.errorResolved = "true";
+            e.currentTarget.src = FALLBACK_BUILDING_IMAGE;
+          }
         }}
       />
       <div className="chatbot-property-info">

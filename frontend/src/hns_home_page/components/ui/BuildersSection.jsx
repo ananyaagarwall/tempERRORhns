@@ -1,8 +1,8 @@
-import API_BASE_URL from '../../../config';
-import React, { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import "../../home_page_css/BuildersSection.css";
+import React, { useState, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import '../../home_page_css/BuildersSection.css';
 import SectionHeading from './SectionHeading';
+import { usePropertiesByLocation } from '../../../queries/properties';
 
 const TABS = [
   { label: "Thane", key: "thane" },
@@ -29,47 +29,29 @@ function parsePriceInCr(priceStr) {
 }
 
 const BuildersSection = ({ searchFilters }) => {
-  const [activeTab, setActiveTab] = useState("thane");
-  const [areas, setAreas] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-
+  const [activeTab, setActiveTab] = useState('thane');
   const tabRowRef = useRef(null);
   const cardsRowRef = useRef(null);
-
-  // Fetch properties whenever activeTab changes
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(
-          `${API_BASE_URL}/api/properties/location/${activeTab}`
-        );
-        const data = await res.json();
-        // Add Existing_Configurations to mapped data
-        const mapped = data.map((p) => ({
-          id: p.id,
-          name: p.Property_Name,
-          img: p.image || "/fallback.png",
-          projects: p.projects || "N/A Projects",
-          price: p.Price_Starting_From || "N/A",
-          Existing_Configurations: p.Existing_Configurations || [],
-        }));
-        setAreas(mapped);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError("Failed to fetch properties");
-        setAreas([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [activeTab]);
-
-
   const navigate = useNavigate();
+
+  // Active tab label (capitalised) used as query key + cache key
+  const activeTabLabel = TABS.find((t) => t.key === activeTab)?.label ?? activeTab;
+
+  // TanStack Query — same key as NearYouSection for identical locations:
+  // if NearYouSection has already fetched "Thane", this returns cached data.
+  const { data: rawAreas = [], isLoading: loading, isError } = usePropertiesByLocation(activeTabLabel);
+
+  const areas = useMemo(() =>
+    rawAreas.map((p) => ({
+      id: p.id,
+      name: p.Property_Name,
+      img: p.image || '/fallback.png',
+      projects: p.projects || 'N/A Projects',
+      price: p.Price_Starting_From || 'N/A',
+      Existing_Configurations: p.Existing_Configurations || [],
+    })),
+  [rawAreas]);
+
 
   const handleCardClick = (area) => {
     // Store property data in localStorage and update recently viewed
@@ -137,8 +119,8 @@ const BuildersSection = ({ searchFilters }) => {
         <div className="builders-cards-row" ref={cardsRowRef}>
           {loading ? (
             <div style={{ padding: "2rem" }}>Loading...</div>
-          ) : error ? (
-            <div style={{ padding: "2rem", color: "red" }}>{error}</div>
+          ) : isError ? (
+            <div style={{ padding: "2rem", color: "red" }}>Failed to fetch properties</div>
           ) : areas.length === 0 ? (
             <div style={{ padding: "2rem" }}>No properties found</div>
           ) : (

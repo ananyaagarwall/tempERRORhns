@@ -56,7 +56,12 @@ const BuildersListing = () => {
       });
       if (!response.ok) throw new Error('Failed to fetch builders');
       const data = await response.json();
-      setBuilders(data);
+      // Normalise: backend may return array directly or {builders:[...]}
+      const list = Array.isArray(data) ? data
+        : Array.isArray(data?.builders) ? data.builders
+        : Array.isArray(data?.data) ? data.data
+        : [];
+      setBuilders(list);
       setError(null);
     } catch (err) {
       setError(err.message);

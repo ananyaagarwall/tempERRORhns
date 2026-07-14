@@ -13,7 +13,10 @@ const MainContent = ({ blog }) => {
             alt={blog.featured_image_alt || blog.title}
             className="intro-image"
             onError={(e) => {
-              e.target.src = "/news.jpg";
+              if (!e.currentTarget.dataset.errorResolved) {
+                e.currentTarget.dataset.errorResolved = "true";
+                e.currentTarget.src = "/news.jpg";
+              }
             }}
           />
         )}
@@ -28,7 +31,10 @@ const MainContent = ({ blog }) => {
           alt={blog.alt_text1 || ''}
           className="content-image"
           onError={(e) => {
-            e.target.src = "/news.jpg";
+            if (!e.currentTarget.dataset.errorResolved) {
+              e.currentTarget.dataset.errorResolved = "true";
+              e.currentTarget.src = "/news.jpg";
+            }
           }}
         />
       )}
@@ -41,7 +47,10 @@ const MainContent = ({ blog }) => {
           alt={blog.alt_text2 || ''}
           className="content-image"
           onError={(e) => {
-            e.target.src = "/news.jpg";
+            if (!e.currentTarget.dataset.errorResolved) {
+              e.currentTarget.dataset.errorResolved = "true";
+              e.currentTarget.src = "/news.jpg";
+            }
           }}
         />
       )}
@@ -54,7 +63,8 @@ const MainContent = ({ blog }) => {
           alt={blog.alt_text3 || ''}
           className="content-image"
           onError={(e) => {
-            e.target.src = "/news.jpg";
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = "/news.jpg";
           }}
         />
       )}
